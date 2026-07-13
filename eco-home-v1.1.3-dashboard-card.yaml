@@ -1,0 +1,101 @@
+type: vertical-stack
+cards:
+  - type: markdown
+    content: |
+      ## Eco Home v1.1.3
+      **Automazione:** {{ 'attiva' if is_state('input_boolean.echo_home_attivo', 'on') else 'disattivata' }}  
+      **Modalità silenziosa:** {{ 'attiva' if is_state('input_boolean.echo_home_silenzioso', 'on') else 'disattivata' }}  
+      **Nest Hub:** {{ states('media_player.nest_hub_sala') }}
+
+  - type: entities
+    title: Controlli
+    show_header_toggle: false
+    entities:
+      - entity: input_boolean.echo_home_attivo
+        name: Eco Home attivo
+        icon: mdi:home-assistant
+      - entity: input_boolean.echo_home_silenzioso
+        name: Modalità silenziosa
+        icon: mdi:volume-off
+      - entity: input_boolean.echo_home_asciugatrice_da_annunciare
+        name: Promemoria asciugatrice in attesa
+        icon: mdi:tumble-dryer-alert
+
+  - type: entities
+    title: Scenario di test
+    show_header_toggle: false
+    entities:
+      - entity: input_select.echo_home_scenario_test
+        name: Messaggio da simulare
+        icon: mdi:test-tube
+
+  - type: button
+    entity: input_button.echo_home_test_vocale
+    name: Avvia il test selezionato
+    icon: mdi:account-voice
+    show_name: true
+    show_icon: true
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: input_button.press
+      target:
+        entity_id: input_button.echo_home_test_vocale
+    hold_action:
+      action: none
+
+  - type: entities
+    title: Persone e dispositivi
+    show_header_toggle: false
+    entities:
+      - entity: person.stefano
+        name: Stefano
+      - entity: person.laura
+        name: Laura
+      - entity: binary_sensor.porta_contact
+        name: Portone
+        icon: mdi:door
+      - entity: sensor.esterno_asciugatrice_machine_state
+        name: Stato asciugatrice
+        icon: mdi:tumble-dryer
+      - entity: sensor.esterno_asciugatrice_completion_time
+        name: Fine prevista asciugatrice
+        icon: mdi:clock-end
+      - entity: media_player.nest_hub_sala
+        name: Nest Hub
+        icon: mdi:cast-audio
+
+  - type: entities
+    title: Diagnostica
+    show_header_toggle: false
+    entities:
+      - type: simple-entity
+        entity: input_text.echo_home_ultimo_evento
+        name: Ultimo evento
+      - type: simple-entity
+        entity: input_text.echo_home_ultimo_esito
+        name: Ultimo esito
+      - type: simple-entity
+        entity: input_text.echo_home_ultima_persona
+        name: Ultima persona rilevata
+      - type: simple-entity
+        entity: input_text.echo_home_ultimo_profilo
+        name: Ultimo profilo vocale
+      - type: simple-entity
+        entity: input_text.echo_home_ultimo_messaggio
+        name: Ultimo messaggio
+      - type: simple-entity
+        entity: input_datetime.echo_home_ultima_apertura_portone
+        name: Ultima apertura portone
+      - type: simple-entity
+        entity: input_datetime.echo_home_ultimo_arrivo
+        name: Ultimo arrivo
+      - type: simple-entity
+        entity: input_datetime.echo_home_ultimo_annuncio
+        name: Ultimo annuncio
+
+  - type: markdown
+    content: |
+      Il test usa lo scenario selezionato, verifica TTS e TV e ripristina il volume precedente del Nest Hub.
+      Il test non modifica la presenza reale e non consuma il promemoria dell'asciugatrice.
+

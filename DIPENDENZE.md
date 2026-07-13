@@ -1,8 +1,8 @@
-# Dipendenze di Eco Home v1.1.2
+# Dipendenze di Eco Home v1.1.3
 
-Eco Home è un'automazione YAML per Home Assistant. Non richiede HACS, componenti personalizzati, librerie Python, Node.js o servizi AI esterni per generare le frasi.
+Eco Home usa esclusivamente funzioni standard di Home Assistant. Non richiede HACS o componenti personalizzati.
 
-## Dipendenze obbligatorie
+## Entità obbligatorie
 
 Adatta questi entity ID alla tua installazione:
 
@@ -14,17 +14,29 @@ media_player.nest_hub_sala
 tts.google_ai_tts
 ```
 
-Le persone devono passare correttamente tra `home` e `not_home`. Il sensore del portone deve produrre un cambio di stato quando viene aperto.
+Le persone devono passare correttamente a `home`. Il portone deve passare a `on` quando viene aperto.
 
-La configurazione predefinita considera il portone aperto quando passa a:
+## Entità opzionali
 
-```yaml
-to: "on"
+```text
+light.luceambiente
+media_player.tv_sala_ue85du7170uxzt
+sensor.esterno_asciugatrice_machine_state
+sensor.esterno_asciugatrice_completion_time
+sensor.esterno_asciugatrice_energia_elettrica
 ```
 
-Se il tuo sensore usa `off`, modifica sia il trigger sia il controllo `trigger_to_state` dell'automazione.
+Se non utilizzi una funzione opzionale, disattiva o rimuovi i relativi blocchi seguendo [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
 
-## Helper richiesti
+## Helper
+
+Per una nuova installazione copia
+`eco-home-v1.1.3-helpers.yaml` in `/config/packages/eco-home-v1.1.3-helpers.yaml`.
+
+Se aggiorni dalla 1.1.2 e possiedi già gli helper precedenti, usa soltanto
+`eco-home-v1.1.3-helper-update.yaml`.
+
+Il file completo definisce:
 
 ```text
 input_boolean.echo_home_attivo
@@ -32,70 +44,32 @@ input_boolean.echo_home_silenzioso
 input_boolean.echo_home_asciugatrice_da_annunciare
 input_datetime.echo_home_asciugatrice_fine
 input_datetime.echo_home_ultimo_annuncio
+input_datetime.echo_home_ultima_apertura_portone
+input_datetime.echo_home_ultimo_arrivo
 input_button.echo_home_test_vocale
+input_select.echo_home_scenario_test
+input_text.echo_home_ultimo_evento
+input_text.echo_home_ultimo_esito
+input_text.echo_home_ultimo_profilo
+input_text.echo_home_ultimo_messaggio
+input_text.echo_home_ultima_persona
 ```
 
-Gli helper della versione 1.1.1 restano compatibili con la 1.1.2.
-
-Esempio di package:
-
-```yaml
-input_boolean:
-  echo_home_attivo:
-    name: Eco home attivo
-    icon: mdi:home-assistant
-  echo_home_silenzioso:
-    name: Eco home silenzioso
-    icon: mdi:volume-off
-  echo_home_asciugatrice_da_annunciare:
-    name: Eco home asciugatrice da annunciare
-    icon: mdi:tumble-dryer-alert
-
-input_datetime:
-  echo_home_asciugatrice_fine:
-    name: Eco home asciugatrice fine
-    has_date: true
-    has_time: true
-  echo_home_ultimo_annuncio:
-    name: Eco home ultimo annuncio
-    has_date: true
-    has_time: true
-
-input_button:
-  echo_home_test_vocale:
-    name: Eco home test vocale
-    icon: mdi:speaker-message
-```
-
-Per caricare i package, `configuration.yaml` deve contenere:
+Per abilitare i package, `configuration.yaml` contiene:
 
 ```yaml
 homeassistant:
   packages: !include_dir_named packages
 ```
 
-## Funzioni opzionali
+Non aggiungere due volte lo stesso helper: se lo hai già creato dalla UI, crea manualmente soltanto quelli nuovi oppure usa il file incrementale come riferimento.
 
-```text
-light.luceambiente
-media_player.tv_sala_ue85du7170uxzt
-sensor.esterno_asciugatrice_machine_state
-sensor.esterno_asciugatrice_completion_time
-```
-
-- La luce viene accesa solo quando `sun.sun` è `below_horizon`.
-- La TV deve supportare `media_player.volume_mute`.
-- Il sensore di fine asciugatrice deve fornire una data interpretabile da Home Assistant.
-- Il muting TV può essere disabilitato impostando `tv_ducking_enabled: false`.
-
-## Controllo prima dell'installazione
+## Controllo prima dell'uso
 
 1. Verifica gli entity ID in **Strumenti per sviluppatori → Stati**.
-2. Prova il motore TTS sul Nest Hub.
-3. Crea gli helper richiesti.
-4. Controlla lo stato del sensore del portone quando viene aperto.
-5. Inserisci l'automazione in `automations.yaml`.
-6. Esegui **Controlla configurazione**.
-7. Ricarica le automazioni e prova il pulsante vocale.
-
+2. Controlla che il portone sia `on` quando aperto.
+3. Prova `tts.google_ai_tts` sul Nest Hub.
+4. Esegui **Controlla configurazione**.
+5. Ricarica package e automazioni oppure riavvia Home Assistant.
+6. Seleziona `Percorso audio` dalla card ed esegui il test.
 

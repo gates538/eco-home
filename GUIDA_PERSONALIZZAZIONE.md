@@ -1,95 +1,84 @@
-# Guida alla personalizzazione di Eco Home v1.1.2
+# Personalizzazione Eco Home v1.1.3
 
-Questa guida indica le sezioni principali da adattare senza fare affidamento su numeri di riga, che possono cambiare tra le versioni.
+I numeri di riga si riferiscono a `eco-home-v1.1.3.yaml` pubblicato con la release.
 
-## Persone tracciate
+## Persone
 
-Cerca `person.stefano` e `person.laura` nei trigger, in `tracked_people` e nelle variabili `arrived_stefano`, `arrived_laura` e `arrived_now_couple`.
+Alle righe **9-10** e **573-574** sostituisci:
 
-Gli stessi entity ID devono essere usati in tutte queste sezioni. La versione 1.1.2 usa gli entity ID per scegliere i nomignoli e non dipende dal `friendly_name` completo.
-
-## Nomignoli
-
-Cerca:
-
-```yaml
-stefano_nicknames:
-laura_nicknames:
-couple_nicknames:
+```text
+person.stefano
+person.laura
 ```
 
-Puoi aggiungere, eliminare o sostituire le voci. Mantieni almeno un elemento in ogni lista.
+Se cambi questi entity ID, sostituisci anche tutte le occorrenze nei blocchi `arrived_stefano`, `arrived_laura` e `arrived_now_couple`, circa alle righe **317-327**.
 
-## Sensore del portone
+## Portone
 
-Cerca:
+L'entità compare alla riga **18** e nella variabile `door_sensor` alla riga **568**:
 
-```yaml
-door_sensor: binary_sensor.porta_contact
+```text
+binary_sensor.porta_contact
 ```
 
-e il trigger `door_opened`. La configurazione predefinita usa `on` per indicare l'apertura. Se il tuo sensore usa `off`, aggiorna sia il trigger sia `trigger_door_open_valid`.
-
-## Finestra temporale
-
-```yaml
-arrival_person_door_window_seconds: 300
-arrival_group_window_seconds: 3
-welcome_cooldown_seconds: 20
-```
-
-- `300`: massimo 5 minuti tra presenza e portone, in entrambi gli ordini.
-- `3`: attesa prima del messaggio per raggruppare arrivi ravvicinati.
-- `20`: protezione tra annunci consecutivi.
+La configurazione considera il portone aperto quando passa a `on`.
 
 ## Nest Hub e TTS
 
-Aggiorna `speaker`, `tts_engine` e gli entity ID presenti nelle azioni `media_player.volume_set`, `media_player.media_stop` e `tts.speak`.
+Controlla tutte le occorrenze di:
 
-## TV
-
-Aggiorna `tv_media_player` e gli entity ID delle azioni `media_player.volume_mute`.
-
-Per disattivare la funzione:
-
-```yaml
-tv_ducking_enabled: false
+```text
+media_player.nest_hub_sala
+tts.google_ai_tts
 ```
 
-## Luce
+Le variabili principali sono alle righe **564-565**. Gli stessi entity ID vengono usati anche nelle azioni TTS e di ripristino volume.
 
-Aggiorna `light_entity` e l'entity ID dell'azione `light.turn_on`.
+## TV e luce
 
-Parametri principali:
-
-```yaml
-light_brightness_pct: 45
-light_kelvin: 4000
+```text
+media_player.tv_sala_ue85du7170uxzt
+light.luceambiente
 ```
+
+Le variabili sono alle righe **566-567**. Sostituisci anche le occorrenze nelle azioni della parte superiore del file.
 
 ## Asciugatrice
 
-Aggiorna:
+Controlla:
 
-```yaml
-dryer_state_sensor:
-dryer_completion_sensor:
+```text
+sensor.esterno_asciugatrice_machine_state
+sensor.esterno_asciugatrice_completion_time
+sensor.esterno_asciugatrice_energia_elettrica
 ```
 
-La durata del promemoria è controllata da:
+Le variabili si trovano circa alle righe **569-571**. Il sensore di energia è predisposto ma non è indispensabile per il promemoria.
 
-```yaml
-dryer_announce_valid_hours: 12
-```
+## Tempi e volumi
+
+| Impostazione | Riga | Valore predefinito |
+|---|---:|---:|
+| Assenza minima | 587 | 2 minuti |
+| Finestra presenza-portone | 588 | 300 secondi |
+| Attesa gruppo | 589 | 3 secondi |
+| Cooldown annunci | 590 | 20 secondi |
+| Volume giorno | 594 | 0.8 |
+| Volume sera | 595 | 0.8 |
+| Volume notte | 596 | 0.4 |
+| Luminosità luce | 604 | 45% |
 
 ## Debug
 
-Durante le prove lascia:
+Alla riga **562**:
 
 ```yaml
 debug: true
 ```
 
-Quando il comportamento è stato verificato puoi impostare `false` per ridurre le registrazioni nel Logbook.
+Imposta `false` quando l'automazione è stabile e non vuoi più messaggi diagnostici nel Logbook. Gli helper della card continueranno ad aggiornarsi.
 
+## Card
+
+Gli entity ID delle persone e dei dispositivi sono presenti anche in `eco-home-v1.1.3-dashboard-card.yaml` e devono corrispondere a quelli dell'automazione.
 

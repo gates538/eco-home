@@ -1,132 +1,73 @@
-# Guida aggiornamento Eco Home
+# Aggiornamento da Eco Home 1.1.2 a 1.1.3
 
-Questa guida spiega come aggiornare **Eco Home dalla versione 1.1.1 alla 1.1.2** senza perdere le altre automazioni presenti in Home Assistant.
+Questa procedura conserva tutte le altre automazioni presenti in `automations.yaml`.
 
-## Prima di iniziare
+## 1. Crea un backup
 
-La versione 1.1.2:
+Da **Impostazioni → Sistema → Backup**, crea un backup prima di modificare i file. Copia inoltre `/config/automations.yaml` in un posto sicuro.
 
-- non richiede nuovi helper;
-- non richiede nuove entità;
-- mantiene la compatibilità con la configurazione della 1.1.1;
-- corregge il rientro quando il portone viene aperto prima che la persona risulti `home`;
-- usa nomignoli casuali per Stefano, Laura o la coppia.
+## 2. Installa soltanto i nuovi helper
 
-## 1. Crea una copia di sicurezza
+Se possiedi già gli helper della 1.1.2, usa come riferimento:
 
-Prima di modificare i file:
+```text
+eco-home-v1.1.3-helper-update.yaml
+```
 
-1. apri **Impostazioni → Sistema → Backup**;
-2. crea un nuovo backup;
-3. in alternativa, copia almeno `/config/automations.yaml` in un posto sicuro.
+Puoi copiarlo in `/config/packages/` se i vecchi helper sono anch'essi definiti tramite package. Se invece li hai creati dalla UI, crea dalla UI soltanto questi nuovi helper:
 
-## 2. Scarica la nuova automazione
+```text
+input_datetime.echo_home_ultima_apertura_portone
+input_datetime.echo_home_ultimo_arrivo
+input_select.echo_home_scenario_test
+input_text.echo_home_ultimo_evento
+input_text.echo_home_ultimo_esito
+input_text.echo_home_ultimo_profilo
+input_text.echo_home_ultimo_messaggio
+input_text.echo_home_ultima_persona
+```
 
-Scarica il file:
+Non creare due volte helper con lo stesso entity ID.
 
-- [eco-home-v1.1.2.yaml](eco-home-v1.1.2.yaml)
+## 3. Sostituisci soltanto Eco Home
 
-Non copiare il file della cartella `archive/v1.1.1`: serve soltanto come archivio della versione precedente.
-
-## 3. Aggiorna senza cancellare le altre automazioni
-
-Il file `automations.yaml` può contenere molte automazioni. **Non sostituire l'intero file** con `eco-home-v1.1.2.yaml`.
-
-Apri `/config/automations.yaml` con File editor, Studio Code Server o Samba e cerca il blocco che inizia con:
+Apri `/config/automations.yaml` e cerca:
 
 ```yaml
 - id: '1783777716602'
   alias: Eco home
 ```
 
-Elimina solamente l'intero blocco dell'automazione **Eco home**, fino alla riga precedente all'automazione successiva.
-
-Al suo posto incolla tutto il contenuto di `eco-home-v1.1.2.yaml`.
-
-Le altre automazioni presenti prima e dopo quel blocco devono restare invariate.
-
-> Se il tuo ID è diverso, cerca `alias: Eco home` e sostituisci il relativo blocco completo.
-
-## 4. Controlla le entità personalizzate
-
-Se nella versione 1.1.1 avevi modificato entity ID, tempi o volumi, confrontali con la nuova versione.
-
-Controlla in particolare:
+Elimina esclusivamente quel blocco completo, fino alla riga precedente all'automazione successiva. Al suo posto incolla tutto il contenuto di:
 
 ```text
-person.stefano
-person.laura
-binary_sensor.porta_contact
-media_player.nest_hub_sala
-tts.google_ai_tts
+eco-home-v1.1.3.yaml
 ```
 
-Per l'elenco completo consulta:
+Non sostituire l'intero `automations.yaml`: le altre automazioni devono restare invariate.
 
-- [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md)
-- [DIPENDENZE.md](DIPENDENZE.md)
+## 4. Riporta le personalizzazioni
 
-Non copiare automaticamente il vecchio codice sopra la nuova versione: riporta soltanto i tuoi entity ID e le impostazioni personalizzate.
+Confronta la vecchia automazione e riporta soltanto i tuoi entity ID, tempi e volumi. Consulta [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
 
-## 5. Salva e verifica la configurazione
+## 5. Aggiorna la card
 
-Dopo aver salvato `automations.yaml`:
-
-1. apri **Strumenti per sviluppatori → YAML**;
-2. esegui **Controlla configurazione**;
-3. se il controllo non segnala errori, seleziona **Ricarica automazioni**;
-4. se Home Assistant richiede il riavvio, eseguilo solo dopo un controllo valido.
-
-Se compare un errore YAML, ripristina il backup del file e verifica soprattutto:
-
-- il trattino `-` iniziale dell'automazione;
-- l'indentazione;
-- che non sia rimasta una parte della vecchia automazione;
-- che l'automazione successiva inizi ancora con il proprio trattino.
-
-## 6. Esegui il test vocale
-
-Usa:
+Sostituisci il codice della vecchia card con:
 
 ```text
-input_button.echo_home_test_vocale
+eco-home-v1.1.3-dashboard-card.yaml
 ```
 
-oppure installa la card:
+## 6. Verifica
 
-- [eco-home-v1.1.2-dashboard-card.yaml](eco-home-v1.1.2-dashboard-card.yaml)
-- [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md)
+1. Esegui **Controlla configurazione**.
+2. Ricarica automazioni e helper oppure riavvia Home Assistant.
+3. Apri la card.
+4. Seleziona `Percorso audio`.
+5. Avvia il test e controlla `Ultimo esito`.
+6. Verifica che il volume del Nest Hub torni al valore precedente.
 
-Il test vocale verifica Nest Hub, volume, TTS e silenziamento temporaneo della TV. Non simula la combinazione reale tra presenza e portone.
+## Ripristino
 
-## 7. Verifica un rientro reale
+In caso di errore, ripristina il backup di `automations.yaml` e rimuovi soltanto gli helper nuovi della 1.1.3. La versione 1.1.2 resta disponibile in `archive/v1.1.2`.
 
-La versione 1.1.2 accetta entrambi gli ordini:
-
-```text
-persona home → apertura portone
-apertura portone → persona home
-```
-
-I due eventi devono avvenire entro 5 minuti. Dopo la conferma, il messaggio parte con un breve ritardo.
-
-Se non funziona, abilita temporaneamente `debug: true` nell'automazione e controlla la traccia o il Logbook. Le variabili più utili sono:
-
-```text
-door_opened_recently
-person_arrived_recently
-trigger_person_arrival_valid
-trigger_door_open_valid
-arrival_confirmed_by_person_and_door
-```
-
-## Ripristino della versione precedente
-
-Se devi tornare alla 1.1.1:
-
-1. apri [archive/v1.1.1](archive/v1.1.1);
-2. scarica `eco-home-v1.1.1.yaml`;
-3. sostituisci solamente il blocco `alias: Eco home` in `automations.yaml`;
-4. controlla la configurazione e ricarica le automazioni.
-
-La 1.1.1 resta archiviata per emergenza, ma per l'uso normale è consigliata la 1.1.2.

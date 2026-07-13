@@ -1,38 +1,45 @@
-# Guida al pulsante di test - Eco Home v1.1.2
+# Guida agli scenari di test
 
-Il pulsante verifica Nest Hub, TTS, volume e muting della TV senza dover simulare un rientro.
-
-## Helper
-
-L'automazione usa:
+Eco Home 1.1.3 usa:
 
 ```text
+input_select.echo_home_scenario_test
 input_button.echo_home_test_vocale
 ```
 
-Puoi crearlo dalla UI:
+## Scenari disponibili
 
-1. apri **Impostazioni → Dispositivi e servizi → Aiutanti**;
-2. seleziona **Crea aiutante → Pulsante**;
-3. usa il nome `Eco home test vocale`;
-4. verifica che l'entity ID sia `input_button.echo_home_test_vocale`.
+| Scenario | Cosa verifica |
+|---|---|
+| Percorso audio | TTS, Nest Hub, volume e TV |
+| Rientro Stefano | Nomignoli e frasi maschili |
+| Rientro Laura | Nomignoli e frasi femminili |
+| Rientro di coppia | Nomignoli e frasi di coppia |
+| Modalità notte | Frasi notturne e volume ridotto |
+| Promemoria asciugatrice | Testo del promemoria senza modificare quello reale |
 
-## Utilizzo
+## Utilizzo dalla card
 
-Premi il pulsante dalla pagina degli helper oppure dalla card Lovelace inclusa nel repository.
+1. Apri la card Eco Home.
+2. In **Scenario di test**, scegli il messaggio da simulare.
+3. Premi **Avvia il test selezionato**.
+4. Controlla la sezione **Diagnostica**.
 
-Il Nest Hub deve pronunciare un messaggio di conferma. Il test controlla il percorso audio, ma non modifica gli stati delle persone o del portone.
+Il test:
 
-Per provare la logica completa è necessario un vero passaggio `not_home → home` abbinato all'apertura del portone entro la finestra configurata.
+- funziona anche se gli annunci automatici sono disattivati;
+- non cambia lo stato delle persone;
+- non richiede l'apertura del portone;
+- non cancella il promemoria reale dell'asciugatrice;
+- ripristina il volume precedente del Nest Hub;
+- non rimuove un eventuale mute della TV già presente prima del test.
 
-## Se non funziona
+## Utilizzo senza card
 
-Controlla:
+Da **Strumenti per sviluppatori → Azioni**:
 
-- che l'helper esista con l'entity ID esatto;
-- che l'automazione `Eco home` sia attiva;
-- che `media_player.nest_hub_sala` sia disponibile;
-- che `tts.google_ai_tts` funzioni;
-- la traccia dell'ultima esecuzione.
+1. esegui `input_select.select_option` su `input_select.echo_home_scenario_test`;
+2. esegui `input_button.press` su `input_button.echo_home_test_vocale`.
 
+Se il Nest Hub è `unavailable`, il test non tenta il TTS e registra l'esito in `input_text.echo_home_ultimo_esito`.
 
