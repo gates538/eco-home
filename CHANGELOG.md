@@ -17,6 +17,8 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 - Aggiunti nomignoli casuali femminili per Laura.
 - Aggiunti nomignoli casuali di coppia quando entrambi rientrano insieme.
 - Aggiornati README, card Lovelace e guide per descrivere la logica bidirezionale.
+- Aggiunta una guida per aggiornare dalla 1.1.1 alla 1.1.2 senza perdere le altre automazioni.
+- Archiviate le versioni precedenti nella cartella `archive`, separate dai file correnti.
 
 ### Compatibilità
 
@@ -31,5 +33,3 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 - Prima versione pubblica con conferma tramite presenza e portone.
 - Messaggi locali casuali, gestione Nest Hub, luce, TV e asciugatrice.
 - Pulsante di test vocale, card Lovelace e diagnostica nel Logbook.
-
-

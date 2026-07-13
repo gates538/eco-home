@@ -83,6 +83,8 @@ La versione 1.1.2 non richiede nuovi helper rispetto alla 1.1.1.
 6. Da Home Assistant esegui **Controlla configurazione**.
 7. Ricarica le automazioni e usa il pulsante di test vocale.
 
+Stai usando la 1.1.1? Segui la [guida di aggiornamento alla 1.1.2](GUIDA_AGGIORNAMENTO.md) per conservare tutte le altre automazioni.
+
 Con la configurazione standard, `configuration.yaml` contiene:
 
 ```yaml
@@ -105,10 +107,20 @@ La card usa soltanto componenti standard di Home Assistant e non richiede HACS.
 | [eco-home-v1.1.2.yaml](eco-home-v1.1.2.yaml) | Automazione standalone |
 | [CHANGELOG.md](CHANGELOG.md) | Cronologia delle versioni |
 | [DIPENDENZE.md](DIPENDENZE.md) | Entità, integrazioni e helper richiesti |
+| [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md) | Aggiornamento dalla 1.1.1 alla 1.1.2 senza perdere altre automazioni |
 | [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md) | Personalizzazione dell'automazione |
 | [GUIDA_PULSANTE_TEST.md](GUIDA_PULSANTE_TEST.md) | Utilizzo del test vocale |
 | [eco-home-v1.1.2-dashboard-card.yaml](eco-home-v1.1.2-dashboard-card.yaml) | Card Lovelace |
 | [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md) | Installazione e utilizzo della card |
+| [archive/v1.1.1](archive/v1.1.1) | File archiviati della versione 1.1.1 |
+
+## Versioni archiviate
+
+I file delle versioni precedenti sono conservati nella cartella [`archive`](archive) e non sono mescolati con quelli della versione corrente.
+
+- [Eco Home v1.1.1](archive/v1.1.1)
+
+Per una nuova installazione utilizza sempre i file `v1.1.2` presenti nella cartella principale.
 
 ## Risoluzione rapida
 
@@ -131,5 +143,3 @@ Per problemi tecnici o suggerimenti utilizza la sezione [Issues](https://github.
 Il progetto è disponibile gratuitamente. Se vuoi sostenerlo:
 
 [![Sostieni Eco Home su GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Sostieni%20Eco%20Home-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/gates538)
-
-

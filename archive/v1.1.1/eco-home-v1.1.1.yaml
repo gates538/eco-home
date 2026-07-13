@@ -138,7 +138,7 @@
             entity_id: sensor.esterno_asciugatrice_machine_state
     - conditions:
       - condition: template
-        value_template: "{{ echo_home_enabled\n   and trigger_type == 'door_opened'\n   and not echo_home_silent\n   and welcome_cooldown_ok\n
+        value_template: "{{ echo_home_enabled\n   and trigger_type in ['door_opened', 'person_arrived']\n   and not echo_home_silent\n   and welcome_cooldown_ok\n
           \  and arrival_confirmed_by_person_and_door }}"
       sequence:
       - delay:
@@ -156,16 +156,24 @@
             + arrival_group_window_seconds) %}\n  {% set ns.names = ns.names + [p.attributes.friendly_name
             | default(p.entity_id | replace('person.', '') | title)] %}\n{% endfor
             %}\n{{ ns.names | unique | list | count }}"
+          arrived_stefano: "{% set recent = arrival_person_door_window_seconds
+            + arrival_group_window_seconds %} {{\n  is_state('person.stefano', 'home')\n
+            \ and (as_timestamp(now()) - as_timestamp(states.person.stefano.last_changed))
+            < recent\n}}"
+          arrived_laura: "{% set recent = arrival_person_door_window_seconds
+            + arrival_group_window_seconds %} {{\n  is_state('person.laura', 'home')\n
+            \ and (as_timestamp(now()) - as_timestamp(states.person.laura.last_changed))
+            < recent\n}}"
           arrived_now_couple: "{% set recent = arrival_person_door_window_seconds
             + arrival_group_window_seconds %} {{\n  is_state('person.stefano', 'home')\n
             \ and is_state('person.laura', 'home')\n  and (as_timestamp(now()) - as_timestamp(states.person.stefano.last_changed))
             < recent\n  and (as_timestamp(now()) - as_timestamp(states.person.laura.last_changed))
             < recent\n}}"
           welcome_name: "{% if arrived_now_couple %}\n  {{ couple_nicknames | random
-            }}\n{% elif arrived_now_text == 'Stefano' %}\n  {{ stefano_nicknames |
-            random }}\n{% elif arrived_now_text == 'Laura' %}\n  {{ laura_nicknames
-            | random }}\n{% elif arrived_now_count | int(0) > 1 %}\n  {{ couple_nicknames
-            | random }}\n{% else %}\n  {{ arrived_now_text }}\n{% endif %}"
+            }}\n{% elif arrived_stefano %}\n  {{ stefano_nicknames | random }}\n{% elif
+            arrived_laura %}\n  {{ laura_nicknames | random }}\n{% elif arrived_now_count
+            | int(0) > 1 %}\n  {{ couple_nicknames | random }}\n{% else %}\n  bentornati
+            a casa\n{% endif %}"
           welcome_opening: '{{ saluto_orario }} {{ welcome_name | trim }}.'
       - variables:
           dryer_pending_minutes_ago: "{% set ts = as_timestamp(states('input_datetime.echo_home_asciugatrice_fine'),
@@ -197,9 +205,9 @@
           welcome_body: "{% if is_night %}\n  {{ night_phrase_starts | random }}:
             {{ night_phrase_tails | random }}\n{% elif arrived_now_couple or arrived_now_count
             | int(0) > 1 %}\n  {{ couple_phrase_starts | random }}: {{ couple_phrase_tails
-            | random }}\n{% elif arrived_now_text == 'Laura' %}\n  {{ laura_phrase_starts
-            | random }}: {{ laura_phrase_tails | random }}\n{% elif arrived_now_text
-            == 'Stefano' %}\n  {{ stefano_phrase_starts | random }}: {{ stefano_phrase_tails
+            | random }}\n{% elif arrived_laura %}\n  {{ laura_phrase_starts | random
+            }}: {{ laura_phrase_tails | random }}\n{% elif arrived_stefano %}\n  {{
+            stefano_phrase_starts | random }}: {{ stefano_phrase_tails
             | random }}\n{% else %}\n  {{ generic_phrase_starts | random }}: {{ generic_phrase_tails
             | random }}\n{% endif %}"
           occasion_text: "{% if special_day_text != 'Nessuna data speciale personale.'
@@ -449,25 +457,33 @@
       not in ['unknown', 'unavailable', 'none']\n   and dryer_remaining_minutes |
       int(0) > 1\n   and dryer_remaining_minutes | int(0) < 360 }}"
     stefano_nicknames:
-    - Stefano
     - Ste
-    - amore
     - bello
     - tesoro
     - capitano
+    - campione
+    - capo
+    - boss
+    - re di casa
+    - grande uomo
     laura_nicknames:
-    - Laura
     - Lau
-    - amore
     - bella
     - tesoro
     - principessa
+    - regina di casa
+    - dolcezza
+    - splendore
+    - meraviglia
     couple_nicknames:
-    - Stefano e Laura
     - amori
     - squadra del cuore
     - coppia bella
     - ragazzi
+    - piccioncini
+    - belli
+    - duo delle meraviglie
+    - squadra di casa
     laura_phrase_starts:
     - La casa sembra più luminosa
     - Atmosfera dolce attivata
@@ -618,3 +634,4 @@
     - il resto può attendere con pazienza.
     - si può ricominciare da un ritmo più umano.
     - tutto torna un po' più semplice.
+

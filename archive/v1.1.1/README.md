@@ -1,5 +1,7 @@
 # Eco home v1.1.1
 
+> Versione archiviata. Per le nuove installazioni usa la versione corrente nella cartella principale del repository.
+
 Automazione Home Assistant per un messaggio di benvenuto sul Nest Hub quando il rientro e' confermato dalla combinazione tra presenza e portone.
 
 La conferma funziona in entrambi gli ordini:
@@ -27,12 +29,11 @@ Se Eco home ti e' utile e vuoi offrirmi un caffe':
 ## File
 
 - `eco-home-v1.1.1.yaml`: automazione completa da copiare in `automations.yaml` o importare/modificare dalla UI di Home Assistant.
-- `CHANGELOG.md`: cronologia delle modifiche tra le versioni.
-- `GUIDA_PERSONALIZZAZIONE.md`: elenco delle voci da modificare con linee e spiegazioni.
-- `GUIDA_PULSANTE_TEST.md`: guida per creare e usare il pulsante di test vocale.
+- [`CHANGELOG.md`](../../CHANGELOG.md): cronologia delle modifiche tra le versioni.
+- [`GUIDA_PERSONALIZZAZIONE.md`](../../GUIDA_PERSONALIZZAZIONE.md): elenco delle voci da modificare con linee e spiegazioni.
+- [`GUIDA_PULSANTE_TEST.md`](../../GUIDA_PULSANTE_TEST.md): guida per creare e usare il pulsante di test vocale.
 - `eco-home-v1.1.1-dashboard-card.yaml`: card Lovelace per controllare e testare Eco Home dalla plancia.
-- `GUIDA_CARD_TEST.md`: guida per installare e utilizzare la card di test.
-- `packages/eco-home-helpers-v1.1.yaml`: helper necessari; non sono cambiati nella versione 1.1.1.
+- [`GUIDA_CARD_TEST.md`](../../GUIDA_CARD_TEST.md): guida per installare e utilizzare la card di test.
 
 Alias visibile in Home Assistant:
 
@@ -69,17 +70,9 @@ Controlla questi entity ID prima di usarla:
 ## Installazione rapida
 
 1. Copia `eco-home-v1.1.1.yaml` dentro `automations.yaml` oppure importa l'automazione dalla UI.
-2. Se non hai gia' gli helper, copia `packages/eco-home-helpers-v1.1.yaml` in `/config/packages/`.
-3. Se usi i package, assicurati che `configuration.yaml` contenga:
-
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
-```
-
-4. Controlla le entita' indicate in `GUIDA_PERSONALIZZAZIONE.md`.
-5. Se vuoi testare manualmente la voce, segui `GUIDA_PULSANTE_TEST.md`.
-6. Da Home Assistant esegui **Controlla configurazione** e poi **Ricarica automazioni**.
+2. Controlla le entita' indicate nella [`GUIDA_PERSONALIZZAZIONE.md`](../../GUIDA_PERSONALIZZAZIONE.md).
+3. Se vuoi testare manualmente la voce, segui la [`GUIDA_PULSANTE_TEST.md`](../../GUIDA_PULSANTE_TEST.md).
+4. Da Home Assistant esegui **Controlla configurazione** e poi **Ricarica automazioni**.
 
 ## Logica principale
 
@@ -100,3 +93,4 @@ a:
 ```yaml
 to: 'off'
 ```
+
