@@ -32,13 +32,6 @@ Alias visibile in Home Assistant:
 ```text
 Eco home
 ```
-
-Versione:
-
-```text
-v1.1
-```
-
 ## Entita' da adattare
 
 Controlla questi entity id prima di usarla:
