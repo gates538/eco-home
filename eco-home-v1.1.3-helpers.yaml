@@ -1,0 +1,69 @@
+input_boolean:
+  echo_home_attivo:
+    name: Eco Home attivo
+    icon: mdi:home-assistant
+  echo_home_silenzioso:
+    name: Eco Home silenzioso
+    icon: mdi:volume-off
+  echo_home_asciugatrice_da_annunciare:
+    name: Eco Home asciugatrice da annunciare
+    icon: mdi:tumble-dryer-alert
+
+input_datetime:
+  echo_home_asciugatrice_fine:
+    name: Eco Home asciugatrice fine
+    has_date: true
+    has_time: true
+  echo_home_ultimo_annuncio:
+    name: Eco Home ultimo annuncio
+    has_date: true
+    has_time: true
+  echo_home_ultima_apertura_portone:
+    name: Eco Home ultima apertura portone
+    has_date: true
+    has_time: true
+  echo_home_ultimo_arrivo:
+    name: Eco Home ultimo arrivo
+    has_date: true
+    has_time: true
+
+input_button:
+  echo_home_test_vocale:
+    name: Eco Home test vocale
+    icon: mdi:account-voice
+
+input_select:
+  echo_home_scenario_test:
+    name: Eco Home scenario di test
+    icon: mdi:test-tube
+    options:
+      - Percorso audio
+      - Rientro Stefano
+      - Rientro Laura
+      - Rientro di coppia
+      - Modalità notte
+      - Promemoria asciugatrice
+    initial: Percorso audio
+
+input_text:
+  echo_home_ultimo_evento:
+    name: Eco Home ultimo evento
+    icon: mdi:timeline-clock-outline
+    max: 255
+  echo_home_ultimo_esito:
+    name: Eco Home ultimo esito
+    icon: mdi:check-decagram-outline
+    max: 255
+  echo_home_ultimo_profilo:
+    name: Eco Home ultimo profilo
+    icon: mdi:account-tag-outline
+    max: 100
+  echo_home_ultimo_messaggio:
+    name: Eco Home ultimo messaggio
+    icon: mdi:message-text-outline
+    max: 255
+  echo_home_ultima_persona:
+    name: Eco Home ultima persona
+    icon: mdi:account-clock-outline
+    max: 100
+
