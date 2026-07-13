@@ -109,6 +109,15 @@ La card usa soltanto componenti standard di Home Assistant e non richiede HACS.
 | [GUIDA_PULSANTE_TEST.md](GUIDA_PULSANTE_TEST.md) | Utilizzo del test vocale |
 | [eco-home-v1.1.2-dashboard-card.yaml](eco-home-v1.1.2-dashboard-card.yaml) | Card Lovelace |
 | [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md) | Installazione e utilizzo della card |
+| [archive/v1.1.1](archive/v1.1.1) | File archiviati della versione 1.1.1 |
+
+## Versioni archiviate
+
+I file delle versioni precedenti sono conservati nella cartella [`archive`](archive) e non sono mescolati con quelli della versione corrente.
+
+- [Eco Home v1.1.1](archive/v1.1.1)
+
+Per una nuova installazione utilizza sempre i file `v1.1.2` presenti nella cartella principale.
 
 ## Risoluzione rapida
 
@@ -131,5 +140,4 @@ Per problemi tecnici o suggerimenti utilizza la sezione [Issues](https://github.
 Il progetto è disponibile gratuitamente. Se vuoi sostenerlo:
 
 [![Sostieni Eco Home su GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Sostieni%20Eco%20Home-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/gates538)
-
 
