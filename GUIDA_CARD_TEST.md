@@ -1,191 +1,61 @@
-# Guida alla card di test - Eco Home v1.1.2
+# Guida alla card Eco Home v1.1.3
 
-Questa guida spiega come aggiungere alla plancia di Home Assistant la card di controllo e come utilizzarla per verificare Eco Home v1.1.2.
+La card usa soltanto componenti standard di Home Assistant.
 
-## Funzioni della card
+## Requisiti
 
-La card permette di:
+Prima di installarla verifica che siano presenti:
 
-- attivare o disattivare Eco Home;
-- abilitare o disabilitare la modalita' silenziosa;
-- controllare se esiste un promemoria dell'asciugatrice in attesa;
-- vedere la data e l'ora dell'ultimo annuncio;
-- avviare manualmente un test vocale sul Nest Hub.
+- l'automazione `Eco home` 1.1.3;
+- gli helper indicati in [DIPENDENZE.md](DIPENDENZE.md);
+- le entità personali e i dispositivi configurati nella card.
 
-## File necessario
+## Installazione
 
-Usa il file:
+1. Apri la dashboard Home Assistant.
+2. Seleziona **Modifica dashboard**.
+3. Premi **Aggiungi scheda**.
+4. Scegli **Manuale**.
+5. Copia tutto il contenuto di `eco-home-v1.1.3-dashboard-card.yaml`.
+6. Salva la scheda.
 
-```text
-eco-home-v1.1.2-dashboard-card.yaml
-```
+## Sezioni della card
 
-## Prerequisiti
+### Controlli
 
-Prima di aggiungere la card, assicurati che Eco Home v1.1.2 e i suoi helper siano gia' installati.
+Permette di attivare Eco Home, impostare la modalità silenziosa e vedere se esiste un promemoria asciugatrice.
 
-La card utilizza queste entita':
+### Scenario di test
 
-```text
-input_boolean.echo_home_attivo
-input_boolean.echo_home_silenzioso
-input_boolean.echo_home_asciugatrice_da_annunciare
-input_datetime.echo_home_ultimo_annuncio
-input_button.echo_home_test_vocale
-```
+Seleziona il profilo vocale e avvia il test. Consulta [GUIDA_PULSANTE_TEST.md](GUIDA_PULSANTE_TEST.md) per il significato degli scenari.
 
-Puoi controllarne l'esistenza da:
+### Persone e dispositivi
 
-**Impostazioni → Dispositivi e servizi → Entita'**
+Mostra graficamente:
 
-Se una di queste entita' non esiste, installa prima gli helper contenuti in:
+- Stefano e Laura;
+- portone;
+- stato e fine prevista dell'asciugatrice;
+- Nest Hub.
 
-```text
-packages/eco-home-helpers-v1.1.yaml
-```
+Se i tuoi entity ID sono diversi, modificali sia nell'automazione sia nella card.
 
-Gli helper della versione 1.1 sono compatibili con Eco Home v1.1.2.
+### Diagnostica
 
-## Installazione della card
+Mostra l'ultimo evento ricevuto, l'esito, la persona, il profilo, il messaggio e gli orari principali. I valori sono visualizzati in sola lettura dalla card.
 
-1. Apri Home Assistant.
-2. Entra nella plancia in cui vuoi mostrare Eco Home.
-3. Premi i tre puntini in alto a destra.
-4. Seleziona **Modifica plancia**.
-5. Premi **Aggiungi scheda**.
-6. Cerca e seleziona la scheda **Manuale**.
-7. Apri il file `eco-home-v1.1.2-dashboard-card.yaml`.
-8. Copia tutto il suo contenuto.
-9. Incollalo nell'editor YAML della scheda manuale.
-10. Premi **Salva**.
-11. Premi **Fine** per uscire dalla modifica della plancia.
+## Primo test consigliato
 
-La card non richiede componenti personalizzati o installazioni tramite HACS.
+1. Seleziona `Percorso audio`.
+2. Premi il pulsante di test.
+3. Verifica che il Nest Hub pronunci il messaggio.
+4. Controlla che il volume torni al valore precedente.
+5. Controlla `Ultimo esito` nella sezione diagnostica.
 
-## Come utilizzare la card
+## Problemi comuni
 
-### Eco Home attivo
-
-Il controllo **Eco Home attivo** abilita o disabilita gli annunci automatici.
-
-- Attivo: Eco Home puo' eseguire il messaggio di benvenuto.
-- Disattivato: gli annunci automatici vengono ignorati.
-
-Per il normale utilizzo deve essere attivo.
-
-### Modalita' silenziosa
-
-Il controllo **Modalita silenziosa** blocca i messaggi automatici senza disattivare completamente il progetto.
-
-- Attiva: nessun messaggio automatico di benvenuto.
-- Disattivata: gli annunci possono essere riprodotti normalmente.
-
-E' utile quando non vuoi essere disturbato, per esempio durante una chiamata o nelle ore di riposo.
-
-### Promemoria asciugatrice in attesa
-
-Questa voce indica se Eco Home ha memorizzato un ciclo dell'asciugatrice terminato mentre non era presente nessuno.
-
-- Attivo: il promemoria verra' inserito nel prossimo messaggio valido di rientro.
-- Disattivato: non ci sono promemoria da annunciare.
-
-### Ultimo annuncio
-
-La voce **Ultimo annuncio** mostra quando e' stato eseguito l'ultimo messaggio automatico valido.
-
-Serve anche per verificare il periodo di pausa tra due annunci consecutivi.
-
-### Avvia test vocale
-
-Premi una sola volta il pulsante **Avvia test vocale**.
-
-Il test verifica:
-
-- raggiungibilita' del Nest Hub;
-- servizio Google AI TTS;
-- impostazione del volume;
-- muting temporaneo della TV, se abilitato e applicabile;
-- ripristino della TV al termine del messaggio.
-
-Durante il test dovresti sentire un messaggio simile a:
-
-```text
-Echo Home e' attivo. Test vocale completato.
-```
-
-## Cosa non simula il pulsante
-
-Il pulsante verifica il percorso audio, ma non simula un vero rientro.
-
-Non modifica artificialmente:
-
-- lo stato di `person.stefano` o `person.laura`;
-- lo stato del sensore del portone;
-- la combinazione temporale tra presenza e portone;
-- il promemoria dell'asciugatrice.
-
-Per verificare completamente la logica di arrivo e' necessario un vero passaggio `not_home → home` abbinato all'apertura del portone entro la finestra prevista.
-
-## Risoluzione dei problemi
-
-### La card mostra un'entita' non disponibile
-
-Controlla che l'entity ID indicato nella card corrisponda a quello realmente presente in Home Assistant.
-
-Verifica le entita' da:
-
-**Strumenti per sviluppatori → Stati**
-
-### Il pulsante non produce alcun messaggio
-
-Controlla, nell'ordine:
-
-1. che `input_button.echo_home_test_vocale` esista;
-2. che l'automazione Eco Home sia attiva;
-3. che `media_player.nest_hub_sala` sia disponibile;
-4. che `tts.google_ai_tts` sia configurato;
-5. la traccia dell'ultima esecuzione dell'automazione.
-
-### La TV non viene silenziata
-
-Il muting viene eseguito soltanto se:
-
-- la funzione TV ducking e' abilitata nell'automazione;
-- il media player della TV e' disponibile;
-- la TV non e' spenta, in standby, sconosciuta o non disponibile;
-- la TV non era gia' silenziata.
-
-### Il test parla ma il rientro reale non funziona
-
-In questo caso TTS e Nest Hub funzionano. Il problema e' probabilmente nella conferma del rientro.
-
-Controlla nella traccia:
-
-```text
-person_arrived_recently
-door_opened_recently
-trigger_person_arrival_valid
-trigger_door_open_valid
-arrival_confirmed_by_person_and_door
-```
-
-Nella versione 1.1.2 il rientro puo' essere confermato in entrambi gli ordini:
-
-```text
-persona home → portone
-portone → persona home
-```
-
-I due eventi devono comunque verificarsi entro la finestra temporale configurata.
-
-## Rimozione della card
-
-La rimozione della card non elimina Eco Home e non modifica gli helper.
-
-Per rimuoverla:
-
-1. apri **Modifica plancia**;
-2. seleziona la card Eco Home;
-3. premi **Elimina scheda**;
-4. conferma e salva la plancia.
+- **Entità non disponibile:** correggi l'entity ID nella card.
+- **Scenario o diagnostica assenti:** installa gli helper nuovi della 1.1.3.
+- **Il pulsante non parla:** controlla lo stato del Nest Hub e `Ultimo esito`.
+- **La TV non si silenzia:** verifica che supporti `media_player.volume_mute`.
 
