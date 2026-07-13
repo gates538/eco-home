@@ -1,0 +1,44 @@
+type: vertical-stack
+cards:
+  - type: markdown
+    content: |
+      ## Eco Home v1.1.2
+      Pannello di controllo e test dell'annuncio vocale.
+
+  - type: entities
+    title: Controlli
+    show_header_toggle: false
+    entities:
+      - entity: input_boolean.echo_home_attivo
+        name: Eco Home attivo
+        icon: mdi:home-assistant
+      - entity: input_boolean.echo_home_silenzioso
+        name: Modalita silenziosa
+        icon: mdi:volume-off
+      - entity: input_boolean.echo_home_asciugatrice_da_annunciare
+        name: Promemoria asciugatrice in attesa
+        icon: mdi:tumble-dryer-alert
+      - entity: input_datetime.echo_home_ultimo_annuncio
+        name: Ultimo annuncio
+        icon: mdi:clock-check-outline
+
+  - type: button
+    entity: input_button.echo_home_test_vocale
+    name: Avvia test vocale
+    icon: mdi:account-voice
+    show_name: true
+    show_icon: true
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: input_button.press
+      target:
+        entity_id: input_button.echo_home_test_vocale
+    hold_action:
+      action: none
+
+  - type: markdown
+    content: |
+      Il test verifica Nest Hub, volume TTS e muting temporaneo della TV.
+      Il test controlla il percorso audio. Il rientro reale viene confermato dalla combinazione **presenza + portone**, in entrambi gli ordini.
+
