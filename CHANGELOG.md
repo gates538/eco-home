@@ -2,6 +2,25 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [1.1.4] - 2026-07-13
+
+### Corretto
+
+- Sostituito ovunque il prefisso incoerente `echo_home_*` con `eco_home_*`.
+- Allineati automazione, card, package helper, variabili interne, messaggi,
+  diagnostica e documentazione al nome **Eco Home**.
+- Gli helper creati dalla UI ora ricevono naturalmente gli stessi Entity ID
+  utilizzati dall'automazione.
+
+### Migrazione
+
+- Aggiunta la procedura completa per rinominare i 14 helper esistenti senza
+  duplicarli.
+- Aggiunta una guida dedicata alla creazione degli helper dalla UI.
+- La logica funzionale della 1.1.3 resta invariata.
+- Le versioni archiviate conservano il prefisso storico perché rappresentano
+  fedelmente le release precedenti.
+
 ## [1.1.3] - 2026-07-13
 
 ### Aggiunto

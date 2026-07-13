@@ -1,4 +1,4 @@
-# Guida alla card Eco Home v1.1.3
+# Guida alla card Eco Home v1.1.4
 
 La card usa soltanto componenti standard di Home Assistant.
 
@@ -6,7 +6,7 @@ La card usa soltanto componenti standard di Home Assistant.
 
 Prima di installarla verifica che siano presenti:
 
-- l'automazione `Eco home` 1.1.3;
+- l'automazione `Eco home` 1.1.4;
 - gli helper indicati in [DIPENDENZE.md](DIPENDENZE.md);
 - le entità personali e i dispositivi configurati nella card.
 
@@ -16,7 +16,7 @@ Prima di installarla verifica che siano presenti:
 2. Seleziona **Modifica dashboard**.
 3. Premi **Aggiungi scheda**.
 4. Scegli **Manuale**.
-5. Copia tutto il contenuto di `eco-home-v1.1.3-dashboard-card.yaml`.
+5. Copia tutto il contenuto di `eco-home-v1.1.4-dashboard-card.yaml`.
 6. Salva la scheda.
 
 ## Sezioni della card
@@ -55,7 +55,7 @@ Mostra l'ultimo evento ricevuto, l'esito, la persona, il profilo, il messaggio e
 ## Problemi comuni
 
 - **Entità non disponibile:** correggi l'entity ID nella card.
-- **Scenario o diagnostica assenti:** installa gli helper nuovi della 1.1.3.
+- **Scenario o diagnostica assenti:** verifica che i 14 helper usino il prefisso `eco_home_*` e non `echo_home_*`.
 - **Il pulsante non parla:** controlla lo stato del Nest Hub e `Ultimo esito`.
 - **La TV non si silenzia:** verifica che supporti `media_player.volume_mute`.
 

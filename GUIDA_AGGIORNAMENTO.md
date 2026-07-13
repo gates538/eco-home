@@ -1,33 +1,48 @@
-# Aggiornamento da Eco Home 1.1.2 a 1.1.3
+# Aggiornamento a Eco Home 1.1.4
 
-Questa procedura conserva tutte le altre automazioni presenti in `automations.yaml`.
+La 1.1.4 corregge il prefisso storico `echo_home_*` e usa ovunque
+`eco_home_*`. La logica dell'automazione non cambia.
+
+Questa procedura conserva tutte le altre automazioni presenti in
+`automations.yaml`.
 
 ## 1. Crea un backup
 
-Da **Impostazioni → Sistema → Backup**, crea un backup prima di modificare i file. Copia inoltre `/config/automations.yaml` in un posto sicuro.
+Da **Impostazioni → Sistema → Backup**, crea un backup. Copia inoltre
+`/config/automations.yaml` e l'eventuale vecchio package degli helper in un
+posto sicuro.
 
-## 2. Installa soltanto i nuovi helper
+## 2. Migra gli helper
 
-Se possiedi già gli helper della 1.1.2, usa come riferimento:
+### Helper creati dalla UI
+
+Vai in **Impostazioni → Dispositivi e servizi → Entità**. Cerca `echo_home` e
+rinomina gli Entity ID sostituendo soltanto il prefisso:
 
 ```text
-eco-home-v1.1.3-helper-update.yaml
+input_boolean.echo_home_attivo                         → input_boolean.eco_home_attivo
+input_boolean.echo_home_silenzioso                     → input_boolean.eco_home_silenzioso
+input_boolean.echo_home_asciugatrice_da_annunciare     → input_boolean.eco_home_asciugatrice_da_annunciare
+input_datetime.echo_home_asciugatrice_fine             → input_datetime.eco_home_asciugatrice_fine
+input_datetime.echo_home_ultimo_annuncio               → input_datetime.eco_home_ultimo_annuncio
+input_datetime.echo_home_ultima_apertura_portone       → input_datetime.eco_home_ultima_apertura_portone
+input_datetime.echo_home_ultimo_arrivo                 → input_datetime.eco_home_ultimo_arrivo
+input_button.echo_home_test_vocale                     → input_button.eco_home_test_vocale
+input_select.echo_home_scenario_test                   → input_select.eco_home_scenario_test
+input_text.echo_home_ultimo_evento                     → input_text.eco_home_ultimo_evento
+input_text.echo_home_ultimo_esito                      → input_text.eco_home_ultimo_esito
+input_text.echo_home_ultimo_profilo                    → input_text.eco_home_ultimo_profilo
+input_text.echo_home_ultimo_messaggio                  → input_text.eco_home_ultimo_messaggio
+input_text.echo_home_ultima_persona                    → input_text.eco_home_ultima_persona
 ```
 
-Puoi copiarlo in `/config/packages/` se i vecchi helper sono anch'essi definiti tramite package. Se invece li hai creati dalla UI, crea dalla UI soltanto questi nuovi helper:
+Non ricreare gli helper: rinominandoli conservi stato e impostazioni.
 
-```text
-input_datetime.echo_home_ultima_apertura_portone
-input_datetime.echo_home_ultimo_arrivo
-input_select.echo_home_scenario_test
-input_text.echo_home_ultimo_evento
-input_text.echo_home_ultimo_esito
-input_text.echo_home_ultimo_profilo
-input_text.echo_home_ultimo_messaggio
-input_text.echo_home_ultima_persona
-```
+### Helper definiti tramite package YAML
 
-Non creare due volte helper con lo stesso entity ID.
+1. Rimuovi o rinomina il vecchio file package che definisce `echo_home_*`.
+2. Copia `eco-home-v1.1.4-helpers.yaml` in `/config/packages/`.
+3. Non caricare contemporaneamente il vecchio e il nuovo package.
 
 ## 3. Sostituisci soltanto Eco Home
 
@@ -38,36 +53,27 @@ Apri `/config/automations.yaml` e cerca:
   alias: Eco home
 ```
 
-Elimina esclusivamente quel blocco completo, fino alla riga precedente all'automazione successiva. Al suo posto incolla tutto il contenuto di:
+Sostituisci esclusivamente quel blocco con il contenuto di
+`eco-home-v1.1.4.yaml`. Non sostituire l'intero file se contiene altre
+automazioni.
 
-```text
-eco-home-v1.1.3.yaml
-```
+## 4. Aggiorna la card
 
-Non sostituire l'intero `automations.yaml`: le altre automazioni devono restare invariate.
+Sostituisci la vecchia card con il contenuto di
+`eco-home-v1.1.4-dashboard-card.yaml`.
 
-## 4. Riporta le personalizzazioni
-
-Confronta la vecchia automazione e riporta soltanto i tuoi entity ID, tempi e volumi. Consulta [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
-
-## 5. Aggiorna la card
-
-Sostituisci il codice della vecchia card con:
-
-```text
-eco-home-v1.1.3-dashboard-card.yaml
-```
-
-## 6. Verifica
+## 5. Verifica
 
 1. Esegui **Controlla configurazione**.
-2. Ricarica automazioni e helper oppure riavvia Home Assistant.
-3. Apri la card.
-4. Seleziona `Percorso audio`.
-5. Avvia il test e controlla `Ultimo esito`.
-6. Verifica che il volume del Nest Hub torni al valore precedente.
+2. Riavvia Home Assistant se gli helper provengono da un package; altrimenti
+   ricarica le automazioni.
+3. In **Strumenti per sviluppatori → Stati**, cerca `echo_home`: non deve
+   restare alcun helper attivo con quel prefisso.
+4. Cerca `eco_home`: devono comparire tutti i 14 helper.
+5. Apri la card, seleziona `Percorso audio` ed esegui il test.
+6. Controlla `input_text.eco_home_ultimo_esito`.
 
 ## Ripristino
 
-In caso di errore, ripristina il backup di `automations.yaml` e rimuovi soltanto gli helper nuovi della 1.1.3. La versione 1.1.2 resta disponibile in `archive/v1.1.2`.
-
+In caso di errore, ripristina `automations.yaml` e il package degli helper dal
+backup. La versione 1.1.3 resta disponibile in `archive/v1.1.3`.
