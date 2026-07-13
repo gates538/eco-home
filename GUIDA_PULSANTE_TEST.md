@@ -1,10 +1,10 @@
 # Guida agli scenari di test
 
-Eco Home 1.1.3 usa:
+Eco Home 1.1.4 usa:
 
 ```text
-input_select.echo_home_scenario_test
-input_button.echo_home_test_vocale
+input_select.eco_home_scenario_test
+input_button.eco_home_test_vocale
 ```
 
 ## Scenari disponibili
@@ -38,8 +38,8 @@ Il test:
 
 Da **Strumenti per sviluppatori → Azioni**:
 
-1. esegui `input_select.select_option` su `input_select.echo_home_scenario_test`;
-2. esegui `input_button.press` su `input_button.echo_home_test_vocale`.
+1. esegui `input_select.select_option` su `input_select.eco_home_scenario_test`;
+2. esegui `input_button.press` su `input_button.eco_home_test_vocale`.
 
-Se il Nest Hub è `unavailable`, il test non tenta il TTS e registra l'esito in `input_text.echo_home_ultimo_esito`.
+Se il Nest Hub è `unavailable`, il test non tenta il TTS e registra l'esito in `input_text.eco_home_ultimo_esito`.
 

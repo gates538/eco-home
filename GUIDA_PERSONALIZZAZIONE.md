@@ -1,6 +1,6 @@
-# Personalizzazione Eco Home v1.1.3
+# Personalizzazione Eco Home v1.1.4
 
-I numeri di riga si riferiscono a `eco-home-v1.1.3.yaml` pubblicato con la release.
+I numeri di riga si riferiscono a `eco-home-v1.1.4.yaml` pubblicato con la release.
 
 ## Persone
 
@@ -80,5 +80,5 @@ Imposta `false` quando l'automazione è stabile e non vuoi più messaggi diagnos
 
 ## Card
 
-Gli entity ID delle persone e dei dispositivi sono presenti anche in `eco-home-v1.1.3-dashboard-card.yaml` e devono corrispondere a quelli dell'automazione.
+Gli entity ID delle persone e dei dispositivi sono presenti anche in `eco-home-v1.1.4-dashboard-card.yaml` e devono corrispondere a quelli dell'automazione.
 

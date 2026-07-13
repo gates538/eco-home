@@ -5,20 +5,18 @@
 **Benvenuto intelligente per Home Assistant, confermato da presenza e apertura del portone.**
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Automation-41BDF5?style=flat-square&logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
-[![Versione](https://img.shields.io/badge/versione-1.1.3-2ea44f?style=flat-square)](eco-home-v1.1.3.yaml)
-[![Formato](https://img.shields.io/badge/formato-YAML-CB171E?style=flat-square&logo=yaml&logoColor=white)](eco-home-v1.1.3.yaml)
+[![Versione](https://img.shields.io/badge/versione-1.1.4-2ea44f?style=flat-square)](eco-home-v1.1.4.yaml)
+[![Formato](https://img.shields.io/badge/formato-YAML-CB171E?style=flat-square&logo=yaml&logoColor=white)](eco-home-v1.1.4.yaml)
 
 </div>
 
-## Novità della versione 1.1.3
+## Novità della versione 1.1.4
 
-- sei scenari selezionabili dalla card: percorso audio, Stefano, Laura, coppia, notte e asciugatrice;
-- ripristino automatico del volume precedente del Nest Hub dopo TTS;
-- diagnostica persistente con ultimo evento, esito, persona, profilo e messaggio;
-- card ampliata con persone, portone, asciugatrice e stato del Nest Hub;
-- protezione esplicita dalle transizioni provenienti da `unknown` e `unavailable`;
-- gestione pulita del Nest Hub non disponibile, senza perdere la diagnostica;
-- file helper completo e file di aggiornamento dedicato a chi proviene dalla 1.1.2.
+- tutti gli helper usano finalmente il prefisso coerente `eco_home_*`;
+- automazione, card, helper, variabili interne, messaggi e guide usano lo stesso nome **Eco Home**;
+- gli helper creati dalla UI ricevono direttamente gli Entity ID attesi dall'automazione;
+- guida completa per rinominare gli helper `echo_home_*` delle versioni precedenti senza duplicarli;
+- nessuna modifica alla logica di rientro, ai nomignoli o agli scenari della 1.1.3.
 
 La logica di rientro continua a funzionare in entrambi gli ordini:
 
@@ -43,32 +41,32 @@ apertura portone → persona home
 ## Installazione nuova
 
 1. Leggi [DIPENDENZE.md](DIPENDENZE.md).
-2. Installa [eco-home-v1.1.3-helpers.yaml](eco-home-v1.1.3-helpers.yaml) come package oppure crea gli stessi helper dalla UI.
-3. Copia [eco-home-v1.1.3.yaml](eco-home-v1.1.3.yaml) in `automations.yaml`.
+2. Installa [eco-home-v1.1.4-helpers.yaml](eco-home-v1.1.4-helpers.yaml) come package oppure segui [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md).
+3. Copia [eco-home-v1.1.4.yaml](eco-home-v1.1.4.yaml) in `automations.yaml`.
 4. Non sostituire l'intero `automations.yaml` se contiene altre automazioni.
 5. Adatta gli entity ID seguendo [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
 6. Esegui **Controlla configurazione** e poi **Ricarica automazioni**.
 7. Installa la card seguendo [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md).
 
-## Aggiornamento dalla 1.1.2
+## Aggiornamento dalla 1.1.3 o precedente
 
-Segui [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md). Il file
-[eco-home-v1.1.3-helper-update.yaml](eco-home-v1.1.3-helper-update.yaml)
-contiene soltanto i nuovi helper della 1.1.3.
+Segui [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md). Prima di installare
+l'automazione devi rinominare gli helper da `echo_home_*` a `eco_home_*` oppure
+sostituire il vecchio package degli helper.
 
 ## File della versione corrente
 
 | File | Contenuto |
 |---|---|
-| [eco-home-v1.1.3.yaml](eco-home-v1.1.3.yaml) | Automazione standalone |
-| [eco-home-v1.1.3-dashboard-card.yaml](eco-home-v1.1.3-dashboard-card.yaml) | Card Lovelace completa |
-| [eco-home-v1.1.3-helpers.yaml](eco-home-v1.1.3-helpers.yaml) | Package completo degli helper |
-| [eco-home-v1.1.3-helper-update.yaml](eco-home-v1.1.3-helper-update.yaml) | Solo helper nuovi per aggiornare dalla 1.1.2 |
+| [eco-home-v1.1.4.yaml](eco-home-v1.1.4.yaml) | Automazione standalone |
+| [eco-home-v1.1.4-dashboard-card.yaml](eco-home-v1.1.4-dashboard-card.yaml) | Card Lovelace completa |
+| [eco-home-v1.1.4-helpers.yaml](eco-home-v1.1.4-helpers.yaml) | Package completo degli helper |
 | [DIPENDENZE.md](DIPENDENZE.md) | Entità e integrazioni richieste |
+| [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md) | Creazione o verifica dei 14 helper dalla UI |
 | [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md) | Entity ID e impostazioni da adattare |
 | [GUIDA_PULSANTE_TEST.md](GUIDA_PULSANTE_TEST.md) | Scenari del test vocale |
 | [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md) | Installazione e utilizzo della card |
-| [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md) | Passaggio sicuro dalla 1.1.2 |
+| [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md) | Migrazione sicura dal prefisso `echo_home_*` |
 | [GUIDA_DIAGNOSTICA.md](GUIDA_DIAGNOSTICA.md) | Interpretazione degli esiti diagnostici |
 | [CHANGELOG.md](CHANGELOG.md) | Cronologia delle versioni |
 
@@ -76,10 +74,11 @@ contiene soltanto i nuovi helper della 1.1.3.
 
 Le versioni precedenti restano nella cartella [`archive`](archive):
 
+- [Eco Home v1.1.3](archive/v1.1.3)
 - [Eco Home v1.1.2](archive/v1.1.2)
 - [Eco Home v1.1.1](archive/v1.1.1)
 
-Per nuove installazioni usa sempre i file `v1.1.3` nella cartella principale.
+Per nuove installazioni usa sempre i file `v1.1.4` nella cartella principale.
 
 ## Supporto
 
