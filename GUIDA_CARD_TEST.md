@@ -1,6 +1,6 @@
-# Guida alla card di test - Eco Home v1.1.1
+# Guida alla card di test - Eco Home v1.1.2
 
-Questa guida spiega come aggiungere alla plancia di Home Assistant la card di controllo e come utilizzarla per verificare Eco Home v1.1.1.
+Questa guida spiega come aggiungere alla plancia di Home Assistant la card di controllo e come utilizzarla per verificare Eco Home v1.1.2.
 
 ## Funzioni della card
 
@@ -17,12 +17,12 @@ La card permette di:
 Usa il file:
 
 ```text
-eco-home-v1.1.1-dashboard-card.yaml
+eco-home-v1.1.2-dashboard-card.yaml
 ```
 
 ## Prerequisiti
 
-Prima di aggiungere la card, assicurati che Eco Home v1.1.1 e i suoi helper siano gia' installati.
+Prima di aggiungere la card, assicurati che Eco Home v1.1.2 e i suoi helper siano gia' installati.
 
 La card utilizza queste entita':
 
@@ -44,7 +44,7 @@ Se una di queste entita' non esiste, installa prima gli helper contenuti in:
 packages/eco-home-helpers-v1.1.yaml
 ```
 
-Gli helper della versione 1.1 sono compatibili con Eco Home v1.1.1.
+Gli helper della versione 1.1 sono compatibili con Eco Home v1.1.2.
 
 ## Installazione della card
 
@@ -54,7 +54,7 @@ Gli helper della versione 1.1 sono compatibili con Eco Home v1.1.1.
 4. Seleziona **Modifica plancia**.
 5. Premi **Aggiungi scheda**.
 6. Cerca e seleziona la scheda **Manuale**.
-7. Apri il file `eco-home-v1.1.1-dashboard-card.yaml`.
+7. Apri il file `eco-home-v1.1.2-dashboard-card.yaml`.
 8. Copia tutto il suo contenuto.
 9. Incollalo nell'editor YAML della scheda manuale.
 10. Premi **Salva**.
@@ -169,7 +169,7 @@ trigger_door_open_valid
 arrival_confirmed_by_person_and_door
 ```
 
-Nella versione 1.1.1 il rientro puo' essere confermato in entrambi gli ordini:
+Nella versione 1.1.2 il rientro puo' essere confermato in entrambi gli ordini:
 
 ```text
 persona home → portone
