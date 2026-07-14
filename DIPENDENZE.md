@@ -2,6 +2,10 @@
 
 Eco Home usa esclusivamente funzioni standard di Home Assistant. Non richiede HACS o componenti personalizzati.
 
+Questo file elenca le dipendenze software e gli entity ID. Per sapere quali
+dispositivi fisici servono, quali coordinatori possono essere necessari e come
+verificarne la compatibilità, leggi [REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md).
+
 ## Entità obbligatorie
 
 Adatta questi entity ID alla tua installazione:
@@ -16,6 +20,15 @@ tts.google_ai_tts
 
 Le persone devono passare correttamente a `home`. Il portone deve passare a `on` quando viene aperto.
 
+Il file pubblicato è configurato per due persone. Chi usa una sola persona deve
+adattare tutte le occorrenze indicate in
+[GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md), non soltanto l'elenco
+dei trigger.
+
+La presenza di un'entità `media_player.*` non garantisce il TTS: il lettore deve
+superare una prova reale con `tts.speak`. Anche il provider `tts.*` può essere
+sostituito, purché l'azione funzioni con il lettore scelto.
+
 ## Entità opzionali
 
 ```text
@@ -24,9 +37,15 @@ media_player.tv_sala_ue85du7170uxzt
 sensor.esterno_asciugatrice_machine_state
 sensor.esterno_asciugatrice_completion_time
 sensor.esterno_asciugatrice_energia_elettrica
+sun.sun
 ```
 
 Se non utilizzi una funzione opzionale, disattiva o rimuovi i relativi blocchi seguendo [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
+
+`sun.sun` serve soltanto per accendere la luce quando è buio. Il sensore di
+energia dell'asciugatrice è predisposto ma non viene usato dalla logica della
+v1.1.4. Il sensore `machine_state` è invece necessario se si vuole il
+promemoria di fine ciclo.
 
 ## Helper
 
@@ -71,9 +90,10 @@ versione corrente utilizza esclusivamente il prefisso `eco_home_*`.
 ## Controllo prima dell'uso
 
 1. Verifica gli entity ID in **Strumenti per sviluppatori → Stati**.
-2. Controlla che il portone sia `on` quando aperto.
-3. Prova `tts.google_ai_tts` sul Nest Hub.
-4. Esegui **Controlla configurazione**.
-5. Ricarica package e automazioni oppure riavvia Home Assistant.
-6. Seleziona `Percorso audio` dalla card ed esegui il test.
+2. Controlla che il portone sia `off` quando chiuso e `on` quando aperto.
+3. Prova l'azione `tts.speak` sul lettore scelto: il messaggio deve essere realmente udibile.
+4. Completa la lista di controllo in [REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md).
+5. Esegui **Controlla configurazione**.
+6. Ricarica package e automazioni oppure riavvia Home Assistant.
+7. Seleziona `Percorso audio` dalla card ed esegui il test.
 
