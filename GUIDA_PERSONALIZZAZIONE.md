@@ -22,6 +22,8 @@ binary_sensor.porta_contact
 ```
 
 La configurazione considera il portone aperto quando passa a `on`.
+Prima di usarlo, verifica installazione e stati seguendo
+[REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md#2-sensore-di-apertura-del-portone).
 
 ## Nest Hub e TTS
 
@@ -33,6 +35,10 @@ tts.google_ai_tts
 ```
 
 Le variabili principali sono alle righe **564-565**. Gli stessi entity ID vengono usati anche nelle azioni TTS e di ripristino volume.
+
+Non scegliere il lettore soltanto perché compare come `media_player`: deve
+superare le prove TTS, volume e arresto descritte in
+[REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md#4-altoparlante-o-display-per-il-tts).
 
 ## TV e luce
 

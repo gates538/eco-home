@@ -40,13 +40,14 @@ apertura portone → persona home
 
 ## Installazione nuova
 
-1. Leggi [DIPENDENZE.md](DIPENDENZE.md).
-2. Installa [eco-home-v1.1.4-helpers.yaml](eco-home-v1.1.4-helpers.yaml) come package oppure segui [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md).
-3. Copia [eco-home-v1.1.4.yaml](eco-home-v1.1.4.yaml) in `automations.yaml`.
-4. Non sostituire l'intero `automations.yaml` se contiene altre automazioni.
-5. Adatta gli entity ID seguendo [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
-6. Esegui **Controlla configurazione** e poi **Ricarica automazioni**.
-7. Installa la card seguendo [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md).
+1. Controlla i dispositivi necessari in [REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md).
+2. Leggi l'elenco di entità e helper in [DIPENDENZE.md](DIPENDENZE.md).
+3. Installa [eco-home-v1.1.4-helpers.yaml](eco-home-v1.1.4-helpers.yaml) come package oppure segui [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md).
+4. Copia [eco-home-v1.1.4.yaml](eco-home-v1.1.4.yaml) in `automations.yaml`.
+5. Non sostituire l'intero `automations.yaml` se contiene altre automazioni.
+6. Adatta gli entity ID seguendo [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
+7. Esegui **Controlla configurazione** e poi **Ricarica automazioni**.
+8. Installa la card seguendo [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md).
 
 ## Aggiornamento dalla 1.1.3 o precedente
 
@@ -62,6 +63,7 @@ sostituire il vecchio package degli helper.
 | [eco-home-v1.1.4-dashboard-card.yaml](eco-home-v1.1.4-dashboard-card.yaml) | Card Lovelace completa |
 | [eco-home-v1.1.4-helpers.yaml](eco-home-v1.1.4-helpers.yaml) | Package completo degli helper |
 | [DIPENDENZE.md](DIPENDENZE.md) | Entità e integrazioni richieste |
+| [REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md) | Hardware necessario, esempi e prove di compatibilità |
 | [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md) | Creazione o verifica dei 14 helper dalla UI |
 | [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md) | Entity ID e impostazioni da adattare |
 | [GUIDA_PULSANTE_TEST.md](GUIDA_PULSANTE_TEST.md) | Scenari del test vocale |
