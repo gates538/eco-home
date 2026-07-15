@@ -1,6 +1,6 @@
-# Personalizzazione Eco Home v1.1.4
+# Personalizzazione Eco Home v1.1.5
 
-I numeri di riga si riferiscono a `eco-home-v1.1.4.yaml` pubblicato con la release.
+I numeri di riga si riferiscono a `eco-home-v1.1.5.yaml` pubblicato con la release.
 
 ## Persone
 
@@ -84,7 +84,19 @@ debug: true
 
 Imposta `false` quando l'automazione è stabile e non vuoi più messaggi diagnostici nel Logbook. Gli helper della card continueranno ad aggiornarsi.
 
+## Telecamera e Notifiche Foto
+
+Le nuove variabili configurabili per la telecamera e le notifiche si trovano nella sezione `variables:` dell'automazione:
+
+- `camera_entity`: L'entity ID della telecamera (default: `camera.sala_2`).
+- `stefano_notification_service`: Il servizio di notifica per Stefano (default: `notify.notify` per tutti i dispositivi. Cambialo es. in `notify.mobile_app_stefano` per inviarlo solo a Stefano).
+- `laura_notification_service`: Il servizio di notifica per Laura (default: `notify.notify`).
+- `snapshot_file_path`: Il percorso su disco dove salvare temporaneamente lo snapshot (default: `/config/www/snapshots/eco_home_sala_2.jpg`).
+- `snapshot_access_url`: L'URL locale per l'allegato notifica (default: `/local/snapshots/eco_home_sala_2.jpg`).
+
+La notifica verrà inviata **solo se la casa era completamente vuota** prima del rientro rilevato.
+
 ## Card
 
-Gli entity ID delle persone e dei dispositivi sono presenti anche in `eco-home-v1.1.4-dashboard-card.yaml` e devono corrispondere a quelli dell'automazione.
+Gli entity ID delle persone e dei dispositivi sono presenti anche in `eco-home-v1.1.5-dashboard-card.yaml` e devono corrispondere a quelli dell'automazione.
 

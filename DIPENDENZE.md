@@ -1,4 +1,4 @@
-# Dipendenze di Eco Home v1.1.4
+# Dipendenze di Eco Home v1.1.5
 
 Eco Home usa esclusivamente funzioni standard di Home Assistant. Non richiede HACS o componenti personalizzati.
 
@@ -38,6 +38,7 @@ sensor.esterno_asciugatrice_machine_state
 sensor.esterno_asciugatrice_completion_time
 sensor.esterno_asciugatrice_energia_elettrica
 sun.sun
+camera.sala_2
 ```
 
 Se non utilizzi una funzione opzionale, disattiva o rimuovi i relativi blocchi seguendo [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
@@ -50,19 +51,18 @@ promemoria di fine ciclo.
 ## Helper
 
 Per una nuova installazione copia
-`eco-home-v1.1.4-helpers.yaml` in `/config/packages/eco-home-v1.1.4-helpers.yaml`.
+`eco-home-v1.1.5-helpers.yaml` in `/config/packages/eco-home-v1.1.5-helpers.yaml`.
 
 Se preferisci crearli dalla UI, segui [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md).
 
-Se aggiorni dalla 1.1.3 o da una versione precedente, non caricare il nuovo
-package insieme al vecchio. Segui prima [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md)
-per migrare da `echo_home_*` a `eco_home_*`.
+Se aggiorni dalla 1.1.4 o da una versione precedente, segui prima [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md).
 
 Il file completo definisce:
 
 ```text
 input_boolean.eco_home_attivo
 input_boolean.eco_home_silenzioso
+input_boolean.eco_home_notifiche_foto
 input_boolean.eco_home_asciugatrice_da_annunciare
 input_datetime.eco_home_asciugatrice_fine
 input_datetime.eco_home_ultimo_annuncio

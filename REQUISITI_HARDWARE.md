@@ -1,4 +1,4 @@
-# Requisiti hardware e compatibilità di Eco Home v1.1.4
+# Requisiti hardware e compatibilità di Eco Home v1.1.5
 
 Questa guida descrive i dispositivi fisici necessari per usare Eco Home e le
 funzioni che devono esporre in Home Assistant.
@@ -334,7 +334,15 @@ dell'automazione.
 Il sensore dell'orario di completamento deve restituire una data/ora che Home
 Assistant sappia convertire in timestamp.
 
-## 8. Verifica finale di compatibilità
+## 8. Telecamera opzionale per notifiche foto
+
+Per scattare e inviare una foto del rientro sul cellulare (se la casa era vuota):
+
+* **Telecamera compatibile**: Deve supportare l'azione `camera.snapshot`. Puoi verificarla in **Strumenti per sviluppatori → Azioni**.
+* **Cartella snapshot locale**: Devi creare la cartella `/config/www/snapshots/` sul tuo Home Assistant. L'immagine temporanea verrà salvata lì (es. `/config/www/snapshots/eco_home_sala_2.jpg`) e sarà accessibile all'app Companion o a Telegram tramite l'URL `/local/snapshots/eco_home_sala_2.jpg`.
+* **Servizio di Notifica**: I telefoni devono avere configurata l'app Home Assistant Companion o l'integrazione di Telegram.
+
+## 9. Verifica finale di compatibilità
 
 Prima di considerare pronto l'impianto, completa questa lista:
 
@@ -347,6 +355,8 @@ Prima di considerare pronto l'impianto, completa questa lista:
 - [ ] La luce opzionale accetta luminosità e temperatura colore, oppure il blocco è stato adattato.
 - [ ] La TV opzionale esegue mute e unmute, oppure `tv_ducking_enabled` è `false`.
 - [ ] Lo stato opzionale dell'asciugatrice usa valori riconosciuti.
+- [ ] La telecamera opzionale supporta l'azione `camera.snapshot`.
+- [ ] La cartella locale `/config/www/snapshots/` è stata creata.
 - [ ] Tutti gli entity ID sono stati sostituiti anche nella card e nelle azioni, non solo nelle variabili finali.
 
 Soltanto dopo queste prove esegui il test **Percorso audio** dalla card e poi un

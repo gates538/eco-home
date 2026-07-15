@@ -2,6 +2,17 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [1.1.5] - 2026-07-15
+
+### Aggiunto
+
+- Funzionalità di scatto foto (snapshot) tramite telecamera (`camera.sala_2` / "Cam Sala 2") e invio di notifica push ricca con immagine sul cellulare al rientro.
+- La notifica viene inviata **solo se la casa era vuota** prima del rientro rilevato (ossia quando Stefano, Laura o persone future non erano in casa).
+- Nuovo helper `input_boolean.eco_home_notifiche_foto` per abilitare/disabilitare le notifiche con foto direttamente dalla dashboard.
+- Configurazione flessibile per mappare i servizi di notifica individuali (es. `notify.mobile_app_stefano` o `notify.notify` per broadcast).
+- Nuova sezione dedicata nella plancia Lovelace per controllare lo stato delle notifiche con foto e visualizzare l'anteprima della telecamera.
+- Documentazione completa aggiornata (`README.md`, `DIPENDENZE.md`, `REQUISITI_HARDWARE.md`, `GUIDA_PERSONALIZZAZIONE.md`, `GUIDA_AGGIORNAMENTO.md`).
+
 ## [1.1.4] - 2026-07-13
 
 ### Corretto

@@ -1,79 +1,53 @@
-# Aggiornamento a Eco Home 1.1.4
+# Guida di Aggiornamento a Eco Home 1.1.5
 
-La 1.1.4 corregge il prefisso storico `echo_home_*` e usa ovunque
-`eco_home_*`. La logica dell'automazione non cambia.
+Questa guida descrive la procedura per aggiornare Eco Home dalla versione 1.1.4 (o precedenti) alla versione **1.1.5**. 
 
-Questa procedura conserva tutte le altre automazioni presenti in
-`automations.yaml`.
+La versione 1.1.5 introduce le notifiche push con immagine da telecamera quando la casa è vuota, aggiungendo un nuovo helper (`input_boolean.eco_home_notifiche_foto`) e le relative configurazioni per la telecamera.
 
-## 1. Crea un backup
+---
 
-Da **Impostazioni → Sistema → Backup**, crea un backup. Copia inoltre
-`/config/automations.yaml` e l'eventuale vecchio package degli helper in un
-posto sicuro.
+## 1. Crea la cartella degli snapshot
+Per consentire a Home Assistant di salvare le immagini scattate dalla telecamera, devi creare la cartella per gli snapshot:
+1. Accedi ai file del tuo Home Assistant (tramite Samba, SSH o l'add-on Studio Code Server).
+2. All'interno della cartella `/config/www/`, crea una nuova cartella chiamata `snapshots` (il percorso completo sarà `/config/www/snapshots/`).
+   * *Nota*: Se la cartella `www` non esiste, creala e riavvia Home Assistant prima di procedere.
 
-## 2. Migra gli helper
+---
 
-### Helper creati dalla UI
+## 2. Aggiorna o crea il nuovo helper
 
-Vai in **Impostazioni → Dispositivi e servizi → Entità**. Cerca `echo_home` e
-rinomina gli Entity ID sostituendo soltanto il prefisso:
+### Se usi i Package YAML (Consigliato)
+1. Rimuovi il vecchio file package `eco-home-v1.1.4-helpers.yaml` da `/config/packages/`.
+2. Copia il nuovo file `eco-home-v1.1.5-helpers.yaml` nella stessa cartella.
+3. Ricarica i package o riavvia Home Assistant.
 
-```text
-input_boolean.echo_home_attivo                         → input_boolean.eco_home_attivo
-input_boolean.echo_home_silenzioso                     → input_boolean.eco_home_silenzioso
-input_boolean.echo_home_asciugatrice_da_annunciare     → input_boolean.eco_home_asciugatrice_da_annunciare
-input_datetime.echo_home_asciugatrice_fine             → input_datetime.eco_home_asciugatrice_fine
-input_datetime.echo_home_ultimo_annuncio               → input_datetime.eco_home_ultimo_annuncio
-input_datetime.echo_home_ultima_apertura_portone       → input_datetime.eco_home_ultima_apertura_portone
-input_datetime.echo_home_ultimo_arrivo                 → input_datetime.eco_home_ultimo_arrivo
-input_button.echo_home_test_vocale                     → input_button.eco_home_test_vocale
-input_select.echo_home_scenario_test                   → input_select.eco_home_scenario_test
-input_text.echo_home_ultimo_evento                     → input_text.eco_home_ultimo_evento
-input_text.echo_home_ultimo_esito                      → input_text.eco_home_ultimo_esito
-input_text.echo_home_ultimo_profilo                    → input_text.eco_home_ultimo_profilo
-input_text.echo_home_ultimo_messaggio                  → input_text.eco_home_ultimo_messaggio
-input_text.echo_home_ultima_persona                    → input_text.eco_home_ultima_persona
-```
+### Se hai creato gli helper dalla UI
+Se preferisci gestire gli helper manualmente dalla UI di Home Assistant, vai in **Impostazioni → Dispositivi e servizi → Aiutanti** e crea il nuovo helper mancante:
+* **Tipo**: Interruttore (input_boolean)
+* **Nome**: Eco Home notifiche foto
+* **Entity ID generato**: `input_boolean.eco_home_notifiche_foto`
+* **Icona**: `mdi:camera`
 
-Non ricreare gli helper: rinominandoli conservi stato e impostazioni.
+---
 
-### Helper definiti tramite package YAML
+## 3. Aggiorna l'automazione
+Apri il tuo file `/config/automations.yaml` ed individua il blocco dell'automazione Eco Home (puoi cercarlo tramite l'id `'1783777716602'`).
+1. Sostituisci **esclusivamente** il blocco dell'automazione esistente con il contenuto di [eco-home-v1.1.5.yaml](eco-home-v1.1.5.yaml).
+2. Modifica le variabili in fondo al file (nella sezione `variables:`) per impostare la tua telecamera (default: `camera.sala_2`) e i tuoi canali di notifica push (es. `notify.mobile_app_tuo_telefono`).
+3. Salva il file e vai su **Strumenti per sviluppatori → YAML** e clicca su **Ricarica le automazioni**.
 
-1. Rimuovi o rinomina il vecchio file package che definisce `echo_home_*`.
-2. Copia `eco-home-v1.1.4-helpers.yaml` in `/config/packages/`.
-3. Non caricare contemporaneamente il vecchio e il nuovo package.
+---
 
-## 3. Sostituisci soltanto Eco Home
+## 4. Aggiorna la card Lovelace
+Apri la plancia di Home Assistant, clicca sui tre puntini in alto a destra → **Modifica plancia**.
+1. Trova la card di Eco Home, clicca su **Modifica** e poi su **Editor di codice**.
+2. Sostituisci il codice YAML esistente con il contenuto di [eco-home-v1.1.5-dashboard-card.yaml](eco-home-v1.1.5-dashboard-card.yaml).
+3. Clicca su **Salva** e poi su **Fatto**.
 
-Apri `/config/automations.yaml` e cerca:
+---
 
-```yaml
-- id: '1783777716602'
-  alias: Eco home
-```
-
-Sostituisci esclusivamente quel blocco con il contenuto di
-`eco-home-v1.1.4.yaml`. Non sostituire l'intero file se contiene altre
-automazioni.
-
-## 4. Aggiorna la card
-
-Sostituisci la vecchia card con il contenuto di
-`eco-home-v1.1.4-dashboard-card.yaml`.
-
-## 5. Verifica
-
-1. Esegui **Controlla configurazione**.
-2. Riavvia Home Assistant se gli helper provengono da un package; altrimenti
-   ricarica le automazioni.
-3. In **Strumenti per sviluppatori → Stati**, cerca `echo_home`: non deve
-   restare alcun helper attivo con quel prefisso.
-4. Cerca `eco_home`: devono comparire tutti i 14 helper.
-5. Apri la card, seleziona `Percorso audio` ed esegui il test.
-6. Controlla `input_text.eco_home_ultimo_esito`.
-
-## Ripristino
-
-In caso di errore, ripristina `automations.yaml` e il package degli helper dal
-backup. La versione 1.1.3 resta disponibile in `archive/v1.1.3`.
+## 5. Verifica del funzionamento
+1. Vai sulla dashboard di Eco Home e attiva il nuovo interruttore **Notifiche con foto**.
+2. Esegui un test selezionando lo scenario `Percorso audio` o `Rientro Stefano` dalla card e cliccando su **Avvia il test**.
+3. Verifica in `/config/www/snapshots/` se l'immagine temporanea viene correttamente creata.
+4. Controlla che i telefoni ricevano la notifica push con lo snapshot allegato.
