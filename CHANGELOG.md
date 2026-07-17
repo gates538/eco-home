@@ -2,6 +2,14 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [1.1.7] - 2026-07-17
+
+### Aggiunto
+- Monitoraggio della temperatura media interna all'arrivo basato su una lista configurabile di sensori (`indoor_temp_sensors`).
+- Annuncio vocale della temperatura corrente tramite Nest Hub durante il benvenuto.
+- Notifica push interattiva (actionable notification) al rientro se la temperatura interna è maggiore di 26°C, chiedendo se si desidera accendere i condizionatori.
+- Gestione automatica del clic sulla notifica per accendere i condizionatori (`ac_climate_entities`) in modalità raffrescamento (`cool`).
+
 ## [1.1.6] - 2026-07-17
 
 ### Corretto
@@ -17,7 +25,7 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 - Nuovo helper `input_boolean.eco_home_notifiche_foto` per abilitare/disabilitare le notifiche con foto direttamente dalla dashboard.
 - Configurazione flessibile per mappare i servizi di notifica individuali (es. `notify.mobile_app_stefano` o `notify.notify` per broadcast).
 - Nuova sezione dedicata nella plancia Lovelace per controllare lo stato delle notifiche con foto e visualizzare l'anteprima della telecamera.
-- Nuova plancia Lovelace completa [eco-home-v1.1.6-dashboard-tuttacasa.yaml](eco-home-v1.1.6-dashboard-tuttacasa.yaml) per controllare l'intero ecosistema di Home Assistant (clima, luci, presenze, telecamere, elettrodomestici e diagnostica).
+- Nuova plancia Lovelace completa [eco-home-v1.1.7-dashboard-tuttacasa.yaml](eco-home-v1.1.7-dashboard-tuttacasa.yaml) per controllare l'intero ecosistema di Home Assistant (clima, luci, presenze, telecamere, elettrodomestici e diagnostica).
 - Documentazione completa aggiornata (`README.md`, `DIPENDENZE.md`, `REQUISITI_HARDWARE.md`, `GUIDA_PERSONALIZZAZIONE.md`, `GUIDA_AGGIORNAMENTO.md`).
 
 ## [1.1.4] - 2026-07-13

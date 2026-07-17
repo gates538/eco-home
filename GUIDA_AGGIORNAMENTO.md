@@ -1,8 +1,8 @@
-# Guida di Aggiornamento a Eco Home 1.1.6
+# Guida di Aggiornamento a Eco Home 1.1.7
 
-Questa guida descrive la procedura per aggiornare Eco Home alla versione **1.1.6** da una versione precedente.
+Questa guida descrive la procedura per aggiornare Eco Home alla versione **1.1.7** da una versione precedente.
 
-La versione 1.1.5 ha introdotto le notifiche push con immagine da telecamera quando la casa è vuota (richiedendo l'helper `input_boolean.eco_home_notifiche_foto`), mentre la versione 1.1.6 rimuove il ritardo iniziale di 3 secondi prima dell'annuncio vocale.
+La versione 1.1.7 introduce il monitoraggio della temperatura media interna all'arrivo e l'opzione di accendere i condizionatori tramite notifica push interattiva sul cellulare se si superano i 26°C.
 
 ---
 
@@ -17,8 +17,8 @@ Per consentire a Home Assistant di salvare le immagini scattate dalla telecamera
 ## 2. Aggiorna o crea il nuovo helper
 
 ### Se usi i Package YAML (Consigliato)
-1. Rimuovi il vecchio file package `eco-home-v1.1.5-helpers.yaml` (o precedenti) da `/config/packages/`.
-2. Copia il nuovo file `eco-home-v1.1.6-helpers.yaml` nella stessa cartella.
+1. Rimuovi il vecchio file package `eco-home-v1.1.6-helpers.yaml` (o precedenti) da `/config/packages/`.
+2. Copia il nuovo file `eco-home-v1.1.7-helpers.yaml` nella stessa cartella.
 3. Ricarica i package o riavvia Home Assistant.
 
 ### Se hai creato gli helper dalla UI
@@ -32,7 +32,7 @@ Se preferisci gestire gli helper manualmente dalla UI di Home Assistant, vai in 
 
 ## 3. Aggiorna l'automazione
 Apri il tuo file `/config/automations.yaml` ed individua il blocco dell'automazione Eco Home (puoi cercarlo tramite l'id `'1783777716602'`).
-1. Sostituisci **esclusivamente** il blocco dell'automazione esistente con il contenuto di [eco-home-v1.1.6.yaml](eco-home-v1.1.6.yaml).
+1. Sostituisci **esclusivamente** il blocco dell'automazione esistente con il contenuto di [eco-home-v1.1.7.yaml](eco-home-v1.1.7.yaml).
 2. Modifica le variabili in fondo al file (nella sezione `variables:`) per impostare la tua telecamera (default: `camera.sala_2`) e i tuoi canali di notifica push (es. `notify.mobile_app_tuo_telefono`).
 3. Salva il file e vai su **Strumenti per sviluppatori → YAML** e clicca su **Ricarica le automazioni**.
 
@@ -41,7 +41,7 @@ Apri il tuo file `/config/automations.yaml` ed individua il blocco dell'automazi
 ## 4. Aggiorna la card Lovelace
 Apri la plancia di Home Assistant, clicca sui tre puntini in alto a destra → **Modifica plancia**.
 1. Trova la card di Eco Home, clicca su **Modifica** e poi su **Editor di codice**.
-2. Sostituisci il codice YAML esistente con il contenuto di [eco-home-v1.1.6-dashboard-card.yaml](eco-home-v1.1.6-dashboard-card.yaml).
+2. Sostituisci il codice YAML esistente con il contenuto di [eco-home-v1.1.7-dashboard-card.yaml](eco-home-v1.1.7-dashboard-card.yaml).
 3. Clicca su **Salva** e poi su **Fatto**.
 
 ---

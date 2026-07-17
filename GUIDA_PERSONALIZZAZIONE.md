@@ -1,21 +1,21 @@
-# Personalizzazione Eco Home v1.1.6
+# Personalizzazione Eco Home v1.1.7
 
-I numeri di riga si riferiscono a `eco-home-v1.1.6.yaml` pubblicato con la release.
+I numeri di riga si riferiscono a `eco-home-v1.1.7.yaml` pubblicato con la release.
 
 ## Persone
 
-Alle righe **10-11** e **661-662** sostituisci:
+Alle righe **10-11** e **795-796** sostituisci:
 
 ```text
 person.stefano
 person.laura
 ```
 
-Se cambi questi entity ID, sostituisci anche tutte le occorrenze nei blocchi `arrived_stefano`, `arrived_laura` e `arrived_now_couple`, circa alle righe **317-329**.
+Se cambi questi entity ID, sostituisci anche tutte le occorrenze nei blocchi `arrived_stefano`, `arrived_laura` e `arrived_now_couple`, circa alle righe **340-360**.
 
 ## Portone
 
-L'entità compare alla riga **19** e nella variabile `door_sensor` alla riga **651**:
+L'entità compare alla riga **19** e nella variabile `door_sensor` alla riga **779**:
 
 ```text
 binary_sensor.porta_contact
@@ -34,7 +34,7 @@ media_player.nest_hub_sala
 tts.google_ai_tts
 ```
 
-Le variabili principali sono alle righe **647-648**. Gli stessi entity ID vengono usati anche nelle azioni TTS e di ripristino volume.
+Le variabili principali sono alle righe **775-776**. Gli stessi entity ID vengono usati anche nelle azioni TTS e di ripristino volume.
 
 Non scegliere il lettore soltanto perché compare come `media_player`: deve
 superare le prove TTS, volume e arresto descritte in
@@ -47,7 +47,7 @@ media_player.tv_sala_ue85du7170uxzt
 light.luceambiente
 ```
 
-Le variabili sono alle righe **649-650**. Sostituisci anche le occorrenze nelle azioni della parte superiore del file.
+Le variabili sono alle righe **777-778**. Sostituisci anche le occorrenze nelle azioni della parte superiore del file.
 
 ## Asciugatrice
 
@@ -59,24 +59,24 @@ sensor.esterno_asciugatrice_completion_time
 sensor.esterno_asciugatrice_energia_elettrica
 ```
 
-Le variabili si trovano circa alle righe **652-654**. Il sensore di energia è predisposto ma non è indispensabile per il promemoria.
+Le variabili si trovano circa alle righe **780-782**. Il sensore di energia è predisposto ma non è indispensabile per il promemoria.
 
 ## Tempi e volumi
 
 | Impostazione | Riga | Valore predefinito |
 |---|---:|---:|
-| Assenza minima | 676 | 2 minuti |
-| Finestra presenza-portone | 677 | 300 secondi |
-| Attesa gruppo | 678 | 0 secondi |
-| Cooldown annunci | 679 | 20 secondi |
-| Volume giorno | 683 | 0.8 |
-| Volume sera | 684 | 0.8 |
-| Volume notte | 685 | 0.4 |
-| Luminosità luce | 693 | 45% |
+| Assenza minima | 810 | 2 minuti |
+| Finestra presenza-portone | 811 | 300 secondi |
+| Attesa gruppo | 812 | 0 secondi |
+| Cooldown annunci | 813 | 20 secondi |
+| Volume giorno | 817 | 0.8 |
+| Volume sera | 818 | 0.8 |
+| Volume notte | 819 | 0.4 |
+| Luminosità luce | 827 | 45% |
 
 ## Debug
 
-Alla riga **645**:
+Alla riga **773**:
 
 ```yaml
 debug: true
@@ -96,7 +96,14 @@ Le nuove variabili configurabili per la telecamera e le notifiche si trovano nel
 
 La notifica verrà inviata **solo se la casa era completamente vuota** prima del rientro rilevato.
 
+## Temperatura e Condizionatori (Clima)
+
+Le variabili per gestire il controllo del clima e della temperatura si trovano nella sezione `variables:` dell'automazione alle righe **788-793**:
+
+- `indoor_temp_sensors`: La lista dei sensori di temperatura interna da monitorare (default: `sensor.temperatura_sala` e `sensor.temperatura_camera`). L'automazione ne calcolerà la media automatica.
+- `ac_climate_entities`: La lista dei condizionatori (entità `climate.*`) da accendere in modalità raffrescamento al clic sulla notifica (default: `climate.condizionatore_sala` e `climate.condizionatore_camera`).
+
 ## Card
 
-Gli entity ID delle persone e dei dispositivi sono presenti anche in `eco-home-v1.1.6-dashboard-card.yaml` e devono corrispondere a quelli dell'automazione.
+Gli entity ID delle persone e dei dispositivi sono presenti anche in `eco-home-v1.1.7-dashboard-card.yaml` e devono corrispondere a quelli dell'automazione.
 

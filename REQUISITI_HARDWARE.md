@@ -1,4 +1,4 @@
-# Requisiti hardware e compatibilità di Eco Home v1.1.6
+# Requisiti hardware e compatibilità di Eco Home v1.1.7
 
 Questa guida descrive i dispositivi fisici necessari per usare Eco Home e le
 funzioni che devono esporre in Home Assistant.
@@ -342,7 +342,15 @@ Per scattare e inviare una foto del rientro sul cellulare (se la casa era vuota)
 * **Cartella snapshot locale**: Devi creare la cartella `/config/www/snapshots/` sul tuo Home Assistant. L'immagine temporanea verrà salvata lì (es. `/config/www/snapshots/eco_home_sala_2.jpg`) e sarà accessibile all'app Companion o a Telegram tramite l'URL `/local/snapshots/eco_home_sala_2.jpg`.
 * **Servizio di Notifica**: I telefoni devono avere configurata l'app Home Assistant Companion o l'integrazione di Telegram.
 
-## 9. Verifica finale di compatibilità
+## 9. Sensori di temperatura e condizionatori (Clima) opzionali
+
+Per abilitare l'annuncio vocale della temperatura interna e l'accensione intelligente del condizionatore:
+
+* **Sensori di temperatura**: Devono essere entità che restituiscono un valore numerico (es. `sensor.*_temperature` o `sensor.*_temperatura`). Puoi configurare più sensori: l'automazione ne calcolerà la media matematica automaticamente.
+* **Entità condizionatori (clima)**: Devono essere entità di tipo `climate.*` compatibili con le azioni `climate.turn_on` e `climate.set_hvac_mode` (impostati su `cool`).
+* **Notifiche Push sul Cellulare**: I cellulari devono supportare le notifiche push interattive (actionable notifications) tramite l'app Home Assistant Companion per consentire la risposta sul pulsante "Sì, accendi".
+
+## 10. Verifica finale di compatibilità
 
 Prima di considerare pronto l'impianto, completa questa lista:
 
@@ -357,6 +365,7 @@ Prima di considerare pronto l'impianto, completa questa lista:
 - [ ] Lo stato opzionale dell'asciugatrice usa valori riconosciuti.
 - [ ] La telecamera opzionale supporta l'azione `camera.snapshot`.
 - [ ] La cartella locale `/config/www/snapshots/` è stata creata.
+- [ ] I condizionatori e i sensori di temperatura opzionali sono configurati.
 - [ ] Tutti gli entity ID sono stati sostituiti anche nella card e nelle azioni, non solo nelle variabili finali.
 
 Soltanto dopo queste prove esegui il test **Percorso audio** dalla card e poi un

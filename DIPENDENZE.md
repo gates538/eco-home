@@ -1,4 +1,4 @@
-# Dipendenze di Eco Home v1.1.6
+# Dipendenze di Eco Home v1.1.7
 
 Eco Home usa esclusivamente funzioni standard di Home Assistant. Non richiede HACS o componenti personalizzati.
 
@@ -51,7 +51,7 @@ promemoria di fine ciclo.
 ## Helper
 
 Per una nuova installazione copia
-`eco-home-v1.1.6-helpers.yaml` in `/config/packages/eco-home-v1.1.6-helpers.yaml`.
+`eco-home-v1.1.7-helpers.yaml` in `/config/packages/eco-home-v1.1.7-helpers.yaml`.
 
 Se preferisci crearli dalla UI, segui [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md).
 
