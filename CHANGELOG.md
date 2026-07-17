@@ -2,6 +2,12 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [1.1.6] - 2026-07-17
+
+### Corretto
+- Rimosso il ritardo fisso di 3 secondi (`arrival_group_window_seconds: 0`) prima dell'annuncio vocale di benvenuto, che ora si attiva immediatamente dopo la conferma di rientro.
+- Aggiornati i riferimenti interni e i numeri di riga in tutta la documentazione per allinearli alla versione corrente.
+
 ## [1.1.5] - 2026-07-15
 
 ### Aggiunto
@@ -11,6 +17,7 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 - Nuovo helper `input_boolean.eco_home_notifiche_foto` per abilitare/disabilitare le notifiche con foto direttamente dalla dashboard.
 - Configurazione flessibile per mappare i servizi di notifica individuali (es. `notify.mobile_app_stefano` o `notify.notify` per broadcast).
 - Nuova sezione dedicata nella plancia Lovelace per controllare lo stato delle notifiche con foto e visualizzare l'anteprima della telecamera.
+- Nuova plancia Lovelace completa [eco-home-v1.1.6-dashboard-tuttacasa.yaml](eco-home-v1.1.6-dashboard-tuttacasa.yaml) per controllare l'intero ecosistema di Home Assistant (clima, luci, presenze, telecamere, elettrodomestici e diagnostica).
 - Documentazione completa aggiornata (`README.md`, `DIPENDENZE.md`, `REQUISITI_HARDWARE.md`, `GUIDA_PERSONALIZZAZIONE.md`, `GUIDA_AGGIORNAMENTO.md`).
 
 ## [1.1.4] - 2026-07-13

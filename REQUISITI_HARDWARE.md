@@ -1,4 +1,4 @@
-# Requisiti hardware e compatibilità di Eco Home v1.1.5
+# Requisiti hardware e compatibilità di Eco Home v1.1.6
 
 Questa guida descrive i dispositivi fisici necessari per usare Eco Home e le
 funzioni che devono esporre in Home Assistant.

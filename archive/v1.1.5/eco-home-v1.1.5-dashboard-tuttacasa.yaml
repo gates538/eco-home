@@ -1,0 +1,194 @@
+# =========================================================================
+# ECO HOME v1.1.5 - PLANCIA DI CONTROLLO "TUTTA CASA"
+# Configurazione Dashboard Lovelace YAML Completa per Raw Config Editor
+# =========================================================================
+
+views:
+  - title: Tutta Casa
+    path: tutta_casa
+    icon: mdi:home-assistant
+    cards:
+      - type: vertical-stack
+        cards:
+          # 1. HEADER BANNER (HTML/CSS Gradient)
+          - type: markdown
+            content: |
+              <div style="background: linear-gradient(135deg, #1f1c2c 0%, #3a3250 50%, #5d4a75 100%); padding: 24px; border-radius: 20px; color: #f2f3f5; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08);">
+                <h1 style="margin: 0; font-size: 26px; font-weight: 800; font-family: 'Outfit', sans-serif; letter-spacing: 1.5px; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">STEFANO'S COMMAND CENTER</h1>
+                <p style="margin: 6px 0 0 0; opacity: 0.8; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; font-weight: 600;">Ecosistema Domotico &bull; Borgo Santa Maria, Roma</p>
+                
+                <div style="display: flex; justify-content: space-around; margin-top: 20px; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 15px; font-family: 'Plus Jakarta Sans', sans-serif;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span>☀️</span>
+                    <span>Sole: <strong>{{ 'Sopra l\'orizzonte' if is_state('sun.sun', 'above_horizon') else 'Sotto l\'orizzonte' }}</strong></span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span>📅</span>
+                    <span>Data: <strong>{{ now().strftime('%d %B %Y') }}</strong></span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span>🤖</span>
+                    <span>Eco Home: <strong style="color: {{ '#27ae60' if is_state('input_boolean.eco_home_attivo', 'on') else '#eb5757' }}">{{ 'Attivo' if is_state('input_boolean.eco_home_attivo', 'on') else 'Spento' }}</strong></span>
+                  </div>
+                </div>
+              </div>
+
+          # 2. ALERT CONDIZIONALE: ASCIUGATRICE COMPLETATA
+          - type: conditional
+            conditions:
+              - entity: input_boolean.eco_home_asciugatrice_da_annunciare
+                state: 'on'
+            card:
+              type: markdown
+              content: |
+                <div style="background: rgba(242, 201, 76, 0.12); border: 1.5px solid #f2c94c; padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 15px; box-shadow: 0 4px 15px rgba(242, 201, 76, 0.1);">
+                  <div style="font-size: 26px;">🧺</div>
+                  <div style="font-family: 'Plus Jakarta Sans', sans-serif;">
+                    <h3 style="margin: 0; color: #f2c94c; font-size: 15px; font-weight: 700;">Asciugatrice Pronta!</h3>
+                    <p style="margin: 3px 0 0 0; font-size: 12px; opacity: 0.9; color: #f2f3f5;">Il ciclo di asciugatura è terminato. Il promemoria vocale verrà annunciato automaticamente al prossimo rientro rilevato a casa.</p>
+                  </div>
+                </div>
+
+          # 3. GRIGLIA A TRE COLONNE (STUCK RESPONSIVE)
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              # --- COLONNA 1: PRESENZE E ILLUMINAZIONE ---
+              - type: vertical-stack
+                cards:
+                  - type: glance
+                    title: 👥 Presenze in Famiglia
+                    show_name: true
+                    show_state: true
+                    entities:
+                      - entity: person.stefano
+                        name: Stefano
+                      - entity: person.laura
+                        name: Laura
+                      - entity: binary_sensor.porta_contact
+                        name: Portone
+                        icon: mdi:door-closed
+
+                  - type: entities
+                    title: 💡 Luci & Clima
+                    show_header_toggle: false
+                    entities:
+                      - entity: light.luceambiente
+                        name: Luce Ambiente
+                        icon: mdi:led-strip-variant
+                      - entity: sun.sun
+                        name: Posizione Sole
+                        icon: mdi:white-balance-sunny
+
+              # --- COLONNA 2: SICUREZZA & MULTIMEDIA ---
+              - type: vertical-stack
+                cards:
+                  - type: picture-glance
+                    title: 📹 Live Cam Sala 2
+                    image: https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=400&q=80
+                    camera_image: camera.sala_2
+                    camera_view: live
+                    entities:
+                      - entity: binary_sensor.porta_contact
+                        icon: mdi:door
+                      - entity: input_boolean.eco_home_notifiche_foto
+                        icon: mdi:camera
+
+                  - type: entities
+                    title: 📺 Intrattenimento
+                    show_header_toggle: false
+                    entities:
+                      - entity: media_player.tv_sala_ue85du7170uxzt
+                        name: TV Samsung 85"
+                        icon: mdi:television
+                      - entity: media_player.nest_hub_sala
+                        name: Nest Hub Sala
+                        icon: mdi:google-home
+
+              # --- COLONNA 3: ELETTRODOMESTICI & CONTROLLI ECO HOME ---
+              - type: vertical-stack
+                cards:
+                  - type: entities
+                    title: 🧺 Asciugatrice
+                    show_header_toggle: false
+                    entities:
+                      - entity: sensor.esterno_asciugatrice_machine_state
+                        name: Stato Attuale
+                        icon: mdi:tumble-dryer
+                      - entity: sensor.esterno_asciugatrice_completion_time
+                        name: Ora Fine Prevista
+                        icon: mdi:clock-end
+                      - entity: sensor.esterno_asciugatrice_energia_elettrica
+                        name: Consumo Energia
+                        icon: mdi:flash
+
+                  - type: entities
+                    title: ⚙️ Eco Home Control
+                    show_header_toggle: false
+                    entities:
+                      - entity: input_boolean.eco_home_attivo
+                        name: Automazione Abilitata
+                      - entity: input_boolean.eco_home_silenzioso
+                        name: Modalità Silenziosa
+                      - entity: input_boolean.eco_home_notifiche_foto
+                        name: Notifiche Foto Rientro
+                      - entity: input_select.eco_home_scenario_test
+                        name: Scenario Test Vocale
+                      - entity: input_button.eco_home_test_vocale
+                        name: Avvia Test Vocale
+                        icon: mdi:play-circle
+
+          # 4. MONITOR DIAGNOSTICA AVANZATO (Tabella Jinja HTML)
+          - type: markdown
+            title: "📋 Eco Home Diagnostica & Log"
+            content: |
+              <div style="font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                  <thead>
+                    <tr style="border-bottom: 2px solid rgba(255,255,255,0.15); font-weight: bold; opacity: 0.9;">
+                      <th style="padding: 10px 8px;">Entità / Parametro</th>
+                      <th style="padding: 10px 8px;">Valore Registrato</th>
+                      <th style="padding: 10px 8px; text-align: right;">Ultimo Aggiornamento</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                      <td style="padding: 10px 8px; font-weight: 600; color: #00f2fe;">Ultimo Evento</td>
+                      <td style="padding: 10px 8px;">{{ states('input_text.eco_home_ultimo_evento') }}</td>
+                      <td style="padding: 10px 8px; text-align: right; color: gray;">
+                        {{ relative_time(states.input_text.eco_home_ultimo_evento.last_changed) }} fa
+                      </td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                      <td style="padding: 10px 8px; font-weight: 600; color: #00f2fe;">Ultima Persona</td>
+                      <td style="padding: 10px 8px;">{{ states('input_text.eco_home_ultima_persona') }}</td>
+                      <td style="padding: 10px 8px; text-align: right; color: gray;">-</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                      <td style="padding: 10px 8px; font-weight: 600; color: #f2c94c;">Ultimo Messaggio TTS</td>
+                      <td style="padding: 10px 8px; font-style: italic; color: #e0d0a0;">"{{ states('input_text.eco_home_ultimo_messaggio') }}"</td>
+                      <td style="padding: 10px 8px; text-align: right; color: gray;">
+                        {{ states('input_datetime.eco_home_ultimo_annuncio') }}
+                      </td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                      <td style="padding: 10px 8px; font-weight: 600; color: #9b51e0;">Profilo Vocale Utilizzato</td>
+                      <td style="padding: 10px 8px;">{{ states('input_text.eco_home_ultimo_profilo') }}</td>
+                      <td style="padding: 10px 8px; text-align: right; color: gray;">-</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                      <td style="padding: 10px 8px; font-weight: 600; color: #ff7675;">Esito Diagnostico</td>
+                      <td style="padding: 10px 8px;">
+                        {% set esito = states('input_text.eco_home_ultimo_esito') %}
+                        {% if 'successo' in esito | lower %}
+                          <span style="color: #4cd137; font-weight: bold; background: rgba(39,174,96,0.15); padding: 2px 8px; border-radius: 10px;">🟢 {{ esito }}</span>
+                        {% else %}
+                          <span style="color: #eb5757; font-weight: bold; background: rgba(235,87,87,0.15); padding: 2px 8px; border-radius: 10px;">🔴 {{ esito }}</span>
+                        {% endif %}
+                      </td>
+                      <td style="padding: 10px 8px; text-align: right; color: gray;">-</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
