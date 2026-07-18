@@ -1,0 +1,122 @@
+- id: 'eco_home_security_120'
+  alias: Eco Home Security & Guardiano
+  description: Modulo per controlli all'uscita (Guardiano) e sistema anti-intrusione
+  mode: single
+  triggers:
+  - trigger: numeric_state
+    entity_id: zone.home
+    below: 1
+    id: everyone_left
+  - trigger: state
+    entity_id: binary_sensor.porta_contact
+    to: 'on'
+    id: door_opened_intrusion
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: everyone_left
+      sequence:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.eco_home_allarme_inserito
+        continue_on_error: true
+      - delay: 00:01:00
+      - variables:
+          light_is_on: '{{ is_state(light_entity, ''on'') }}'
+          windows_open: >-
+            {% set open = expand(window_sensors) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
+            {{ open | join(', ') if open | length > 0 else 'none' }}
+          dryer_is_on: '{{ states(dryer_state_sensor) not in [''off'', ''idle'', ''stop'', ''stopped'', ''complete'', ''completed'', ''finish'', ''finished'', ''end'', ''ended'', ''none'', ''standby'', ''unknown'', ''unavailable''] }}'
+      - if:
+        - condition: template
+          value_template: '{{ light_is_on }}'
+        then:
+        - action: '{{ default_notification_service }}'
+          data:
+            title: "Guardiano Eco Home"
+            message: "Tutti sono usciti ma la luce {{ state_attr(light_entity, 'friendly_name') }} è accesa. Vuoi spegnerla?"
+            data:
+              actions:
+                - action: "TURN_OFF_LIGHT_{{ context.id }}"
+                  title: "Sì, spegni"
+                - action: "DISMISS_SEC"
+                  title: "Ignora"
+          continue_on_error: true
+      - if:
+        - condition: template
+          value_template: '{{ windows_open != ''none'' }}'
+        then:
+        - action: '{{ default_notification_service }}'
+          data:
+            title: "Guardiano Eco Home"
+            message: "Attenzione: avete lasciato aperto: {{ windows_open }}."
+          continue_on_error: true
+      - if:
+        - condition: template
+          value_template: '{{ dryer_is_on }}'
+        then:
+        - action: '{{ default_notification_service }}'
+          data:
+            title: "Guardiano Eco Home"
+            message: "L'asciugatrice è ancora in funzione mentre siete fuori."
+          continue_on_error: true
+
+    - conditions:
+      - condition: trigger
+        id: door_opened_intrusion
+      - condition: state
+        entity_id: input_boolean.eco_home_allarme_inserito
+        state: 'on'
+      - condition: numeric_state
+        entity_id: zone.home
+        below: 1
+      sequence:
+      - action: camera.snapshot
+        target:
+          entity_id: '{{ camera_entity }}'
+        data:
+          filename: '{{ snapshot_file_path }}'
+        continue_on_error: true
+      - action: '{{ default_notification_service }}'
+        data:
+          title: "🚨 ALLARME INTRUSIONE 🚨"
+          message: "Il portone è stato aperto mentre la casa è vuota!"
+          data:
+            image: '{{ snapshot_access_url }}'
+            attachment:
+              url: '{{ snapshot_access_url }}'
+              content-type: jpeg
+              hide-thumbnail: false
+            actions:
+              - action: "DISARM_ALARM_{{ context.id }}"
+                title: "È un falso allarme"
+        continue_on_error: true
+      - action: media_player.volume_set
+        target:
+          entity_id: '{{ speaker }}'
+        data:
+          volume_level: 1.0
+        continue_on_error: true
+      - action: tts.speak
+        target:
+          entity_id: '{{ tts_engine }}'
+        data:
+          media_player_entity_id: '{{ speaker }}'
+          message: "Attenzione. Intrusione rilevata. Le forze dell'ordine sono state avvisate. Allontanarsi immediatamente."
+          cache: false
+        continue_on_error: true
+
+  variables:
+    speaker: media_player.nest_hub_sala
+    tts_engine: tts.google_ai_tts
+    light_entity: light.luceambiente
+    dryer_state_sensor: sensor.esterno_asciugatrice_machine_state
+    camera_entity: camera.sala_2
+    default_notification_service: notify.notify
+    snapshot_file_path: /media/eco_home/eco_home_sala_2.jpg
+    snapshot_access_url: /media/local/eco_home/eco_home_sala_2.jpg
+    window_sensors:
+    - binary_sensor.finestra_sala
+    - binary_sensor.finestra_camera

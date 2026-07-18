@@ -1,0 +1,95 @@
+- id: 'eco_home_actions_120'
+  alias: Eco Home - Azioni Notifiche
+  mode: parallel
+  description: Eco Home v1.2.0 - Gestisce le risposte interattive (Clima, Luci, Allarme).
+  triggers:
+  - trigger: event
+    event_type: mobile_app_notification_action
+  conditions:
+  - condition: template
+    value_template: >
+      {{ trigger.event.data.action | string | startswith('TURN_ON_AC_') or
+         trigger.event.data.action | string | startswith('TURN_ON_HEAT_') or
+         trigger.event.data.action | string | startswith('TURN_OFF_LIGHT_') or
+         trigger.event.data.action | string | startswith('DISARM_ALARM_') }}
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.action | string | startswith('TURN_ON_AC_') }}
+      sequence:
+      - action: climate.turn_on
+        target:
+          entity_id: '{{ ac_climate_entities }}'
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: '{{ ac_climate_entities }}'
+        data:
+          hvac_mode: cool
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_esito
+        data:
+          value: Condizionatori accesi (Freddo)
+        continue_on_error: true
+
+    - conditions:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.action | string | startswith('TURN_ON_HEAT_') }}
+      sequence:
+      - action: climate.turn_on
+        target:
+          entity_id: '{{ ac_climate_entities }}'
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: '{{ ac_climate_entities }}'
+        data:
+          hvac_mode: heat
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_esito
+        data:
+          value: Condizionatori accesi (Caldo)
+        continue_on_error: true
+
+    - conditions:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.action | string | startswith('TURN_OFF_LIGHT_') }}
+      sequence:
+      - action: light.turn_off
+        target:
+          entity_id: '{{ light_entity }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_esito
+        data:
+          value: Luce dimenticata spenta
+        continue_on_error: true
+
+    - conditions:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.action | string | startswith('DISARM_ALARM_') }}
+      sequence:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.eco_home_allarme_inserito
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_esito
+        data:
+          value: Falso allarme disattivato
+        continue_on_error: true
+
+  variables:
+    debug: true
+    indoor_temp_sensors:
+    - sensor.temperatura_sala
+    - sensor.temperatura_camera
+    ac_climate_entities:
+    - climate.condizionatore_sala
+    - climate.condizionatore_camera
+    light_entity: light.luceambiente

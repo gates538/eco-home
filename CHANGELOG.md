@@ -2,6 +2,19 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [1.2.0] - 2026-07-18
+
+### Modularizzazione e Nuove Feature
+- Suddivisione dell'automazione in più file modulari: `eco-home-v1.2.0-core.yaml`, `eco-home-v1.2.0-security.yaml`, `eco-home-v1.2.0-climate.yaml`.
+- Gestione Invernale: Notifica al rientro se la temperatura interna è sotto i 18°C per suggerire l'accensione del riscaldamento.
+- Integrazione Meteo e Allerte: Annuncio automatico in caso di pioggia (`weather.home`) o allerte meteo in corso (`sensor.allerta_meteo`).
+- Modalità Notte Dinamica: Tra le 23:00 e le 06:00 l'illuminazione si accende al 15% (luce calda a 2200K) e il TTS viene sospeso automaticamente.
+- Modalità Ospiti: Aggiunto `input_boolean.eco_home_ospiti`. Se abilitato, disattiva il TTS all'arrivo.
+- Guardiano Uscite: Quando la casa si svuota (`zone.home` a 0) notifica eventuali luci dimenticate accese, finestre aperte o elettrodomestici in funzione, offrendo azioni rapide.
+- Sistema Anti-Intrusione: Se il portone viene aperto a casa vuota e allarme inserito, scatta una foto, spara il volume al 100% e annuncia l'intrusione inviando notifica push.
+- Risparmio Energetico Clima: L'automazione ferma automaticamente i condizionatori se una finestra resta aperta per più di 3 minuti.
+- Aggiornate le Dashboard Lovelace con controlli per la Modalità Ospiti e lo stato dell'Allarme.
+
 ## [1.1.8] - 2026-07-18
 
 ### Consolidamento e Sicurezza (Codex Review)
