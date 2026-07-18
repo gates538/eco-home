@@ -2,6 +2,18 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [1.1.8] - 2026-07-18
+
+### Consolidamento e Sicurezza (Codex Review)
+- Estrazione dell'azione di accensione condizionatori in un'automazione separata (`eco-home-v1.1.8-actions.yaml`) per evitare ritardi con la coda TTS.
+- Aggiunto `context.id` univoco per le notifiche interattive, prevenendo attivazioni accidentali da vecchie notifiche.
+- Salvataggio degli snapshot telecamera in `/media/eco_home/` anziché `/config/www/` per ragioni di privacy.
+- Risolto bug di duplicazione notifiche al rientro di coppia se entrambi usano lo stesso servizio.
+- Completa applicazione delle variabili configurabili alle azioni dell'automazione.
+- Migliorata diagnostica TTS rimuovendo l'occultamento degli errori.
+- Corretti colori nella dashboard Tutta Casa per segnalare esiti OK non solo in presenza della parola 'successo'.
+- Aggiunta licenza MIT e validatore YAML in GitHub Actions.
+
 ## [1.1.7] - 2026-07-17
 
 ### Aggiunto
@@ -10,13 +22,13 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 - Notifica push interattiva (actionable notification) al rientro se la temperatura interna è maggiore di 26°C, chiedendo se si desidera accendere i condizionatori.
 - Gestione automatica del clic sulla notifica per accendere i condizionatori (`ac_climate_entities`) in modalità raffrescamento (`cool`).
 
-## [1.1.6] - 2026-07-17
+## [1.1.7] - 2026-07-17
 
 ### Corretto
 - Rimosso il ritardo fisso di 3 secondi (`arrival_group_window_seconds: 0`) prima dell'annuncio vocale di benvenuto, che ora si attiva immediatamente dopo la conferma di rientro.
 - Aggiornati i riferimenti interni e i numeri di riga in tutta la documentazione per allinearli alla versione corrente.
 
-## [1.1.5] - 2026-07-15
+## [1.1.6] - 2026-07-15
 
 ### Aggiunto
 
@@ -25,10 +37,10 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 - Nuovo helper `input_boolean.eco_home_notifiche_foto` per abilitare/disabilitare le notifiche con foto direttamente dalla dashboard.
 - Configurazione flessibile per mappare i servizi di notifica individuali (es. `notify.mobile_app_stefano` o `notify.notify` per broadcast).
 - Nuova sezione dedicata nella plancia Lovelace per controllare lo stato delle notifiche con foto e visualizzare l'anteprima della telecamera.
-- Nuova plancia Lovelace completa [eco-home-v1.1.7-dashboard-tuttacasa.yaml](eco-home-v1.1.7-dashboard-tuttacasa.yaml) per controllare l'intero ecosistema di Home Assistant (clima, luci, presenze, telecamere, elettrodomestici e diagnostica).
+- Nuova plancia Lovelace completa [eco-home-v1.1.8-dashboard-tuttacasa.yaml](eco-home-v1.1.8-dashboard-tuttacasa.yaml) per controllare l'intero ecosistema di Home Assistant (clima, luci, presenze, telecamere, elettrodomestici e diagnostica).
 - Documentazione completa aggiornata (`README.md`, `DIPENDENZE.md`, `REQUISITI_HARDWARE.md`, `GUIDA_PERSONALIZZAZIONE.md`, `GUIDA_AGGIORNAMENTO.md`).
 
-## [1.1.4] - 2026-07-13
+## [1.1.5] - 2026-07-13
 
 ### Corretto
 

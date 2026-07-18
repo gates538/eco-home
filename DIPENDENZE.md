@@ -1,4 +1,4 @@
-# Dipendenze di Eco Home v1.1.7
+# Dipendenze di Eco Home v1.1.8
 
 Eco Home usa esclusivamente funzioni standard di Home Assistant. Non richiede HACS o componenti personalizzati.
 
@@ -45,17 +45,17 @@ Se non utilizzi una funzione opzionale, disattiva o rimuovi i relativi blocchi s
 
 `sun.sun` serve soltanto per accendere la luce quando è buio. Il sensore di
 energia dell'asciugatrice è predisposto ma non viene usato dalla logica della
-v1.1.4. Il sensore `machine_state` è invece necessario se si vuole il
+v1.1.8. Il sensore `machine_state` è invece necessario se si vuole il
 promemoria di fine ciclo.
 
 ## Helper
 
 Per una nuova installazione copia
-`eco-home-v1.1.7-helpers.yaml` in `/config/packages/eco-home-v1.1.7-helpers.yaml`.
+`eco-home-v1.1.8-helpers.yaml` in `/config/packages/eco-home-v1.1.8-helpers.yaml`.
 
 Se preferisci crearli dalla UI, segui [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md).
 
-Se aggiorni dalla 1.1.4 o da una versione precedente, segui prima [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md).
+Se aggiorni dalla 1.1.8 o da una versione precedente, segui prima [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md).
 
 Il file completo definisce:
 

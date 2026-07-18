@@ -1,0 +1,1074 @@
+- id: '1783777716602'
+  alias: Eco home
+  description: Eco home v1.1.8 - Rientro bidirezionale presenza-portone, scenari
+    di test, diagnostica persistente, ripristino volume Nest Hub, protezione dagli
+    stati non validi, asciugatrice, luce, TV, frasi locali casuali e notifiche push
+    con foto da telecamera (Cam Sala 2).
+  triggers:
+  - trigger: state
+    entity_id:
+    - person.stefano
+    - person.laura
+    to: home
+    not_from:
+    - home
+    - unknown
+    - unavailable
+    id: person_arrived
+  - trigger: state
+    entity_id: binary_sensor.porta_contact
+    to: 'on'
+    not_from:
+    - unknown
+    - unavailable
+    id: door_opened
+  - trigger: state
+    entity_id: sensor.esterno_asciugatrice_machine_state
+    to:
+    - 'off'
+    - idle
+    - stop
+    - stopped
+    - complete
+    - completed
+    - finish
+    - finished
+    - end
+    - ended
+    - none
+    - standby
+    not_from:
+    - 'off'
+    - idle
+    - stop
+    - stopped
+    - complete
+    - completed
+    - finish
+    - finished
+    - end
+    - ended
+    - none
+    - standby
+    - unknown
+    - unavailable
+    for: 00:02:00
+    id: dryer_finished_while_away
+  - trigger: state
+    entity_id: input_button.eco_home_test_vocale
+    id: manual_test
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger_type == ''door_opened'' }}'
+      sequence:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.eco_home_ultima_apertura_portone
+        data:
+          datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+        continue_on_error: true
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_evento
+        data:
+          value: Portone aperto
+        continue_on_error: true
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger_type == ''person_arrived'' }}'
+      sequence:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.eco_home_ultimo_arrivo
+        data:
+          datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+        continue_on_error: true
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultima_persona
+        data:
+          value: '{{ trigger_person_name | trim }}'
+        continue_on_error: true
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_evento
+        data:
+          value: 'Rientro rilevato: {{ trigger_person_name | trim }}'
+        continue_on_error: true
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger_type == ''dryer_finished_while_away'' }}'
+      sequence:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_evento
+        data:
+          value: Asciugatrice terminata
+        continue_on_error: true
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger_type == ''manual_test'' }}'
+      sequence:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_evento
+        data:
+          value: 'Test manuale: {{ test_scenario | trim }}'
+        continue_on_error: true
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger_type == ''manual_test'' }}'
+      sequence:
+      - variables:
+          test_profile: >-
+            {% if test_scenario | trim == 'Rientro Stefano' %}Stefano
+            {% elif test_scenario | trim == 'Rientro Laura' %}Laura
+            {% elif test_scenario | trim == 'Rientro di coppia' %}Coppia
+            {% elif test_scenario | trim == 'Modalità notte' %}Notte
+            {% elif test_scenario | trim == 'Promemoria asciugatrice' %}Asciugatrice
+            {% else %}Percorso audio{% endif %}
+          test_nickname: >-
+            {% if test_profile | trim == 'Stefano' %}{{ stefano_nicknames | random }}
+            {% elif test_profile | trim == 'Laura' %}{{ laura_nicknames | random }}
+            {% elif test_profile | trim in ['Coppia', 'Notte'] %}{{ couple_nicknames | random }}
+            {% else %}amici di casa{% endif %}
+          test_volume_level: >-
+            {% if test_profile | trim == 'Notte' %}{{ base_volume_night }}
+            {% else %}{{ tts_volume_level }}{% endif %}
+          nest_volume_before: '{{ state_attr(speaker, ''volume_level'') | float(-1) }}'
+      - variables:
+          test_message: >-
+            {% if test_profile | trim == 'Stefano' %}
+              {{ saluto_orario }} {{ test_nickname | trim }}. {{ stefano_phrase_starts | random }}: {{ stefano_phrase_tails | random }}
+            {% elif test_profile | trim == 'Laura' %}
+              {{ saluto_orario }} {{ test_nickname | trim }}. {{ laura_phrase_starts | random }}: {{ laura_phrase_tails | random }}
+            {% elif test_profile | trim == 'Coppia' %}
+              {{ saluto_orario }} {{ test_nickname | trim }}. {{ couple_phrase_starts | random }}: {{ couple_phrase_tails | random }}
+            {% elif test_profile | trim == 'Notte' %}
+              Buonanotte {{ test_nickname | trim }}. {{ night_phrase_starts | random }}: {{ night_phrase_tails | random }}
+            {% elif test_profile | trim == 'Asciugatrice' %}
+              Test promemoria asciugatrice. Il ciclo è terminato e il promemoria vocale funziona correttamente.
+            {% elif eco_home_enabled %}
+              Eco Home è attivo. Test del percorso audio completato.
+            {% else %}
+              Eco Home è disattivato. Il test audio funziona, ma gli annunci automatici sono spenti.
+            {% endif %}
+      - variables:
+          test_tts_delay_seconds: '{% set chars = test_message | length %} {{ [tts_minimum_delay_seconds,
+            ((chars / tts_chars_per_second) | round(0, ''ceil'') | int + 4)] | max }}'
+          tv_should_mute_this_run: "{{ tv_ducking_enabled\n   and not (is_night |
+            bool(false))\n   and states(tv_media_player) not in tv_ducking_excluded_states\n
+            \  and not (state_attr(tv_media_player, 'is_volume_muted') | default(false,
+            true)) }}"
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_profilo
+        data:
+          value: '{{ test_profile | trim }}'
+        continue_on_error: true
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_messaggio
+        data:
+          value: '{{ (test_message | trim)[:250] }}'
+        continue_on_error: true
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ nest_available }}'
+          sequence:
+          - parallel:
+            - sequence:
+              - choose:
+                - conditions:
+                  - condition: template
+                    value_template: '{{ tv_should_mute_this_run }}'
+                  sequence:
+                  - action: media_player.volume_mute
+                    target:
+                      entity_id: '{{ tv_media_player }}'
+                    data:
+                      is_volume_muted: true
+                    continue_on_error: true
+            - sequence:
+              - action: media_player.volume_set
+                target:
+                  entity_id: '{{ speaker }}'
+                data:
+                  volume_level: '{{ test_volume_level }}'
+                continue_on_error: true
+          - action: tts.speak
+            target:
+              entity_id: '{{ tts_engine }}'
+            data:
+              media_player_entity_id: '{{ speaker }}'
+              message: '{{ test_message | trim }}'
+              cache: false
+            continue_on_error: true
+          - delay:
+              seconds: '{{ test_tts_delay_seconds }}'
+          - choose:
+            - conditions:
+              - condition: template
+                value_template: '{{ tv_should_mute_this_run }}'
+              sequence:
+              - action: media_player.volume_mute
+                target:
+                  entity_id: '{{ tv_media_player }}'
+                data:
+                  is_volume_muted: false
+                continue_on_error: true
+          - action: media_player.media_stop
+            target:
+              entity_id: '{{ speaker }}'
+            continue_on_error: true
+          - choose:
+            - conditions:
+              - condition: template
+                value_template: '{{ nest_volume_before | float(-1) >= 0 }}'
+              sequence:
+              - action: media_player.volume_set
+                target:
+                  entity_id: '{{ speaker }}'
+                data:
+                  volume_level: '{{ nest_volume_before }}'
+                continue_on_error: true
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.eco_home_ultimo_annuncio
+            data:
+              datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+            continue_on_error: true
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.eco_home_ultimo_esito
+            data:
+              value: 'Test inviato al Nest Hub: {{ test_profile | trim }}'
+            continue_on_error: true
+        default:
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.eco_home_ultimo_esito
+          data:
+            value: Test non eseguito - Nest Hub non disponibile
+          continue_on_error: true
+        - if:
+          - condition: template
+            value_template: '{{ debug }}'
+          then:
+          - action: logbook.log
+            data:
+              name: Eco Home
+              message: 'Test {{ test_profile | trim }} non eseguito: Nest Hub non disponibile.'
+              entity_id: '{{ speaker }}'
+    - conditions:
+      - condition: template
+        value_template: "{{ eco_home_enabled\n   and trigger_type == 'dryer_finished_while_away'\n
+          \  and trigger_to_state in dryer_finished_states\n   and trigger_from_state
+          not in dryer_finished_states\n   and nobody_home }}"
+      sequence:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.eco_home_asciugatrice_fine
+        data:
+          datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_esito
+        data:
+          value: Promemoria asciugatrice salvato per il prossimo rientro
+        continue_on_error: true
+      - if:
+        - condition: template
+          value_template: '{{ debug }}'
+        then:
+        - action: logbook.log
+          data:
+            name: Eco Home
+            message: Asciugatrice terminata mentre nessuno era in casa. Annuncio salvato.
+            entity_id: sensor.esterno_asciugatrice_machine_state
+    - conditions:
+      - condition: template
+        value_template: "{{ eco_home_enabled\n   and trigger_type in ['door_opened', 'person_arrived']\n   and not eco_home_silent\n   and welcome_cooldown_ok\n
+          \  and arrival_confirmed_by_person_and_door }}"
+      sequence:
+      - variables:
+          indoor_temp_avg: >-
+            {% set sensors = indoor_temp_sensors | default([]) %}
+            {% if sensors is string %}
+              {% set sensors = [sensors] %}
+            {% endif %}
+            {% set ns = namespace(values=[]) %}
+            {% for s in sensors %}
+              {% if states(s) not in ['unknown', 'unavailable'] and states(s) | float(none) is not none %}
+                {% set ns.values = ns.values + [states(s) | float] %}
+              {% endif %}
+            {% endfor %}
+            {% if ns.values | length > 0 %}
+              {{ (ns.values | sum / ns.values | length) | round(1) }}
+            {% else %}
+              none
+            {% endif %}
+          temp_announcement_text: >-
+            {% if indoor_temp_avg != 'none' %}
+              In casa ci sono {{ indoor_temp_avg | replace('.', ',') }} gradi.
+              {% if indoor_temp_avg | float > 26.0 %}
+                Ti ho inviato una notifica sul telefono se desideri accendere i condizionatori.
+              {% endif %}
+            {% else %}
+              {{ '' }}
+            {% endif %}
+          arrived_now_text: "{% set ns = namespace(names=[]) %}\n{% for p in states.person\n
+            \  if p.state == 'home'\n   and p.entity_id in tracked_people\n   and
+            (as_timestamp(now()) - as_timestamp(p.last_changed)) < (arrival_person_door_window_seconds
+            + arrival_group_window_seconds) %}\n  {% set ns.names = ns.names + [p.attributes.friendly_name
+            | default(p.entity_id | replace('person.', '') | title)] %}\n{% endfor
+            %}\n{{ ns.names | unique | list | join(' e ') }}"
+          arrived_now_count: "{% set ns = namespace(names=[]) %}\n{% for p in states.person\n
+            \  if p.state == 'home'\n   and p.entity_id in tracked_people\n   and
+            (as_timestamp(now()) - as_timestamp(p.last_changed)) < (arrival_person_door_window_seconds
+            + arrival_group_window_seconds) %}\n  {% set ns.names = ns.names + [p.attributes.friendly_name
+            | default(p.entity_id | replace('person.', '') | title)] %}\n{% endfor
+            %}\n{{ ns.names | unique | list | count }}"
+          arrived_stefano: "{% set recent = arrival_person_door_window_seconds
+            + arrival_group_window_seconds %} {{\n  is_state('person.stefano', 'home')\n
+            \ and (as_timestamp(now()) - as_timestamp(states.person.stefano.last_changed))
+            < recent\n}}"
+          arrived_laura: "{% set recent = arrival_person_door_window_seconds
+            + arrival_group_window_seconds %} {{\n  is_state('person.laura', 'home')\n
+            \ and (as_timestamp(now()) - as_timestamp(states.person.laura.last_changed))
+            < recent\n}}"
+          arrived_now_couple: "{% set recent = arrival_person_door_window_seconds
+            + arrival_group_window_seconds %} {{\n  is_state('person.stefano', 'home')\n
+            \ and is_state('person.laura', 'home')\n  and (as_timestamp(now()) - as_timestamp(states.person.stefano.last_changed))
+            < recent\n  and (as_timestamp(now()) - as_timestamp(states.person.laura.last_changed))
+            < recent\n}}"
+          welcome_name: "{% if arrived_now_couple %}\n  {{ couple_nicknames | random
+            }}\n{% elif arrived_stefano %}\n  {{ stefano_nicknames | random }}\n{% elif
+            arrived_laura %}\n  {{ laura_nicknames | random }}\n{% elif arrived_now_count
+            | int(0) > 1 %}\n  {{ couple_nicknames | random }}\n{% else %}\n  bentornati
+            a casa\n{% endif %}"
+          welcome_opening: '{{ saluto_orario }} {{ welcome_name | trim }}.'
+      - variables:
+          dryer_pending_minutes_ago: "{% set ts = as_timestamp(states('input_datetime.eco_home_asciugatrice_fine'),
+            default=none) %} {% if ts is not none %}\n  {{ ((as_timestamp(now()) -
+            ts) / 60) | int(0) }}\n{% else %}\n  999999\n{% endif %}"
+          dryer_pending_should_announce: "{{\n  is_state('input_boolean.eco_home_asciugatrice_da_annunciare',
+            'on')\n  and dryer_pending_minutes_ago | int(999999) >= 0\n  and dryer_pending_minutes_ago
+            | int(999999) <= (dryer_announce_valid_hours * 60)\n}}"
+          dryer_pending_expired: "{{\n  is_state('input_boolean.eco_home_asciugatrice_da_annunciare',
+            'on')\n  and dryer_pending_minutes_ago | int(999999) > (dryer_announce_valid_hours
+            * 60)\n}}"
+          dryer_finished_elapsed_text: "{% set m = dryer_pending_minutes_ago | int(0)
+            %}\n{% if m < 2 %}\n  da circa un minuto\n{% elif m < 60 %}\n  da circa
+            {{ m }} minuti\n{% elif m < 120 %}\n  da circa un'ora\n{% else %}\n  da
+            circa {{ (m / 60) | round(0) | int }} ore\n{% endif %}"
+          dryer_arrival_text_final: "{% if dryer_pending_should_announce %}\n  Ah,
+            asciugatrice finita {{ dryer_finished_elapsed_text }}.\n{% elif dryer_running_and_has_remaining_time
+            %}\n  Asciugatrice pronta tra {{ dryer_remaining_minutes }} minuti.\n{%
+            else %}\n  {{ '' }}\n{% endif %}"
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ dryer_pending_expired }}'
+          sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+      - variables:
+          welcome_body: "{% if is_night %}\n  {{ night_phrase_starts | random }}:
+            {{ night_phrase_tails | random }}\n{% elif arrived_now_couple or arrived_now_count
+            | int(0) > 1 %}\n  {{ couple_phrase_starts | random }}: {{ couple_phrase_tails
+            | random }}\n{% elif arrived_laura %}\n  {{ laura_phrase_starts | random
+            }}: {{ laura_phrase_tails | random }}\n{% elif arrived_stefano %}\n  {{
+            stefano_phrase_starts | random }}: {{ stefano_phrase_tails
+            | random }}\n{% else %}\n  {{ generic_phrase_starts | random }}: {{ generic_phrase_tails
+            | random }}\n{% endif %}"
+          occasion_text: "{% if special_day_text != 'Nessuna data speciale personale.'
+            %}\n  {{ special_day_text }}\n{% elif italian_holiday_text != 'Nessuna
+            festività italiana principale.' %}\n  {{ italian_holiday_text }}\n{% elif
+            is_friday_evening %}\n  Weekend in avvicinamento, finalmente.\n{% elif
+            is_sunday_evening %}\n  Domenica sera tranquilla: si rallenta senza sensi
+            di colpa.\n{% elif is_weekend %}\n  Ritmo da weekend confermato.\n{% else
+            %}\n  {{ '' }}\n{% endif %}"
+          final_extra_text: "{% if occasion_text | trim != '' and not is_night %}\n
+            \ {{ occasion_text | trim }}\n{% else %}\n  {{ '' }}\n{% endif %}"
+      - choose:
+        - conditions:
+          - condition: state
+            entity_id: sun.sun
+            state: below_horizon
+          - condition: state
+            entity_id: light.luceambiente
+            state: 'off'
+          sequence:
+          - action: light.turn_on
+            target:
+              entity_id: '{{ light_entity }}'
+            data:
+              brightness_pct: '{{ light_brightness_pct }}'
+              color_temp_kelvin: '{{ light_kelvin }}'
+              transition: 0
+      - variables:
+          messaggio_finale: '{{ welcome_opening | trim }} {{ welcome_body | trim }}
+            {{ final_extra_text | trim }} {{ temp_announcement_text | trim }} {{ dryer_arrival_text_final | trim }}'
+          announced_profile: >-
+            {% if arrived_now_couple or arrived_now_count | int(0) > 1 %}Coppia
+            {% elif arrived_stefano %}Stefano
+            {% elif arrived_laura %}Laura
+            {% else %}Generico{% endif %}
+          nest_volume_before: '{{ state_attr(speaker, ''volume_level'') | float(-1) }}'
+          tts_safe_delay_seconds: '{% set chars = messaggio_finale | length %} {{
+            [tts_minimum_delay_seconds, ((chars / tts_chars_per_second) | round(0,
+            ''ceil'') | int + 4)] | max }}'
+          tv_should_mute_this_run: "{{ tv_ducking_enabled\n   and not (is_night |
+            bool(false))\n   and states(tv_media_player) not in tv_ducking_excluded_states\n
+               and not (state_attr(tv_media_player, 'is_volume_muted') | default(false,
+            true)) }}"
+          was_house_empty: '{{ people_at_home_count | int(0) == arrived_now_count | int(0) }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_profilo
+        data:
+          value: '{{ announced_profile | trim }}'
+        continue_on_error: true
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_messaggio
+        data:
+          value: '{{ (messaggio_finale | trim)[:250] }}'
+        continue_on_error: true
+      - if:
+        - condition: template
+          value_template: "{{ camera_notification_enabled\n   and was_house_empty\n   and states(camera_entity) not in ['unknown', 'unavailable'] }}"
+        then:
+        - action: camera.snapshot
+          target:
+            entity_id: '{{ camera_entity }}'
+          data:
+            filename: '{{ snapshot_file_path }}'
+          continue_on_error: true
+        - delay:
+            seconds: 1
+        - choose:
+          - conditions:
+            - condition: template
+              value_template: '{{ arrived_now_couple }}'
+            sequence:
+            - action: '{{ stefano_notification_service }}'
+              data:
+                title: "Rientro di Coppia - Eco Home"
+                message: "Bentornati a casa, Stefano e Laura!"
+                data:
+                  image: '{{ snapshot_access_url }}'
+                  attachment:
+                    url: '{{ snapshot_access_url }}'
+                    content-type: jpeg
+                    hide-thumbnail: false
+              continue_on_error: true
+            - if:
+              - condition: template
+                value_template: '{{ stefano_notification_service != laura_notification_service }}'
+              then:
+              - action: '{{ laura_notification_service }}'
+                data:
+                  title: "Rientro di Coppia - Eco Home"
+                  message: "Bentornati a casa, Stefano e Laura!"
+                  data:
+                    image: '{{ snapshot_access_url }}'
+                    attachment:
+                      url: '{{ snapshot_access_url }}'
+                      content-type: jpeg
+                      hide-thumbnail: false
+              continue_on_error: true
+          - conditions:
+            - condition: template
+              value_template: '{{ arrived_stefano }}'
+            sequence:
+            - action: '{{ stefano_notification_service }}'
+              data:
+                title: "Rientro - Eco Home"
+                message: "Rilevato rientro di Stefano."
+                data:
+                  image: '{{ snapshot_access_url }}'
+                  attachment:
+                    url: '{{ snapshot_access_url }}'
+                    content-type: jpeg
+                    hide-thumbnail: false
+              continue_on_error: true
+          - conditions:
+            - condition: template
+              value_template: '{{ arrived_laura }}'
+            sequence:
+            - action: '{{ laura_notification_service }}'
+              data:
+                title: "Rientro - Eco Home"
+                message: "Rilevato rientro di Laura."
+                data:
+                  image: '{{ snapshot_access_url }}'
+                  attachment:
+                    url: '{{ snapshot_access_url }}'
+                    content-type: jpeg
+                    hide-thumbnail: false
+              continue_on_error: true
+          default:
+          - action: notify.notify
+            data:
+              title: "Rientro - Eco Home"
+              message: "Rilevato rientro in casa."
+              data:
+                image: '{{ snapshot_access_url }}'
+                attachment:
+                  url: '{{ snapshot_access_url }}'
+                  content-type: jpeg
+                  hide-thumbnail: false
+            continue_on_error: true
+      - if:
+        - condition: template
+          value_template: "{{ indoor_temp_avg != 'none' and indoor_temp_avg | float > 26.0 }}"
+        then:
+        - choose:
+          - conditions:
+            - condition: template
+              value_template: '{{ arrived_now_couple }}'
+            sequence:
+            - action: '{{ stefano_notification_service }}'
+              data:
+                title: "Caldo in casa"
+                message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere i condizionatori?"
+                data:
+                  actions:
+                    - action: "TURN_ON_AC_{{ context.id }}"
+                      title: "Sì, accendi"
+                    - action: "DISMISS_AC"
+                      title: "No, grazie"
+              continue_on_error: true
+            - if:
+              - condition: template
+                value_template: '{{ stefano_notification_service != laura_notification_service }}'
+              then:
+              - action: '{{ laura_notification_service }}'
+                data:
+                  title: "Caldo in casa"
+                message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere i condizionatori?"
+                data:
+                  actions:
+                    - action: "TURN_ON_AC_{{ context.id }}"
+                      title: "Sì, accendi"
+                    - action: "DISMISS_AC"
+                      title: "No, grazie"
+              continue_on_error: true
+          - conditions:
+            - condition: template
+              value_template: '{{ arrived_stefano }}'
+            sequence:
+            - action: '{{ stefano_notification_service }}'
+              data:
+                title: "Caldo in casa"
+                message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere i condizionatori?"
+                data:
+                  actions:
+                    - action: "TURN_ON_AC_{{ context.id }}"
+                      title: "Sì, accendi"
+                    - action: "DISMISS_AC"
+                      title: "No, grazie"
+              continue_on_error: true
+          - conditions:
+            - condition: template
+              value_template: '{{ arrived_laura }}'
+            sequence:
+            - if:
+              - condition: template
+                value_template: '{{ stefano_notification_service != laura_notification_service }}'
+              then:
+              - action: '{{ laura_notification_service }}'
+                data:
+                  title: "Caldo in casa"
+                  message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere i condizionatori?"
+                  data:
+                    actions:
+                      - action: "TURN_ON_AC_{{ context.id }}"
+                        title: "Sì, accendi"
+                      - action: "DISMISS_AC"
+                        title: "No, grazie"
+              continue_on_error: true
+          default:
+          - action: notify.notify
+            data:
+              title: "Caldo in casa"
+              message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere i condizionatori?"
+              data:
+                actions:
+                  - action: "TURN_ON_AC_{{ context.id }}"
+                    title: "Sì, accendi"
+                  - action: "DISMISS_AC"
+                    title: "No, grazie"
+            continue_on_error: true
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ nest_available }}'
+          sequence:
+          - parallel:
+            - sequence:
+              - choose:
+                - conditions:
+                  - condition: template
+                    value_template: '{{ tv_should_mute_this_run }}'
+                  sequence:
+                  - action: media_player.volume_mute
+                    target:
+                      entity_id: '{{ tv_media_player }}'
+                    data:
+                      is_volume_muted: true
+                    continue_on_error: true
+            - sequence:
+              - action: media_player.volume_set
+                target:
+                  entity_id: '{{ speaker }}'
+                data:
+                  volume_level: '{{ tts_volume_level }}'
+                continue_on_error: true
+          - if:
+            - condition: template
+              value_template: '{{ debug }}'
+            then:
+            - action: logbook.log
+              data:
+                name: Eco Home
+                message: 'Rientro confermato. Persone: {{ arrived_now_text }}. Profilo: {{ announced_profile | trim }}. Trigger: {{ trigger_type }}. Messaggio: {{ messaggio_finale }}'
+                entity_id: '{{ speaker }}'
+          - action: tts.speak
+            target:
+              entity_id: '{{ tts_engine }}'
+            data:
+              media_player_entity_id: '{{ speaker }}'
+              message: '{{ messaggio_finale }}'
+              cache: false
+          - delay:
+              seconds: '{{ tts_safe_delay_seconds }}'
+          - choose:
+            - conditions:
+              - condition: template
+                value_template: '{{ tv_should_mute_this_run }}'
+              sequence:
+              - action: media_player.volume_mute
+                target:
+                  entity_id: '{{ tv_media_player }}'
+                data:
+                  is_volume_muted: false
+                continue_on_error: true
+          - action: media_player.media_stop
+            target:
+              entity_id: '{{ speaker }}'
+            continue_on_error: true
+          - choose:
+            - conditions:
+              - condition: template
+                value_template: '{{ nest_volume_before | float(-1) >= 0 }}'
+              sequence:
+              - action: media_player.volume_set
+                target:
+                  entity_id: '{{ speaker }}'
+                data:
+                  volume_level: '{{ nest_volume_before }}'
+                continue_on_error: true
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.eco_home_ultimo_annuncio
+            data:
+              datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.eco_home_ultimo_esito
+            data:
+              value: 'Richiesta TTS inviata: {{ announced_profile | trim }}'
+            continue_on_error: true
+          - choose:
+            - conditions:
+              - condition: template
+                value_template: '{{ dryer_pending_should_announce }}'
+              sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+        default:
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.eco_home_ultimo_esito
+          data:
+            value: Annuncio non eseguito - Nest Hub non disponibile
+          continue_on_error: true
+        - if:
+          - condition: template
+            value_template: '{{ debug }}'
+          then:
+          - action: logbook.log
+            data:
+              name: Eco Home
+              message: 'Rientro confermato, ma annuncio non eseguito: Nest Hub non disponibile.'
+              entity_id: '{{ speaker }}'
+    default:
+    - variables:
+        diagnostic_reason: >-
+          {% if not eco_home_enabled %}Eco Home disattivato
+          {% elif eco_home_silent %}Modalità silenziosa attiva
+          {% elif trigger_type in ['door_opened', 'person_arrived'] and not arrival_confirmed_by_person_and_door %}In attesa della combinazione presenza e portone
+          {% elif not welcome_cooldown_ok %}Annuncio bloccato dal cooldown
+          {% elif trigger_type == 'dryer_finished_while_away' and not nobody_home %}Asciugatrice terminata con qualcuno già in casa
+          {% elif trigger_from_state in ['unknown', 'unavailable'] %}Stato iniziale non valido
+          {% else %}Trigger ignorato dalle condizioni di sicurezza{% endif %}
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_esito
+      data:
+        value: '{{ (diagnostic_reason | trim)[:250] }}'
+      continue_on_error: true
+    - if:
+      - condition: template
+        value_template: '{{ debug }}'
+      then:
+      - action: logbook.log
+        data:
+          name: Eco Home
+          message: 'Trigger ignorato. Tipo: {{ trigger_type }}. Entità: {{ trigger_entity_id
+            }}. Da: {{ trigger_from_state }}. A: {{ trigger_to_state }}. Eco Home
+            attivo: {{ eco_home_enabled }}. Silenzioso: {{ eco_home_silent }}. Rientro
+            confermato: {{ arrival_confirmed_by_person_and_door }}. Esito: {{ diagnostic_reason | trim }}.'
+          entity_id: media_player.nest_hub_sala
+  mode: queued
+  max: 5
+  max_exceeded: silent
+  trace:
+    stored_traces: 20
+  variables:
+    debug: true
+    project_name: Eco Home
+    speaker: media_player.nest_hub_sala
+    tts_engine: tts.google_ai_tts
+    light_entity: light.luceambiente
+    tv_media_player: media_player.tv_sala_ue85du7170uxzt
+    door_sensor: binary_sensor.porta_contact
+    dryer_state_sensor: sensor.esterno_asciugatrice_machine_state
+    dryer_power_sensor: sensor.esterno_asciugatrice_energia_elettrica
+    dryer_completion_sensor: sensor.esterno_asciugatrice_completion_time
+    camera_entity: camera.sala_2
+    stefano_notification_service: notify.notify
+    laura_notification_service: notify.notify
+    snapshot_file_path: /media/eco_home/eco_home_sala_2.jpg
+    snapshot_access_url: /media/local/eco_home/eco_home_sala_2.jpg
+    indoor_temp_sensors:
+    - sensor.temperatura_sala
+    - sensor.temperatura_camera
+    ac_climate_entities:
+    - climate.condizionatore_sala
+    - climate.condizionatore_camera
+    tracked_people:
+    - person.stefano
+    - person.laura
+    eco_home_enabled: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') }}'
+    eco_home_silent: '{{ is_state(''input_boolean.eco_home_silenzioso'', ''on'')
+      }}'
+    camera_notification_enabled: '{{ is_state(''input_boolean.eco_home_notifiche_foto'', ''on'') }}'
+    test_scenario: >-
+      {%- set selected = states('input_select.eco_home_scenario_test') -%}
+      {%- if selected in ['Percorso audio', 'Rientro Stefano', 'Rientro Laura',
+        'Rientro di coppia', 'Modalità notte', 'Promemoria asciugatrice'] %}
+      {{- selected -}}
+      {%- else -%}
+      Percorso audio
+      {%- endif -%}
+    nest_available: '{{ states(speaker) not in [''unknown'', ''unavailable''] }}'
+    min_away_minutes: 2
+    arrival_person_door_window_seconds: 300
+    arrival_group_window_seconds: 0
+    welcome_cooldown_seconds: 20
+    dryer_announce_valid_hours: 12
+    tts_minimum_delay_seconds: 5
+    tts_chars_per_second: 11
+    base_volume_day: 0.8
+    base_volume_evening: 0.8
+    base_volume_night: 0.4
+    tv_ducking_enabled: true
+    tv_duck_debug: false
+    tv_ducking_excluded_states:
+    - 'off'
+    - standby
+    - unknown
+    - unavailable
+    light_brightness_pct: 45
+    light_kelvin: 4000
+    light_transition_seconds: 0
+    trigger_type: '{{ trigger.id | default(''manuale'') }}'
+    trigger_entity_id: '{{ trigger.entity_id if trigger is defined and trigger.entity_id
+      is defined else ''unknown'' }}'
+    trigger_from_state: '{{ trigger.from_state.state if trigger is defined and trigger.from_state
+      is defined and trigger.from_state is not none else ''unknown'' }}'
+    trigger_to_state: '{{ trigger.to_state.state if trigger is defined and trigger.to_state
+      is defined and trigger.to_state is not none else ''unknown'' }}'
+    trigger_person_name: "{% if trigger is defined and trigger.to_state is defined
+      and trigger.to_state is not none %}\n  {{ trigger.to_state.attributes.friendly_name
+      | default(trigger.entity_id | replace('person.', '') | title) }}\n{% else %}\n
+      \ Sconosciuto\n{% endif %}"
+    away_minutes_before_arrival: "{% if trigger_type == 'person_arrived'\n   and trigger
+      is defined\n   and trigger.from_state is defined\n   and trigger.from_state
+      is not none %}\n  {{ ((as_timestamp(now()) - as_timestamp(trigger.from_state.last_changed))
+      / 60) | int(0) }}\n{% else %}\n  999\n{% endif %}"
+    door_opened_recently: "{{\n  states(door_sensor) not in ['unknown', 'unavailable']\n  and (as_timestamp(now())
+      - as_timestamp(states[door_sensor].last_changed)) <= arrival_person_door_window_seconds\n}}"
+    person_arrived_recently: "{% set ns = namespace(ok=false) %} {% for person_id
+      in tracked_people %}\n  {% if is_state(person_id, 'home')\n     and (as_timestamp(now())
+      - as_timestamp(states[person_id].last_changed)) <= arrival_person_door_window_seconds
+      %}\n    {% set ns.ok = true %}\n  {% endif %}\n{% endfor %} {{ ns.ok }}"
+    trigger_person_arrival_valid: "{{\n  trigger_type == 'person_arrived'\n  and trigger_entity_id
+      in tracked_people\n  and trigger_to_state == 'home'\n  and trigger_from_state
+      not in ['home', 'unknown', 'unavailable']\n  and away_minutes_before_arrival | int(0) >= min_away_minutes\n
+      \ and door_opened_recently\n}}"
+    trigger_door_open_valid: "{{\n  trigger_type == 'door_opened'\n  and trigger_to_state
+      == 'on'\n  and trigger_from_state not in ['unknown', 'unavailable']\n  and person_arrived_recently\n}}"
+    arrival_confirmed_by_person_and_door: '{{ trigger_door_open_valid or trigger_person_arrival_valid
+      }}'
+    hour_now: '{{ now().hour }}'
+    today_md: '{{ now().strftime(''%m-%d'') }}'
+    is_night: '{{ hour_now | int(0) >= 23 or hour_now | int(0) < 6 }}'
+    tts_volume_level: "{% if is_night | bool(false) %}\n  {{ base_volume_night }}\n{%
+      elif hour_now | int(0) >= 18 %}\n  {{ base_volume_evening }}\n{% else %}\n  {{
+      base_volume_day }}\n{% endif %}"
+    saluto_orario: "{% if hour_now | int(0) >= 6 and hour_now | int(0) < 12 %}\n  Buongiorno\n{%
+      elif hour_now | int(0) >= 12 and hour_now | int(0) < 18 %}\n  Buon pomeriggio\n{%
+      elif hour_now | int(0) >= 18 and hour_now | int(0) < 23 %}\n  Buonasera\n{%
+      else %}\n  Buonanotte\n{% endif %}"
+    is_weekend: '{{ now().weekday() in [5, 6] }}'
+    is_friday_evening: '{{ now().weekday() == 4 and hour_now | int(0) >= 18 }}'
+    is_sunday_evening: '{{ now().weekday() == 6 and hour_now | int(0) >= 18 }}'
+    people_at_home_count: '{{ states.person | selectattr(''state'', ''eq'', ''home'')
+      | list | count }}'
+    nobody_home: '{{ people_at_home_count | int(0) == 0 }}'
+    last_announcement_ts: '{{ as_timestamp(states(''input_datetime.eco_home_ultimo_annuncio''),
+      default=0) }}'
+    seconds_from_last_announcement: '{% set ts = as_timestamp(states(''input_datetime.eco_home_ultimo_annuncio''),
+      default=0) %} {{ (as_timestamp(now()) - ts) | int(999999) }}'
+    welcome_cooldown_ok: '{{ seconds_from_last_announcement | int(999999) > welcome_cooldown_seconds
+      }}'
+    special_day_text: "{% if today_md == '12-28' %}\n  Oggi è il compleanno di Stefano.
+      Auguri Stefano.\n{% elif today_md == '03-31' %}\n  Oggi è il compleanno di Laura.
+      Auguri Laura.\n{% elif today_md == '08-01' %}\n  Oggi è il vostro anniversario
+      del primo agosto.\n{% elif today_md == '08-28' %}\n  Oggi è il 28 agosto, la
+      data del vostro primo appuntamento.\n{% else %}\n  Nessuna data speciale personale.\n{%
+      endif %}"
+    italian_holiday_text: "{% set md = today_md %}\n{% if md == '01-01' %}\n  Oggi
+      è Capodanno.\n{% elif md == '01-06' %}\n  Oggi è l'Epifania.\n{% elif md ==
+      '04-25' %}\n  Oggi è la Festa della Liberazione.\n{% elif md == '05-01' %}\n
+      \ Oggi è la Festa dei Lavoratori.\n{% elif md == '06-02' %}\n  Oggi è la Festa
+      della Repubblica.\n{% elif md == '08-15' %}\n  Oggi è Ferragosto.\n{% elif md
+      == '11-01' %}\n  Oggi è Ognissanti.\n{% elif md == '12-08' %}\n  Oggi è l'Immacolata.\n{%
+      elif md == '12-25' %}\n  Oggi è Natale.\n{% elif md == '12-26' %}\n  Oggi è
+      Santo Stefano.\n{% elif md == '12-31' %}\n  Oggi è San Silvestro.\n{% else %}\n
+      \ Nessuna festività italiana principale.\n{% endif %}"
+    dryer_finished_states:
+    - 'off'
+    - idle
+    - stop
+    - stopped
+    - complete
+    - completed
+    - finish
+    - finished
+    - end
+    - ended
+    - none
+    - standby
+    dryer_state: '{{ states(dryer_state_sensor) | lower }}'
+    dryer_completion_raw: '{{ states(dryer_completion_sensor) }}'
+    dryer_is_finished_now: '{{ dryer_state in dryer_finished_states }}'
+    dryer_remaining_minutes: "{% set ts = as_timestamp(dryer_completion_raw, default=none)
+      %} {% if ts is not none %}\n  {{ ((ts - as_timestamp(now())) / 60) | round(0,
+      'ceil') | int(0) }}\n{% else %}\n  0\n{% endif %}"
+    dryer_running_and_has_remaining_time: "{{ not dryer_is_finished_now\n   and dryer_state
+      not in ['unknown', 'unavailable', 'none']\n   and dryer_remaining_minutes |
+      int(0) > 1\n   and dryer_remaining_minutes | int(0) < 360 }}"
+    stefano_nicknames:
+    - Ste
+    - bello
+    - tesoro
+    - capitano
+    - campione
+    - capo
+    - boss
+    - re di casa
+    - grande uomo
+    laura_nicknames:
+    - Lau
+    - bella
+    - tesoro
+    - principessa
+    - regina di casa
+    - dolcezza
+    - splendore
+    - meraviglia
+    couple_nicknames:
+    - amori
+    - squadra del cuore
+    - coppia bella
+    - ragazzi
+    - piccioncini
+    - belli
+    - duo delle meraviglie
+    - squadra di casa
+    laura_phrase_starts:
+    - La casa sembra più luminosa
+    - Atmosfera dolce attivata
+    - Rientro speciale rilevato
+    - Casa pronta con un po' di cura in più
+    - Tutto si fa più morbido
+    - La casa ti accoglie con dolcezza
+    - Un rientro gentile era proprio quello che serviva
+    - Qui c'è un po' di calma pronta per te
+    - La casa ha preparato il suo lato più tenero
+    - Bentornata, il ritmo può farsi più leggero
+    - Presenza di Laura rilevata, modalità dolcezza attiva
+    - La giornata può finalmente abbassare il volume
+    - Tutto pronto per farti respirare un po'
+    - La casa ti aspettava con pazienza
+    - Piccola accoglienza morbida in arrivo
+    - Rientro elegante e sereno registrato
+    - La casa si sistema meglio quando arrivi tu
+    - Qui è tutto pronto per coccolarti un po'
+    - Il bello del rientro è appena iniziato
+    - Casa in modalità gentilezza
+    laura_phrase_tails:
+    - puoi lasciare fuori il peso della giornata.
+    - adesso puoi prenderti il tuo spazio.
+    - il resto può aspettare con educazione.
+    - qui trovi un angolo di tranquillità.
+    - ti meriti un rientro sereno.
+    - la calma è già al suo posto.
+    - puoi rallentare senza sensi di colpa.
+    - ora la casa fa il tifo per il relax.
+    - c'è una piccola pace domestica pronta per te.
+    - qui nessuno ti mette fretta.
+    - puoi respirare, sei a casa.
+    - la serata può diventare più leggera.
+    - tutto è un po' più accogliente adesso.
+    - puoi concederti un momento dolce.
+    - la casa ti tiene il posto migliore.
+    - adesso puoi staccare con calma.
+    - qui il caos resta fuori dalla porta.
+    - la giornata può sciogliersi piano.
+    - ti accolgo con garbo e un pizzico di tenerezza.
+    - c'è aria di casa, quella bella.
+    stefano_phrase_starts:
+    - Casa pronta e situazione sotto controllo
+    - Ingresso rilevato, comfort attivato
+    - Bentornato, modalità casa avviata
+    - Rientro registrato con precisione domestica
+    - Tutto operativo e nessun allarme sul ponte
+    - La casa riprende servizio
+    - Presenza rilevata, atmosfera ripristinata
+    - Modalità rientro intelligente attiva
+    - Tutto tranquillo, capo casa rientrato
+    - Casa in assetto accoglienza
+    - Sistema domestico pronto
+    - Rientro confermato, tono leggero attivato
+    - Centrale domestica operativa
+    - Rientro riconosciuto, comfort in posizione
+    - Modalità decompressione disponibile
+    - La casa torna in configurazione abitata
+    stefano_phrase_tails:
+    - puoi lasciare fuori il caos della giornata.
+    - adesso si può ragionare con più calma.
+    - il resto può aspettare qualche minuto.
+    - direi che una pausa ci sta tutta.
+    - la casa era già sul pezzo.
+    - qui almeno nessuno dovrebbe chiederti password.
+    - il divano potrebbe avere buone argomentazioni.
+    - la modalità relax è consigliata ma non obbligatoria.
+    - puoi riprendere possesso del regno domestico.
+    - la giornata può finalmente abbassare i giri.
+    - tutto sembra sotto controllo, almeno per ora.
+    - puoi respirare, sei rientrato.
+    - qui la situazione è decisamente più gestibile.
+    - ora si può mettere ordine nei pensieri.
+    - la casa ha fatto il suo giro di controllo.
+    - il rientro è approvato con riserva di relax.
+    couple_phrase_starts:
+    - Casa pronta per due
+    - Rientro di coppia rilevato
+    - Atmosfera condivisa attivata
+    - Il nido riprende vita
+    - Tutto è più casa quando rientrate insieme
+    - La casa vi accoglie in versione doppia
+    - Ingresso sincronizzato, comfort sincronizzato
+    - Serata in modalità coppia
+    - Bentornati, squadra di casa al completo
+    - La casa torna ufficialmente abitata bene
+    - Doppio rientro rilevato
+    - Comfort condiviso in avvio
+    couple_phrase_tails:
+    - potete lasciare fuori il resto della giornata.
+    - adesso si può rallentare insieme.
+    - qui vi aspetta un po' di calma condivisa.
+    - la casa approva questo rientro sincronizzato.
+    - il divano probabilmente si sta già preparando.
+    - il resto può aspettare fuori dalla porta.
+    - questa è ufficialmente zona relax.
+    - potete riprendervi la serata con calma.
+    - la casa torna subito più viva.
+    - c'è aria di normalità bella.
+    - potete finalmente abbassare il volume del mondo.
+    - qui il ritmo può tornare vostro.
+    night_phrase_starts:
+    - Rientro silenzioso
+    - Casa in modalità notte
+    - Tutto tranquillo
+    - Ingresso rilevato a voce bassa
+    - Atmosfera calma
+    - La casa resta discreta
+    - Modalità notturna confermata
+    - Rientro morbido
+    - Luci basse e tono leggero
+    - Notte tranquilla registrata
+    night_phrase_tails:
+    - puoi sistemarti senza fretta.
+    - il resto può aspettare domani.
+    - mantengo tutto leggero.
+    - nessun rumore inutile.
+    - ti accolgo con discrezione.
+    - la casa parla piano.
+    - qui è tutto calmo.
+    - puoi chiudere la giornata.
+    - tutto resta morbido.
+    - la notte può continuare tranquilla.
+    generic_phrase_starts:
+    - Casa pronta e situazione sotto controllo
+    - Ingresso rilevato, comfort domestico attivato
+    - Rientro registrato, atmosfera ripristinata
+    - Tutto pronto al momento giusto
+    - La casa riprende vita
+    - Modalità accoglienza attiva
+    - Presenza rilevata, clima domestico acceso
+    - Il rientro è stato riconosciuto
+    - Comfort disponibile
+    - Atmosfera di casa ripristinata
+    - Rientro accolto correttamente
+    - Sistema casa operativo
+    generic_phrase_tails:
+    - puoi respirare un po'.
+    - ora si torna in modalità casa.
+    - il caos può aspettare fuori.
+    - adesso ci sta una pausa fatta bene.
+    - tutto sembra decisamente più domestico.
+    - la serata può prendere una piega migliore.
+    - qui almeno il rientro è gestito bene.
+    - puoi rallentare senza chiedere permesso.
+    - la casa ha fatto spazio alla calma.
+    - il resto può attendere con pazienza.
+    - si può ricominciare da un ritmo più umano.
+    - tutto torna un po' più semplice.

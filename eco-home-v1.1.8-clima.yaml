@@ -1,0 +1,66 @@
+- id: 'eco_home_clima_handler'
+  alias: "Eco home - Gestione clima da notifica"
+  description: "Gestisce la risposta interattiva per l'accensione del condizionatore, isolandola dalla coda TTS."
+  mode: parallel
+  max: 10
+  triggers:
+  - trigger: event
+    event_type: mobile_app_notification_action
+    id: turn_on_ac_action
+  conditions:
+  - condition: template
+    value_template: >
+      {{ trigger.event.data.action is string and trigger.event.data.action.startswith('TURN_ON_AC_') }}
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  actions:
+  - variables:
+      indoor_temp_sensors:
+      - sensor.temperatura_sala
+      - sensor.temperatura_camera
+      ac_climate_entities:
+      - climate.condizionatore_sala
+      - climate.condizionatore_camera
+      indoor_temp_avg: >-
+        {% set temps = indoor_temp_sensors | select('is_state_attr', 'unit_of_measurement', '°C') 
+           | map('states') | map('float', -99) | select('>', -50) | list %}
+        {% if temps | count > 0 %}
+          {{ (temps | sum / temps | count) | round(1) }}
+        {% else %}
+          none
+        {% endif %}
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ indoor_temp_avg != 'none' and indoor_temp_avg | float > 26.0 }}"
+      - condition: template
+        value_template: "{{ ac_climate_entities | count > 0 }}"
+      sequence:
+      - action: climate.turn_on
+        target:
+          entity_id: '{{ ac_climate_entities }}'
+        continue_on_error: true
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: '{{ ac_climate_entities }}'
+        data:
+          hvac_mode: cool
+        continue_on_error: true
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_esito
+        data:
+          value: Condizionatori accesi da notifica
+        continue_on_error: true
+      - action: logbook.log
+        data:
+          name: Eco Home
+          message: Condizionatori accesi da notifica interattiva.
+    default:
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_esito
+      data:
+        value: "Accensione clima ignorata (condizioni non più valide)"
+      continue_on_error: true

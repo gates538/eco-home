@@ -1,6 +1,6 @@
 # Creazione degli helper Eco Home dalla UI
 
-Eco Home 1.1.4 utilizza 14 helper con prefisso `eco_home_*`.
+Eco Home 1.1.8 utilizza 15 helper con prefisso `eco_home_*`.
 
 Vai in **Impostazioni → Dispositivi e servizi → Helper → Crea helper**.
 
@@ -14,8 +14,9 @@ Se possiedi già helper `echo_home_*`, non crearne altri: segui
 | Eco Home attivo | `input_boolean.eco_home_attivo` | `mdi:home-assistant` |
 | Eco Home silenzioso | `input_boolean.eco_home_silenzioso` | `mdi:volume-off` |
 | Eco Home asciugatrice da annunciare | `input_boolean.eco_home_asciugatrice_da_annunciare` | `mdi:tumble-dryer-alert` |
+| Eco Home notifiche foto | `input_boolean.eco_home_notifiche_foto` | `mdi:camera` |
 
-Al termine imposta **Eco Home attivo** su ON e lascia gli altri due su OFF.
+Al termine imposta **Eco Home attivo** su ON e lascia gli altri su OFF.
 
 ## Data e ora
 
@@ -68,4 +69,5 @@ Lascia valore iniziale e pattern vuoti. Usa la modalità testo.
 ## Controllo finale
 
 In **Strumenti per sviluppatori → Stati**, cerca `eco_home`. Devono comparire
-14 helper e nessun Entity ID deve terminare con `_2` o `_3`.
+15 helper e nessun Entity ID deve terminare con `_2` o `_3`.
+

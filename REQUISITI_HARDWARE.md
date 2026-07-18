@@ -1,4 +1,4 @@
-# Requisiti hardware e compatibilità di Eco Home v1.1.7
+# Requisiti hardware e compatibilità di Eco Home v1.1.8
 
 Questa guida descrive i dispositivi fisici necessari per usare Eco Home e le
 funzioni che devono esporre in Home Assistant.
@@ -317,7 +317,7 @@ esponga sensori utilizzabili da Home Assistant.
 |---|---|---|
 | `sensor.esterno_asciugatrice_machine_state` | Stato del ciclo | Necessaria |
 | `sensor.esterno_asciugatrice_completion_time` | Orario previsto di fine | Opzionale, aggiunge il tempo residuo al saluto |
-| `sensor.esterno_asciugatrice_energia_elettrica` | Consumo elettrico | Predisposta, ma non usata dalla logica della v1.1.4 |
+| `sensor.esterno_asciugatrice_energia_elettrica` | Consumo elettrico | Predisposta, ma non usata dalla logica della v1.1.8 |
 
 Lo stato macchina deve passare da uno stato di lavoro a uno di questi valori
 riconosciuti:
@@ -339,7 +339,7 @@ Assistant sappia convertire in timestamp.
 Per scattare e inviare una foto del rientro sul cellulare (se la casa era vuota):
 
 * **Telecamera compatibile**: Deve supportare l'azione `camera.snapshot`. Puoi verificarla in **Strumenti per sviluppatori → Azioni**.
-* **Cartella snapshot locale**: Devi creare la cartella `/config/www/snapshots/` sul tuo Home Assistant. L'immagine temporanea verrà salvata lì (es. `/config/www/snapshots/eco_home_sala_2.jpg`) e sarà accessibile all'app Companion o a Telegram tramite l'URL `/local/snapshots/eco_home_sala_2.jpg`.
+* **Cartella snapshot locale**: Devi creare la cartella `/media/eco_home/` sul tuo Home Assistant. L'immagine temporanea verrà salvata lì (es. `/media/eco_home/eco_home_sala_2.jpg`) e sarà accessibile all'app Companion o a Telegram tramite l'URL `/media/local/eco_home/eco_home_sala_2.jpg`.
 * **Servizio di Notifica**: I telefoni devono avere configurata l'app Home Assistant Companion o l'integrazione di Telegram.
 
 ## 9. Sensori di temperatura e condizionatori (Clima) opzionali
@@ -364,7 +364,7 @@ Prima di considerare pronto l'impianto, completa questa lista:
 - [ ] La TV opzionale esegue mute e unmute, oppure `tv_ducking_enabled` è `false`.
 - [ ] Lo stato opzionale dell'asciugatrice usa valori riconosciuti.
 - [ ] La telecamera opzionale supporta l'azione `camera.snapshot`.
-- [ ] La cartella locale `/config/www/snapshots/` è stata creata.
+- [ ] La cartella locale `/media/eco_home/` è stata creata.
 - [ ] I condizionatori e i sensori di temperatura opzionali sono configurati.
 - [ ] Tutti gli entity ID sono stati sostituiti anche nella card e nelle azioni, non solo nelle variabili finali.
 

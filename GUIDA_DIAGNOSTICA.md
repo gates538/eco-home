@@ -1,4 +1,4 @@
-# Diagnostica Eco Home v1.1.4
+# Diagnostica Eco Home v1.1.8
 
 La card mostra informazioni persistenti anche quando `debug: false`.
 
@@ -27,4 +27,5 @@ La card mostra informazioni persistenti anche quando `debug: false`.
 ## Logbook
 
 Con `debug: true`, Eco Home aggiunge dettagli tecnici nel Logbook. Dopo aver verificato il funzionamento puoi impostare `debug: false`; la diagnostica nella card continuerà a essere aggiornata.
+
 
