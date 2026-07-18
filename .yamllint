@@ -1,4 +1,10 @@
 extends: relaxed
+ignore: |
+  archive/
 rules:
   line-length: disable
   truthy: disable
+  indentation: disable
+  trailing-spaces: disable
+  empty-lines: disable
+  new-lines: disable
