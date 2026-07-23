@@ -1,7 +1,8 @@
 - id: 'eco_home_security_120'
   alias: Eco Home Security & Guardiano
   description: Modulo per controlli all'uscita (Guardiano) e sistema anti-intrusione
-  mode: single
+  mode: parallel
+  max: 10
   triggers:
   - trigger: numeric_state
     entity_id: zone.home
@@ -110,13 +111,13 @@
 
   variables:
     speaker: media_player.nest_hub_sala
-    tts_engine: tts.google_ai_tts
+    tts_engine: tts.google_translate_it_lt
     light_entity: light.luceambiente
     dryer_state_sensor: sensor.esterno_asciugatrice_machine_state
     camera_entity: camera.sala_2
     default_notification_service: notify.notify
     snapshot_file_path: /media/eco_home/eco_home_sala_2.jpg
-    snapshot_access_url: /media/local/eco_home/eco_home_sala_2.jpg
+    snapshot_access_url: "/media/local/eco_home/eco_home_sala_2.jpg?time={{ now().timestamp() | int }}"
     window_sensors:
     - binary_sensor.finestra_sala
     - binary_sensor.finestra_camera
