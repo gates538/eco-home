@@ -1,0 +1,110 @@
+- id: '1782669617443'
+  alias: Notifica WhatsApp - Temperatura oltre 40°
+  description: Invia un messaggio WhatsApp quando la temperatura supera i 40°C
+  triggers:
+  - entity_id: sensor.temperatura_media_esterna
+    above: 40
+    trigger: numeric_state
+  actions:
+  - data:
+      message: Attenzione! La temperatura esterna ha superato i 40°C.
+    action: rest_command.whatsapp_group_notify
+  mode: single
+- id: '1782669922081'
+  alias: Notifica WhatsApp - Temperatura sotto zero
+  description: Invia un messaggio WhatsApp quando la temperatura scende sotto i 0°
+  triggers:
+  - entity_id: sensor.temperatura_media_esterna
+    below: 0
+    trigger: numeric_state
+  conditions: []
+  actions:
+  - data:
+      message: Attenzione! La temperatura esterna è sotto zero!
+    action: rest_command.whatsapp_group_notify
+  mode: single
+- id: '1782673217209'
+  alias: Notifica WhatsApp - Raffiche di vento superiori a 10 km/h
+  description: Invia un messaggio WhatsApp quando le raffiche di vento superano i
+    10 km/h
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.sala_anemometro_gust_strength
+    above: 10
+  conditions:
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none\n   or (now() - this.attributes.last_triggered).total_seconds()
+      > 3600 }}\n"
+  actions:
+  - action: rest_command.whatsapp_group_notify
+    data:
+      message: Attenzione! Raffiche di vento superiori a 10 km/h, controllare le tende!
+  mode: single
+- id: '1782675351168'
+  alias: Notifica WhatsApp - Inizio pioggia
+  description: Invia un messaggio WhatsApp quando inizia a piovere
+  triggers:
+  - entity_id: sensor.terrazza_pulvirometro_precipitazione
+    above: 0.01
+    trigger: numeric_state
+  actions:
+  - data:
+      message: Attenzione! Sta iniziando a piovere!
+    action: rest_command.whatsapp_group_notify
+  mode: single
+- id: '1782743732058'
+  alias: Notifica WhatsApp - Temperatura interna oltre 30°
+  description: Invia un messaggio WhatsApp quando la temperatura interna supera i
+    30°C
+  triggers:
+  - entity_id: sensor.temperatura_media
+    above: 30
+    trigger: numeric_state
+  conditions: []
+  actions:
+  - data:
+      message: Attenzione! La temperatura media dentro casa ha superato i 30°C.
+    action: rest_command.whatsapp_group_notify
+  mode: single
+- id: '1782743848044'
+  alias: Notifica WhatsApp - Temperatura interna sotto 15°
+  description: Invia un messaggio WhatsApp quando la temperatura interna scende sotto
+    i 15°C
+  triggers:
+  - entity_id: sensor.temperatura_media
+    below: 15
+    trigger: numeric_state
+  conditions: []
+  actions:
+  - data:
+      message: Attenzione! La temperatura media dentro casa è sotto i 15°C.
+    action: rest_command.whatsapp_group_notify
+  mode: single
+- id: '1782744003356'
+  alias: Notifica WhatsApp - Temperatura percepita oltre 45°
+  description: Invia un messaggio WhatsApp quando la temperatura percepita supera
+    i 45°C
+  triggers:
+  - entity_id: sensor.temperatura_percepita
+    above: 45
+    trigger: numeric_state
+  conditions: []
+  actions:
+  - data:
+      message: Attenzione! La temperatura percepita ha superato i 45°C, riparatevi!
+    action: rest_command.whatsapp_group_notify
+  mode: single
+- id: '1782745812256'
+  alias: Notifica WhatsApp - Temperatura sotto -3°
+  description: Invia un messaggio WhatsApp quando la temperatura scende sotto i -3°
+  triggers:
+  - entity_id: sensor.temperatura_media_esterna
+    below: -3
+    trigger: numeric_state
+  conditions: []
+  actions:
+  - data:
+      message: Attenzione! La temperatura esterna è -3°! Troverai sicuramente la macchina
+        ghiacciata.
+    action: rest_command.whatsapp_group_notify
+  mode: single

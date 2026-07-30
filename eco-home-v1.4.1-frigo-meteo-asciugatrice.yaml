@@ -1,0 +1,194 @@
+- id: 'eco_home_frigo_porta_aperta'
+  alias: 'Eco Home - Allerta Porta Frigorifero Aperta (Sensore Ufficiale)'
+  description: 'Annuncio vocale sarcastico se la porta del frigorifero rimane aperta per più di 60 secondi'
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.cucina_frigorifero_cooler_door
+    - binary_sensor.frigorifero_porta
+    - binary_sensor.frigorifero_door
+    - binary_sensor.cucina_frigorifero_porta
+    - binary_sensor.frigo_door
+    to: 'on'
+    for:
+      minutes: 1
+      seconds: 0
+  conditions:
+  - condition: template
+    value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+  actions:
+  - action: media_player.volume_set
+    target:
+      entity_id: media_player.nest_hub_sala
+    data:
+      volume_level: 0.8
+    continue_on_error: true
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Attenzione! Qualcuno ha scambiato il frigorifero per un condizionatore d'ambiente! Chiudete subito quel portellone!",
+          "Allarme frigo aperto! Avviso per la casa: la banchisa si sta sciogliendo e la società elettrica ringrazia per la donazione!",
+          "Chiudere il frigorifero, grazie! I pinguini all'interno stanno già chiedendo le coperte!",
+          "Attenzione! Sportello del frigo spalancato da un minuto! Guardare il cibo non lo fa cucinare da solo, chiudete!",
+          "Allerta Gourmet! Se lasciate ancora il frigo aperto, stasera ceniamo con la mozzarella fusa ed il latte caldo!"
+        ] | random }}
+    continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Allarme Sarcastico: Porta Frigorifero aperta da 60s"
+    continue_on_error: true
+  mode: single
+
+- id: 'eco_home_freezer_porta_aperta'
+  alias: 'Eco Home - Allerta Porta Freezer Aperta (Congelatore SmartThings)'
+  description: 'Annuncio vocale sarcastico se la porta del congelatore rimane aperta per più di 60 secondi'
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.cucina_frigorifero_freezer_door
+    - binary_sensor.congelatore_porta
+    - binary_sensor.freezer_door
+    to: 'on'
+    for:
+      minutes: 1
+      seconds: 0
+  conditions:
+  - condition: template
+    value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+  actions:
+  - action: media_player.volume_set
+    target:
+      entity_id: media_player.nest_hub_sala
+    data:
+      volume_level: 0.8
+    continue_on_error: true
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Attenzione! La porta del congelatore è rimasta aperta! I gelati stanno facendo le valigie ed i bastoncini di pesce chiedono asilo!",
+          "Allarme freezer aperto! L'Era Glaciale in cucina sta finendo! Chiudete subito il congelatore prima che si sciolga il Polo Nord!",
+          "Chiudere il freezer, grazie! Se va avanti così, al posto dei surgelati stasera ritroviamo una piscina olimpionica!",
+          "Attenzione! Sportello del congelatore aperto da un minuto! I pinguini dentro hanno già la febbre, chiudete!",
+          "Emergenza Gelati! Sportello del freezer aperto! Salvate i coni ed il ghiaccio prima del disastro!"
+        ] | random }}
+    continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Allarme Sarcastico: Porta Freezer aperta da 60s"
+    continue_on_error: true
+  mode: single
+
+- id: 'eco_home_meteo_vento_pioggia_terrazza'
+  alias: 'Eco Home - Allerta Vento Forte e Pioggia (Netatmo Terrazza)'
+  description: 'Annuncio vocale sarcastico quando scattano pioggia o vento forte in terrazza'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.sala_anemometro_gust_strength
+    above: 15
+    id: vento_forte
+  - trigger: numeric_state
+    entity_id: sensor.terrazza_pulvirometro_precipitazione
+    above: 0.01
+    id: inizio_pioggia
+  conditions:
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  - condition: template
+    value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'vento_forte' }}"
+      sequence:
+      - action: tts.speak
+        target:
+          entity_id: tts.google_translate_it_lt
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
+          message: "Attenzione! Vento forte in terrazza sopra i 15 km all'ora! Se avete steso le camicie, probabilmente ora stanno sorvolando il quartiere!"
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'inizio_pioggia' }}"
+      sequence:
+      - action: tts.speak
+        target:
+          entity_id: tts.google_translate_it_lt
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
+          message: "Allarme pioggia in terrazza! I panni stesi stanno facendo il secondo lavaggio gratuito, andate subito a salvarli!"
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Meteo Alert Sarcastico: Vento/Pioggia in terrazza"
+    continue_on_error: true
+  mode: single
+
+- id: 'eco_home_asciugatrice_promemoria_svuotamento'
+  alias: 'Eco Home - Promemoria Asciugatrice da Svuotare (Samsung Dryer)'
+  description: 'Promemoria vocale sarcastico 30 minuti dopo la fine del ciclo asciugatrice'
+  triggers:
+  - trigger: state
+    entity_id: sensor.esterno_asciugatrice_machine_state
+    to:
+    - 'off'
+    - idle
+    - stop
+    for:
+      minutes: 30
+  conditions:
+  - condition: template
+    value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Promemoria asciugatrice: il ciclo è terminato da mezz'ora! Svuotatela prima che i panni diventino più stropicciati di una fisarmonica!",
+          "Attenzione! I panni nell'asciugatrice sono pronti da mezz'ora! È ora di ritirarli prima che prendano la residenza lì dentro!",
+          "Asciugatrice pronta! Ricordatevi di piegare i panni o dovrete passarli con il ferro a vapore ad alta pressione!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Promemoria Asciugatrice Sarcastico: Panni da svuotare"
+    continue_on_error: true
+  mode: single

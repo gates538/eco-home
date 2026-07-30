@@ -1,0 +1,151 @@
+- id: 'eco_home_climate_120'
+  alias: Eco Home Risparmio Energetico Clima
+  description: Spegne i condizionatori se le finestre restano aperte per più di 3 minuti
+  mode: single
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.finestra_sala
+    - binary_sensor.finestra_camera
+    to: 'on'
+    for: 00:03:00
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity_id: climate.condizionatore_sala
+      state: 'cool'
+    - condition: state
+      entity_id: climate.condizionatore_sala
+      state: 'heat'
+    - condition: state
+      entity_id: climate.condizionatore_camera
+      state: 'cool'
+    - condition: state
+      entity_id: climate.condizionatore_camera
+      state: 'heat'
+  actions:
+  - action: climate.turn_off
+    target:
+      entity_id:
+      - climate.condizionatore_sala
+      - climate.condizionatore_camera
+    continue_on_error: true
+  - action: notify.notify
+    data:
+      title: "Risparmio Energetico"
+      message: "Attenzione, stai disperdendo calore/fresco! Ho spento i condizionatori perché la finestra è aperta da più di 3 minuti."
+    continue_on_error: true
+
+- id: 'eco_home_notifica_clima_conferma'
+  alias: 'Eco Home - Notifica Clima con Conferma Esplicita'
+  description: 'Invia una notifica con pulsanti di conferma a Stefano e Laura prima di accendere il clima quando fa troppo caldo o troppo freddo'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.temperatura_media
+    above: 26
+    for:
+      minutes: 10
+    id: troppo_caldo
+  - trigger: numeric_state
+    entity_id: sensor.temperatura_media
+    below: 19
+    for:
+      minutes: 10
+    id: troppo_freddo
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity_id: person.stefano
+      state: 'home'
+    - condition: state
+      entity_id: person.laura
+      state: 'home'
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'troppo_caldo' }}"
+      sequence:
+      - action: notify.notify
+        data:
+          title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
+          message: "Fa caldo in casa! Vuoi che accenda i condizionatori o avete le finestre aperte per far arieggiare?"
+          data:
+            actions:
+            - action: "ACCENDI_CONDIZIONATORI"
+              title: "❄️ Sì, Accendi Clima"
+            - action: "NO_FINESTRE_APERTE"
+              title: "🪟 No, Finestre Aperte"
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'troppo_freddo' }}"
+      sequence:
+      - action: notify.notify
+        data:
+          title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
+          message: "Fa freddino in casa! Vuoi che accenda il riscaldamento o state arieggiando?"
+          data:
+            actions:
+            - action: "ACCENDI_RISCALDAMENTO"
+              title: "🔥 Sì, Accendi Caldaia"
+            - action: "NO_FINESTRE_APERTE"
+              title: "🪟 No, Finestre Aperte"
+  mode: single
+
+- id: 'eco_home_risposta_notifica_clima'
+  alias: 'Eco Home - Esecuzione Azione Clima su Conferma Utente'
+  description: 'Esegue accensione clima/riscaldamento SOLO ed ESCLUSIVAMENTE quando Stefano o Laura premono Sì sulla notifica'
+  triggers:
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "ACCENDI_CONDIZIONATORI"
+    id: accendi_condizionatori
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "ACCENDI_RISCALDAMENTO"
+    id: accendi_riscaldamento
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'accendi_condizionatori' }}"
+      sequence:
+      - action: climate.turn_on
+        target:
+          entity_id: climate.condizionatore_sala
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: climate.condizionatore_sala
+        data:
+          hvac_mode: 'cool'
+      - action: tts.speak
+        target:
+          entity_id: tts.google_en_com
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          message: "Condizionatori accesi come richiesto da notifica!"
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'accendi_riscaldamento' }}"
+      sequence:
+      - action: climate.turn_on
+        target:
+          entity_id: climate.condizionatore_sala
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: climate.condizionatore_sala
+        data:
+          hvac_mode: 'heat'
+      - action: tts.speak
+        target:
+          entity_id: tts.google_en_com
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          message: "Riscaldamento avviato come richiesto da notifica!"
+  mode: single

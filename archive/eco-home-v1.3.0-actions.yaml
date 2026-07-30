@@ -1,23 +1,23 @@
-- id: 'eco_home_actions_120'
-  alias: Eco Home - Azioni Notifiche
+- id: 'eco_home_actions_130'
+  alias: Eco Home - Azioni Notifiche (v1.3.0)
   mode: parallel
-  description: Eco Home v1.2.0 - Gestisce le risposte interattive (Clima, Luci, Allarme).
+  description: Eco Home v1.3.0 - Gestisce le risposte interattive (Clima, Luci, Allarme).
   triggers:
   - trigger: event
     event_type: mobile_app_notification_action
   conditions:
   - condition: template
     value_template: >
-      {{ trigger.event.data.action | string | startswith('TURN_ON_AC_') or
-         trigger.event.data.action | string | startswith('TURN_ON_HEAT_') or
-         trigger.event.data.action | string | startswith('TURN_OFF_LIGHT_') or
-         trigger.event.data.action | string | startswith('DISARM_ALARM_') }}
+      {{ (trigger.event.data.action | string).startswith('TURN_ON_AC_') or
+         (trigger.event.data.action | string).startswith('TURN_ON_HEAT_') or
+         (trigger.event.data.action | string).startswith('TURN_OFF_LIGHT_') or
+         (trigger.event.data.action | string).startswith('DISARM_ALARM_') }}
   actions:
   - choose:
     - conditions:
       - condition: template
         value_template: >
-          {{ trigger.event.data.action | string | startswith('TURN_ON_AC_') }}
+          {{ (trigger.event.data.action | string).startswith('TURN_ON_AC_') }}
       sequence:
       - action: climate.turn_on
         target:
@@ -37,7 +37,7 @@
     - conditions:
       - condition: template
         value_template: >
-          {{ trigger.event.data.action | string | startswith('TURN_ON_HEAT_') }}
+          {{ (trigger.event.data.action | string).startswith('TURN_ON_HEAT_') }}
       sequence:
       - action: climate.turn_on
         target:
@@ -57,7 +57,7 @@
     - conditions:
       - condition: template
         value_template: >
-          {{ trigger.event.data.action | string | startswith('TURN_OFF_LIGHT_') }}
+          {{ (trigger.event.data.action | string).startswith('TURN_OFF_LIGHT_') }}
       sequence:
       - action: light.turn_off
         target:
@@ -72,7 +72,7 @@
     - conditions:
       - condition: template
         value_template: >
-          {{ trigger.event.data.action | string | startswith('DISARM_ALARM_') }}
+          {{ (trigger.event.data.action | string).startswith('DISARM_ALARM_') }}
       sequence:
       - action: input_boolean.turn_off
         target:

@@ -1,0 +1,70 @@
+- id: 'eco_home_pet_alert_crocchette'
+  alias: 'Eco Home - Pet Alert (Crocchette Rilasciate)'
+  description: 'Annuncio vocale ed eventuale notifica quando il dispenser rilascia il pasto per Piccola e Luna'
+  triggers:
+  - trigger: state
+    entity_id: image.dispenser_crocchette_ultimo_pasto
+    not_from:
+    - unknown
+    - unavailable
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') or is_state('person.simone', 'home') or is_state('person.monica', 'home') }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_en_com
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      message: >-
+        {{ [
+          "Pasto erogato! Servita la colazione alle principesse pelose Piccola e Luna!",
+          "Crocchette pronte in ciotola! Buon appetito a Piccola e Luna!",
+          "Attenzione! Rifornimento cibo effettuato nel dispenser delle micie!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Pet Alert: Pasto erogato per Piccola e Luna"
+  mode: single
+
+- id: 'eco_home_promemoria_auto_domenica'
+  alias: 'Eco Home - Promemoria Carburante Auto (Drivvo & Discovery)'
+  description: 'Promemoria domenica sera per verificare rifornimento e consumi della Discovery'
+  triggers:
+  - trigger: time
+    at: '20:30:00'
+  conditions:
+  - condition: time
+    weekday:
+    - sun
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_en_com
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      message: >-
+        {{ [
+          "Stefano, promemoria per la Discovery! Ricordati di verificare l'autonomia ed il carburante prima di domani mattina!",
+          "Attenzione Stefano! Controlla il serbatoio della Discovery prima di iniziare la nuova settimana!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Promemoria Auto: Verifica carburante Discovery"
+  mode: single

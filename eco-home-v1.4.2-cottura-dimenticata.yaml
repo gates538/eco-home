@@ -1,0 +1,55 @@
+- id: 'eco_home_allerta_cottura_dimenticata'
+  alias: 'Eco Home - Allerta Cottura Dimenticata (60 Minuti)'
+  description: 'Notifica WhatsApp e avviso vocale se il piano ad induzione o il forno rimangono accesi per più di 60 minuti'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.cucina_piano_cottura_potenza
+    above: 15
+    for:
+      minutes: 60
+    id: induzione_dimenticata
+  - trigger: state
+    entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+    to:
+    - 'In funzione'
+    - 'Preriscaldamento'
+    for:
+      minutes: 60
+    id: piano_dimenticato
+  - trigger: state
+    entity_id: sensor.cucina_forno_machine_state
+    to:
+    - 'running'
+    - 'cooking'
+    for:
+      minutes: 60
+    id: forno_dimenticato
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') or is_state('person.simone', 'home') or is_state('person.monica', 'home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  actions:
+  - action: rest_command.whatsapp_group_notify
+    data:
+      message: "⚠️ Attenzione! La cucina o il forno sono in funzione da oltre 60 minuti. Verificare se vi siete dimenticati la pentola sul fuoco!"
+  - if:
+      - condition: state
+        entity_id: input_boolean.eco_home_silenzioso
+        state: 'off'
+    then:
+      - action: tts.speak
+        target:
+          entity_id: tts.google_en_com
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          message: "Attenzione Stefano e Laura! La cottura in cucina è attiva da oltre un'ora! Controllate che le pentole ed il forno siano sotto controllo!"
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Allarme Cucina: Cottura attiva da oltre 60 min"
+  mode: single

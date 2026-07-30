@@ -1,0 +1,62 @@
+- id: 'eco_home_cinema_silenzioso_avvio'
+  alias: 'Eco Home - Modalità Silenziosa Automatica Inizio Film (Emby / TV)'
+  description: 'Attiva automaticamente la modalità silenziosa quando parte la riproduzione di un film su Emby o TV'
+  triggers:
+  - trigger: state
+    entity_id:
+    - media_player.emby_edge_windows
+    - media_player.emby_homeassistant
+    - media_player.emby_homeassistant_2
+    - media_player.sala_tv_sala
+    to: 'playing'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  actions:
+  - action: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.eco_home_silenzioso
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Modalità Silenziosa: Attivata per riproduzione Film (Emby/TV)"
+  mode: single
+
+- id: 'eco_home_cinema_silenzioso_fine'
+  alias: 'Eco Home - Ripristino Silenzioso Fine Film (Emby / TV)'
+  description: 'Disattiva automaticamente la modalità silenziosa quando la riproduzione del film termina'
+  triggers:
+  - trigger: state
+    entity_id:
+    - media_player.emby_edge_windows
+    - media_player.emby_homeassistant
+    - media_player.emby_homeassistant_2
+    - media_player.sala_tv_sala
+    to:
+    - 'idle'
+    - 'off'
+    - 'paused'
+    for:
+      minutes: 3
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'on'
+  actions:
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.eco_home_silenzioso
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Modalità Silenziosa: Disattivata al termine del film"
+  mode: single

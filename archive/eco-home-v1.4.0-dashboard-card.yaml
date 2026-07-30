@@ -1,0 +1,143 @@
+type: vertical-stack
+cards:
+  - type: markdown
+    content: |
+      ## Eco Home v1.4.0
+      **Automazione:** {{ 'attiva' if is_state('input_boolean.eco_home_attivo', 'on') else 'disattivata' }}<br>
+      **Modalità silenziosa:** {{ 'attiva' if is_state('input_boolean.eco_home_silenzioso', 'on') else 'disattivata' }}<br>
+      **Modalità ospiti:** {{ 'attiva' if is_state('input_boolean.eco_home_ospiti', 'on') else 'disattivata' }}<br>
+      **Allarme:** {{ 'inserito' if is_state('input_boolean.eco_home_allarme_inserito', 'on') else 'disinserito' }}<br>
+      **Nest Hub:** {{ states('media_player.nest_hub_sala') }}
+
+  - type: entities
+    title: Controlli
+    show_header_toggle: false
+    entities:
+      - entity: input_boolean.eco_home_attivo
+        name: Eco Home attivo
+        icon: mdi:home-assistant
+      - entity: input_boolean.eco_home_silenzioso
+        name: Modalità silenziosa
+        icon: mdi:volume-off
+      - entity: input_boolean.eco_home_ospiti
+        name: Modalità ospiti
+        icon: mdi:account-group
+      - entity: input_boolean.eco_home_allarme_inserito
+        name: Allarme inserito
+        icon: mdi:shield-lock
+      - entity: input_boolean.eco_home_notifiche_foto
+        name: Notifiche con foto
+        icon: mdi:camera
+      - entity: input_boolean.eco_home_asciugatrice_da_annunciare
+        name: Promemoria asciugatrice in attesa
+        icon: mdi:tumble-dryer-alert
+
+  - type: entities
+    title: Scenario di test e Impostazioni Vocali
+    show_header_toggle: false
+    entities:
+      - entity: input_select.eco_home_scenario_test
+        name: Messaggio da simulare
+        icon: mdi:test-tube
+      - entity: input_select.eco_home_tts_voce
+        name: Voce TTS
+        icon: mdi:account-voice
+      - entity: input_select.eco_home_tts_velocita
+        name: Velocità TTS
+        icon: mdi:play-speed
+
+  - type: button
+    entity: input_button.eco_home_test_vocale
+    name: Avvia il test selezionato
+    icon: mdi:account-voice
+    show_name: true
+    show_icon: true
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: input_button.press
+      target:
+        entity_id: input_button.eco_home_test_vocale
+    hold_action:
+      action: none
+
+  - type: entities
+    title: Persone e Presenza
+    show_header_toggle: false
+    entities:
+      - entity: person.stefano
+        name: Stefano
+      - entity: person.laura
+        name: Laura
+      - entity: device_tracker.realme_c55
+        name: Mamma Monica (Realme C55)
+        icon: mdi:cellphone
+      - entity: device_tracker.iphone_alessia
+        name: Alessia (iPhone)
+        icon: mdi:cellphone
+
+  - type: entities
+    title: Dispositivi e Sensori v1.4.0
+    show_header_toggle: false
+    entities:
+      - entity: vacuum.dobby
+        name: Dobby Robot Vacuum
+        icon: mdi:robot-vacuum
+      - entity: binary_sensor.porta_contact
+        name: Portone Ingresso
+        icon: mdi:door
+      - entity: binary_sensor.cucina_frigorifero_fridge_door
+        name: Porta Frigorifero
+        icon: mdi:fridge-outline
+      - entity: binary_sensor.cucina_frigorifero_freezer_door
+        name: Porta Freezer
+        icon: mdi:fridge-bottom
+      - entity: sensor.cucina_piano_cottura_stato_di_funzionamento
+        name: Piano Cottura Induzione
+        icon: mdi:stove
+      - entity: sensor.cucina_forno_machine_state
+        name: Stato Forno
+        icon: mdi:oven
+      - entity: sensor.esterno_asciugatrice_machine_state
+        name: Stato Asciugatrice
+        icon: mdi:tumble-dryer
+      - entity: sensor.sensorerouteresterno_temperature_c
+        name: Temperatura Esterna
+        icon: mdi:thermometer
+      - entity: weather.casa
+        name: Meteo Casa
+        icon: mdi:weather-partly-cloudy
+
+  - type: entities
+    title: Diagnostica
+    show_header_toggle: false
+    entities:
+      - type: simple-entity
+        entity: input_text.eco_home_ultimo_evento
+        name: Ultimo evento
+      - type: simple-entity
+        entity: input_text.eco_home_ultimo_esito
+        name: Ultimo esito
+      - type: simple-entity
+        entity: input_text.eco_home_ultima_persona
+        name: Ultima persona rilevata
+      - type: simple-entity
+        entity: input_text.eco_home_ultimo_profilo
+        name: Ultimo profilo vocale
+      - type: simple-entity
+        entity: input_text.eco_home_ultimo_messaggio
+        name: Ultimo messaggio
+      - type: simple-entity
+        entity: input_datetime.eco_home_ultima_apertura_portone
+        name: Ultima apertura portone
+      - type: simple-entity
+        entity: input_datetime.eco_home_ultimo_arrivo
+        name: Ultimo arrivo
+      - type: simple-entity
+        entity: input_datetime.eco_home_ultimo_annuncio
+        name: Ultimo annuncio
+
+  - type: markdown
+    content: |
+      Il test usa lo scenario selezionato, verifica TTS e TV e ripristina il volume precedente del Nest Hub.
+      Il test non modifica la presenza reale e non consuma il promemoria dell'asciugatrice.

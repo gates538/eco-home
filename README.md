@@ -5,16 +5,19 @@
 **Benvenuto intelligente per Home Assistant, confermato da presenza e apertura del portone.**
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Automation-41BDF5?style=flat-square&logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
-[![Versione](https://img.shields.io/badge/versione-1.1.8-2ea44f?style=flat-square)](eco-home-v1.1.8.yaml)
-[![Formato](https://img.shields.io/badge/formato-YAML-CB171E?style=flat-square&logo=yaml&logoColor=white)](eco-home-v1.1.8.yaml)
+[![Versione](https://img.shields.io/badge/versione-1.4.3-2ea44f?style=flat-square)](CHANGELOG.md)
+[![Formato](https://img.shields.io/badge/formato-YAML-CB171E?style=flat-square&logo=yaml&logoColor=white)](CHANGELOG.md)
 
 </div>
 
-## Novità della versione 1.1.8
+## Novità della versione 1.4.3
 
-- **Lettura Temperatura Interna**: l'altoparlante annuncia all'arrivo la temperatura media interna della casa (es: *"In casa ci sono 24,5 gradi"*).
-- **Accensione Condizionatori**: se la temperatura interna supera i 26°C, l'automazione invia una notifica push interattiva chiedendo se desideri accendere l'aria condizionata. Cliccando su "Sì, accendi", i condizionatori configurati si avviano in modalità raffrescamento (`cool`).
-- **Configurazione Clima**: nuove variabili globali per indicare la lista di sensori di temperatura e i condizionatori da gestire.
+- **Voce Femminile Italiana Nativa**: Chiamate TTS riprodotte in voce femminile italiana naturale su Nest Hub con impostazione esplicita `language: "it"` e `tld: "it"`.
+- **Tracciamento Persone Esteso (Rita & Mauro)**: Supporto per Rita (`person.rita`) e Mauro (`person.mauro`) con helper dedicati per gli annunci.
+- **Allerta Porta Freezer Sarcastica**: Annunci vocali scherzosi e sarcastici se lo sportello del congelatore resta aperto per più di 60 secondi.
+- **Fix Annunci Cucina**: Eliminati annunci ad ogni cambio di potenza; ora scatta 1 solo annuncio ad inizio sessione con blocco di 2 ore (`7200s`).
+- **Fix Saluti al Rientro al Portone**: Corretto bug Jinja template e portato il cooldown dei saluti a 15 minuti per evitare saluti durante le brevi aperture da dentro.
+- **Riorganizzazione Frigo & Meteo**: Notifica porta frigorifero aperta (>60s) con frasi sarcastiche e notifiche per pioggia/vento in terrazza.
 
 <details>
 <summary>Novità delle versioni precedenti</summary>

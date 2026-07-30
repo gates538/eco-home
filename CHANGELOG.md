@@ -2,6 +2,35 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [1.4.3] - 2026-07-30
+
+### Nuove Caratteristiche & Miglioramenti Avanzati
+- **Voce Femminile Italiana Nativa**: Forzata la lingua ed il dominio italiano (`language: "it"`, `options: { tld: "it" }`) in tutte le chiamate TTS (`EcoHome.yaml`, `cucina.yaml`, `frigo_meteo.yaml`), garantendo una voce femminile naturale, fluida ed in italiano nativo.
+- **Tracciamento Esteso Persone (Rita & Mauro)**: Registrati e tracciati Rita (`person.rita`) e Mauro (`person.mauro`) con helper dedicati (`input_boolean.eco_home_saluti_rita` e `input_boolean.eco_home_saluti_mauro`) e logica di rientro integrata.
+- **Allerta Porta Freezer Sarcastica**: Creata l'automazione allerta per la porta del congelatore (`binary_sensor.cucina_frigorifero_freezer_door`) con battute esilaranti e scherzose dopo 60 secondi di apertura.
+- **Fix Definitivo Annunci Cucina**:
+  - Eliminati i trigger sui singoli fuochi per evitare annunci ad ogni cambio di potenza.
+  - Ascolto esclusivo dello stato generale del piano ad induzione (`sensor.cucina_piano_cottura_stato_di_funzionamento` da `ready` a `run`) per 1 solo annuncio ad inizio sessione.
+  - Impostato un blocco ferreo di 2 ore (`7200s`) per gli annunci della cucina ed eliminati i trigger dal pulsante di test.
+- **Fix Definitivo Saluti al Rientro al Portone**:
+  - Risolto un bug nel template Jinja (`states[person_id].from_state`) che bloccava la conferma di arrivo.
+  - Elevato il cooldown dei saluti di rientro a 15 minuti (`900s`) per prevenire falsi annunci aprendo la porta da dentro.
+- **Riorganizzazione Frigo & Meteo**: Ripristinata ed aggiornata l'automazione `frigo_meteo.yaml` per allerta porta frigorifero aperta (>60s) con frasi sarcastiche e notifiche per pioggia/vento in terrazza.
+
+## [1.4.2] - 2026-07-26
+
+### Nuove Caratteristiche & Miglioramenti Avanzati
+- **Regola d'Oro Casa Vuota**: Blindatura completa che impedisce qualsiasi annuncio vocale TTS sul Nest Hub se nessuno è fisicamente a casa (`person.*` home == 0).
+- **Tracciamento Persone Esteso**: Aggiunto tracciamento di presenza ed accoglienza vocale al rientro per **Simone Mancini** (`person.simone`) e **Monica** (`person.monica`).
+- **Interruttore Saluti Mauro**: Aggiunto `input_boolean.eco_home_saluti_mauro` per abilitare/disabilitare dall'interfaccia gli annunci vocali per Mauro ed evitare falsi positivi dal piano superiore.
+- **Notifica Clima con Conferma Esplicita**: Notifiche interattive su smartphone per caldo (>26°C) e freddo (<19°C) con pulsanti di conferma esplicita (*Sì, Accendi Clima* / *No, Finestre Aperte*) prima di eseguire qualsiasi azione, evitando sprechi energetici.
+- **Automazione Dobby Robot Vacuum (Dreame L40 Pro)**: Pausa e ritorno automatico alla base di Dobby non appena qualcuno rientra a casa, più controlli di stato e batteria integrati nella scheda Lovelace.
+- **Report Settimanale Batterie Scariche**: Controllo automatico ogni lunedì alle 10:00 con invio report WhatsApp e avviso vocale se un sensore ha la batteria < 15%.
+- **Pet Alert Crocchette (Piccola & Luna)**: Annunci vocali personalizzati ogni volta che il dispenser Petkit eroga il pasto.
+- **Promemoria Carburante Auto (Discovery / Drivvo)**: Avviso vocale domenicale alle 20:30 per verificare l'autonomia prima dell'inizio della settimana.
+- **Sarcasmo Culinario per Laura**: Frasi esilaranti, ironiche e variegate ad ogni accensione dei fornelli sia per Chef Laura che per Chef Stefano.
+
+
 ## [1.2.0] - 2026-07-18
 
 ### Modularizzazione e Nuove Feature

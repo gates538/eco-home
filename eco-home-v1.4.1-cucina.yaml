@@ -1,0 +1,95 @@
+- id: 'eco_home_annunci_cucina'
+  alias: Eco Home - Annunci Vocali Cucina Sarcastici (Pure Battute)
+  mode: single
+  description: Riproduce battute vocali su Nest Hub al massimo 1 volta ogni 2 ore all'avvio della cottura.
+  triggers:
+  - trigger: state
+    entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+    from:
+    - 'ready'
+    - 'off'
+    - 'Spento'
+    - '0'
+    - 'unknown'
+    - 'unavailable'
+    to:
+    - 'run'
+    - 'running'
+    - 'on'
+    id: induzione_accesa
+  - trigger: state
+    entity_id:
+    - sensor.cucina_forno_machine_state
+    - sensor.cucina_forno_second_cavity_machine_state
+    from:
+    - 'ready'
+    - 'off'
+    - 'unknown'
+    - 'unavailable'
+    to:
+    - 'running'
+    - 'run'
+    - 'preheating'
+    - 'on'
+    id: forno_acceso
+  conditions:
+  - condition: template
+    value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+  - condition: template
+    value_template: "{{ is_state('input_boolean.eco_home_annunci_cucina', 'on') or states('input_boolean.eco_home_annunci_cucina') in ['unknown', 'unavailable'] }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  actions:
+  - action: media_player.volume_set
+    target:
+      entity_id: media_player.nest_hub_sala
+    data:
+      volume_level: 0.8
+    continue_on_error: true
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {% set stefano_home = is_state('person.stefano', 'home') %}
+        {% set laura_home = is_state('person.laura', 'home') %}
+        {% if laura_home and not stefano_home %}
+          {{ [
+            "Attenzione! Chef Laura la Commercialista è ai fornelli! Stasera niente F24, ma speriamo che la pentola sopravviva!",
+            "Laura in cucina! Stasera si fatturano le ricette stellate o ordiniamo una pizza al volo?",
+            "Allarme gourmet! Laura ha appena acceso i fornelli, l'IVA sulla cena è al ventidue percento!",
+            "Esperimento culinario di Laura in corso! Tenersi pronti a tutto, bilanci compresi!"
+          ] | random }}
+        {% elif stefano_home and not laura_home %}
+          {{ [
+            "Esperimento culinario in corso! Stefano, ricordati di controllare la cottura ed il timer!",
+            "Chef Stefano alla riscossa! Estintore a portata di mano per sicurezza!",
+            "Cottura in avvio! Speriamo che la cena rimanga deliziosa e non troppo ben cotta!",
+            "Cucina attiva! Attenzione a non far traboccare la pentola o dimenticare il forno!"
+          ] | random }}
+        {% else %}
+          {{ [
+            "Qualcosa sta bollando in pentola! Chissà chi dei due sta preparando la cena stasera!",
+            "Profumino in arrivo! Sfida culinaria tra Stefano e Laura ufficialmente aperta!",
+            "Cucina in funzione! Chiunque sia ai fornelli stasera, buon appetito!",
+            "Cottura in corso! Stasera la casa inizia a profumare di buono!"
+          ] | random }}
+        {% endif %}
+    continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: >-
+        {% set stefano_home = is_state('person.stefano', 'home') %}
+        {% set laura_home = is_state('person.laura', 'home') %}
+        {% if laura_home and not stefano_home %}Annuncio Cucina: Chef Laura
+        {% elif stefano_home and not laura_home %}Annuncio Cucina: Chef Stefano
+        {% else %}Annuncio Cucina: Sfida Culinaria{% endif %}
+    continue_on_error: true

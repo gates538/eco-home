@@ -1,0 +1,31 @@
+- id: 'eco_home_zero_sprechi_spegnimento_luci'
+  alias: 'Eco Home - Zero Sprechi Spegnimento Luci all Uscita'
+  description: 'Spegne automaticamente tutte le luci della casa quando tutti i membri escono di casa'
+  triggers:
+  - trigger: state
+    entity_id:
+    - person.stefano
+    - person.laura
+    - person.simone
+    - person.monica
+    to: 'not_home'
+    id: persona_uscita
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'not_home') and is_state('person.laura', 'not_home') and is_state('person.simone', 'not_home') and is_state('person.monica', 'not_home') }}"
+  actions:
+  - action: light.turn_off
+    target:
+      entity_id:
+      - light.luceambiente
+      - light.faretti_cucina
+    continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Zero Sprechi: Luci spente all'uscita di tutti"
+  mode: single
