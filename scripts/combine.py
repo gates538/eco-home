@@ -1,6 +1,6 @@
 import yaml, os
 
-dir_path = r"C:\Users\stefa\OneDrive\Cartella di Lavoro\Progetti\eco-home"
+dir_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "automations")
 files = [
     os.path.join(dir_path, "eco-home-v1.4.1-core.yaml"),
     os.path.join(dir_path, "eco-home-v1.4.1-cucina.yaml"),

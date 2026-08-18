@@ -7,7 +7,7 @@ files_to_sync = [
     ("eco-home-v1.4.1-frigo-meteo-asciugatrice.yaml", "/config/automations/frigo_meteo.yaml")
 ]
 
-base_dir = r"C:\Users\stefa\OneDrive\Cartella di Lavoro\Progetti\eco-home"
+base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "automations")
 
 for src, dst in files_to_sync:
     src_path = os.path.join(base_dir, src)

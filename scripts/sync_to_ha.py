@@ -1,7 +1,7 @@
 import shutil
 import os
 
-src_dir = r"C:\Users\stefa\OneDrive\Cartella di Lavoro\Progetti\eco-home"
+src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "automations")
 dst_dir = r"Z:\automations"
 
 mapping = {
