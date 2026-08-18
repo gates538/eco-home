@@ -189,3 +189,89 @@
       data:
         value: "Check Buonanotte: Notificate anomalie aperte/accese"
   mode: single
+
+- id: 'eco_home_allarme_portone_aperto_lungo_micie'
+  alias: 'Eco Home - Allarme Portone Aperto a Lungo (> 3 Minuti - Sicurezza Micie)'
+  description: 'Avviso vocale tempestivo se il portone resta aperto per più di 3 minuti continui per non far scappare Piccola e Luna'
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.porta_contact
+    to: 'on'
+    for:
+      minutes: 3
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 600 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Attenzione! Il portone d'ingresso è rimasto aperto da oltre tre minuti: controllate che sia ben chiuso per non far scappare Piccola e Luna!",
+          "Allarme portone: la porta principale è aperta da tre minuti! Verificate che sia chiusa per la sicurezza della casa e delle gatte!",
+          "Promemoria sicurezza: portone principale aperto da oltre tre minuti, occhio agli spifferi e alle micie!",
+          "Attenzione Stefano e Laura: portone aperto da più di tre minuti! Verificate che le gatte siano al sicuro e richiudete la porta!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Sicurezza Alert: Portone aperto oltre 3 minuti"
+  mode: single
+
+- id: 'eco_home_guardiano_dispositivi_offline'
+  alias: 'Eco Home - Guardiano Dispositivi Offline (Check Giornaliero Ore 11:00)'
+  description: 'Controllo silenzioso quotidiano delle entità critiche per segnalare su smartphone eventuali sensori offline o con batterie scariche'
+  triggers:
+  - trigger: time
+    at: '11:00:00'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  actions:
+  - variables:
+      dispositivi_critici:
+      - binary_sensor.porta_contact
+      - sensor.sala_anemometro_gust_strength
+      - sensor.terrazza_pulvirometro_precipitazione
+      - sensor.temperatura_media
+      - sensor.temperatura_media_esterna
+      - climate.condizionatore_sala
+      - climate.condizionatore_camera
+      offline_list: >-
+        {% set lista = [] %}
+        {% for d in dispositivi_critici %}
+          {% if states(d) in ['unavailable', 'unknown'] %}
+            {% set lista = lista + [state_attr(d, 'friendly_name') | default(d)] %}
+          {% endif %}
+        {% endfor %}
+        {{ lista | join(', ') }}
+  - if:
+    - condition: template
+      value_template: "{{ offline_list | trim != '' }}"
+    then:
+    - action: notify.notify
+      data:
+        title: "⚠️ Eco Home Manutenzione Dispositivi"
+        message: "I seguenti dispositivi risultano offline o non raggiungibili: {{ offline_list }}. Verificare Wi-Fi o batterie!"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: "Manutenzione: Segnalati dispositivi offline"
+  mode: single

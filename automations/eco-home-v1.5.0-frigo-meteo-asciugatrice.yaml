@@ -268,3 +268,44 @@
     data:
       value: "Asciugatrice Alert: Vento/Pioggia con bucato in terrazza"
   mode: single
+
+- id: 'eco_home_allerta_raffiche_vento_porte_sbattute'
+  alias: 'Eco Home - Allerta Raffiche Vento Forte & Porte Sbattute (> 30 km/h)'
+  description: 'Avviso vocale su Nest Hub se l anemometro in terrazza rileva raffiche sopra 30 km/h per prevenire colpi d aria'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.sala_anemometro_gust_strength
+    above: 30
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Attenzione: si sono alzate raffiche di vento a oltre trenta chilometri orari in terrazza! Occhio a porte e finestre per evitare che sbattano con la corrente!",
+          "Allerta vento in paese! Raffiche sostenute all'esterno: controllate che le porte di casa non sbattano all'improvviso!",
+          "Attenzione vento forte: raffiche sostenute in terrazza, verificate le aperture di casa per evitare colpi d'aria e spaventi alle micie!",
+          "Vento forte in arrivo in paese! Chiudete o bloccate le porte per non farle sbattere con la corrente!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Meteo Alert: Raffiche vento > 30 km/h in terrazza"
+  mode: single
