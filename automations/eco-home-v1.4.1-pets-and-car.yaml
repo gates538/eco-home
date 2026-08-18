@@ -24,12 +24,13 @@
       media_player_entity_id: media_player.nest_hub_sala
       message: >-
         {{ [
-          "Pasto erogato! Servita la colazione alle principesse pelose Piccola e Luna!",
+          "Pasto erogato! Servita la pappa alle principesse pelose Piccola e Luna!",
           "Crocchette pronte in ciotola! Buon appetito a Piccola e Luna!",
           "Attenzione! Rifornimento croccantini effettuato con successo nel dispenser delle micie!",
           "Suona la campanella della pappa! Piccola e Luna, il banchetto reale è servito!",
-          "Dispenser attivato! Crocchette fresche a disposizione per le padrone di casa a quattro zampe!",
-          "Pasto servito per Piccola e Luna! Tenersi pronti alle fusa di ringraziamento!"
+          "Dispenser attivato! Luna, abbandona il lavandino del bagnetto e corri alla ciotola!",
+          "Pasto servito! Piccola e Luna sono autorizzate a saltare giù dal lettone per la pappa!",
+          "Crocchette a terra! Luna e Piccola, la dispensa reale vi attende a braccia aperte!"
         ] | random }}
   - action: input_text.set_value
     target:

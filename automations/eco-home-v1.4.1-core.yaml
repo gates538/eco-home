@@ -1008,71 +1008,68 @@
     - duo delle meraviglie
     - squadra di casa
     laura_phrase_starts:
-    - Bentornata a casa,
-    - Ma chi si vede, la regina della casa!
-    - Ingresso trionfale per Laura rilevato,
-    - Allarme relax attivato per Laura,
-    - Finalmente a casa,
-    - Dottoressa Laura in the house,
-    - Evviva, è tornata Laura!
-    - Fermi tutti, è arrivata Laura,
-    - Modalità "Zero Stress" attivata per te,
-    - Rientro morbido per Laura confermato,
+    - Bentornata Laura,
+    - Eccola, la regina di casa è rientrata!
+    - Ingresso trionfale per Laura,
+    - Giornata lavorativa archiviata per Laura!
+    - Bentornata Lau,
+    - Finalmente a casa Laura,
+    - Missione ufficio completata per Laura,
+    - Laura a rapporto nella sua oasi di pace,
+    - Modalità relax attivata per Lau,
+    - La casa riprende vita: bentornata Laura!
     laura_phrase_tails:
-    - stasera si stacca il cervello e si coccolano le micie!
-    - ho già pre-riscaldato l'atmosfera per il massimo relax.
-    - la tua missione di oggi è finita: adesso solo divano.
-    - spero tu abbia portato dei croccantini, le gatte sono in sciopero.
-    - dimentica le fatture, qui si pensa solo a stare bene!
-    - togliti le scarpe e lascia fuori il caos del mondo.
-    - la casa ti accoglie a braccia aperte!
-    - ricordati che il riposo non è tassabile, almeno per ora!
-    - è ufficialmente l'ora di farsi servire e riverire da Stefano.
-    - metti in pausa i pensieri e goditi la serata.
+    - stasera niente pensieri: solo divano, coccole e relax!
+    - hai la casa tutta per te prima che rientri Stefano!
+    - le micie ti aspettavano sul lettone per il riposino serale.
+    - controlla se Luna è ancora nel lavandino del bagnetto o se è scesa!
+    - togliti le scarpe, il caos di fuori è ufficialmente bandito.
+    - la casa è accogliente e pronta a farti staccare la spina.
+    - stasera ti meriti solo coccole dalle gatte e zero stress!
+    - Piccola e Luna ti hanno già riservato il posto d'onore sul lettone!
+    - atmosfera perfetta: mettiti comoda e goditi la serata.
+    - chiudi la porta e lascia tutte le scartoffie fuori dal paese!
     stefano_phrase_starts:
-    - Bentornato a casa, capitano,
-    - Presenza VIP di Stefano confermata,
-    - Il capo supremo dell'ecosistema smart è rientrato,
-    - Attenzione, rientro del boss rilevato,
-    - Eccoti qua,
-    - Missione quotidiana completata per Stefano,
-    - Ehi Ste, ben rientrato,
-    - Allerta rossa annullata, Stefano è a casa,
-    - Ingresso autorizzato per il padrone di casa,
-    - Finalmente sei tornato,
+    - Bentornato a casa Ste,
+    - Presenza del capitano Stefano confermata!
+    - Il boss della domotica ha fatto ritorno,
+    - Bentornato Stefano,
+    - Ehi Ste, rientro registrato con successo,
+    - Eccoti qua capitano,
+    - Rientro operativo per Stefano,
+    - Missione quotidiana finita per Ste,
+    - Ingresso autorizzato per il capo di casa,
+    - Centralina smart attiva: bentornato Stefano!
     stefano_phrase_tails:
-    - il telecomando ha sentito la tua mancanza per tutto il giorno!
-    - i server sono stabili e le micie hanno fame.
-    - hai il permesso ufficiale di crollare sul divano.
-    - la casa è ancora intera, puoi tirare un sospiro di sollievo!
-    - stasera niente sbattimenti, solo puro relax domestico.
-    - spero tu sia pronto a farti fare le feste dalle gatte.
-    - ricordati di lasciare lo stress sullo zerbino!
-    - i tuoi sensori smart ti danno il bentornato ufficiale.
-    - togliti il mantello da supereroe e mettiti le pantofole.
-    - la tua casa smart ti aspettava a gloria!
+    - se è pausa pranzo fai un pit-stop veloce, altrimenti divano immediato!
+    - le micie ti aspettavano per il controllo coccole serale!
+    - vai a vedere se Luna sta dormendo nel lavandino del bagnetto o sul lettone!
+    - la casa è al sicuro e i server della domotica sono stabili.
+    - togliti le scarpe e lascia il lavoro fuori dalla porta.
+    - spero tu sia pronto a farti fare le fusa da Piccola e Luna!
+    - rilassati e prenditi il meritato riposo prima di ripartire.
+    - il divano della sala ti ha tenuto il posto caldo tutto il giorno!
+    - ricordati che lo stress si lascia sullo zerbino di casa!
+    - missione compiuta per oggi: ora solo comfort casalingo!
     couple_phrase_starts:
     - Bentornati ragazzi,
-    - Rientro di squadra confermato,
-    - I padroni di casa sono tornati insieme,
-    - Che bello vedervi rientrare in coppia,
-    - Allarme dolcezza, la coppia è a casa,
-    - Finalmente siete qui,
-    - La squadra del cuore è di nuovo nel nido,
+    - Rientro di coppia confermato,
+    - I padroni di casa sono tornati al nido!
+    - La squadra del cuore è di nuovo al completo,
+    - Che bello vedervi rientrare insieme,
+    - Attenzione, duo dinamico a casa!
     - Doppio rientro registrato con successo,
-    - Eccovi qua, sopravvissuti alla giornata,
-    - Il duo dinamico ha fatto ritorno,
+    - Eccovi qua, bentornati a casa insieme!
     couple_phrase_tails:
     - ora potete decidere insieme chi non ha voglia di cucinare stasera!
-    - le micie vi stavano aspettando... o forse aspettavano solo la pappa.
-    - il divano è pronto ad accogliervi entrambi.
-    - chiudete fuori il mondo e godetevi la vostra serata.
-    - spero non abbiate intenzione di fare le pulizie, è vietato!
-    - stasera si entra in modalità relax sincronizzato.
-    - potete finalmente abbassare le difese e rilassarvi.
-    - la casa è felice di avervi di nuovo tra le sue mura.
-    - preparatevi a una serata di puro comfort domestico.
-    - vediamo chi di voi due si addormenterà prima davanti alla TV!
+    - Piccola e Luna vi aspettavano sul lettone per fare festa!
+    - controllate se Luna è ancora nel lavandino o se è venuta a salutarvi!
+    - il divano della sala vi aspetta per il relax sincronizzato.
+    - chiudete fuori il mondo e godetevi la serata insieme!
+    - stasera niente pulizie e niente pensieri: solo divano e relax.
+    - la casa torna viva e accogliente quando siete insieme!
+    - vediamo chi di voi due cederà per primo al fascino del divano!
+    - serata di coppia ufficialmente aperta: rilassatevi!
     night_phrase_starts:
     - Rientro notturno rilevato,
     - Bentornati nell'ombra,

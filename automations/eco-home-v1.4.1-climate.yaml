@@ -92,11 +92,11 @@
       - action: notify.notify
         data:
           title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
-          message: "Fa freddino in casa! Vuoi che accenda il riscaldamento o state arieggiando?"
+          message: "Fa freddino in casa! Vuoi accendere il termocamino a pellet o la pompa di calore per scaldare?"
           data:
             actions:
             - action: "ACCENDI_RISCALDAMENTO"
-              title: "🔥 Sì, Accendi Caldaia"
+              title: "🔥 Sì, Riscalda Casa"
             - action: "NO_FINESTRE_APERTE"
               title: "🪟 No, Finestre Aperte"
   mode: single
