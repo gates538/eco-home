@@ -86,7 +86,9 @@
       sequence:
       - action: input_datetime.set_datetime
         target:
-          entity_id: input_datetime.eco_home_ultimo_arrivo
+          entity_id:
+          - input_datetime.input_datetime_echo_home_ultimo_arrivo
+          - input_datetime.eco_home_ultimo_arrivo
         data:
           datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
         continue_on_error: true
@@ -341,9 +343,11 @@
             + arrival_group_window_seconds) %}\n  {% set ns.names = ns.names + [p.attributes.friendly_name
             | default(p.entity_id | replace('person.', '') | title)] %}\n{% endfor
             %}\n{{ ns.names | unique | list | count }}"
-          arrived_stefano: "{{ is_state('person.stefano', 'home') and not is_state('person.laura', 'home') }}"
-          arrived_laura: "{{ is_state('person.laura', 'home') and not is_state('person.stefano', 'home') }}"
-          arrived_now_couple: "{{ is_state('person.stefano', 'home') and is_state('person.laura', 'home') }}"
+          stefano_arrived_recently: "{{\n  is_state('person.stefano', 'home')\n  and states['person.stefano'] is defined\n  and states['person.stefano'].last_changed is not none\n  and (as_timestamp(now()) - as_timestamp(states['person.stefano'].last_changed)) <= (arrival_person_door_window_seconds + 300)\n}}"
+          laura_arrived_recently: "{{\n  is_state('person.laura', 'home')\n  and states['person.laura'] is defined\n  and states['person.laura'].last_changed is not none\n  and (as_timestamp(now()) - as_timestamp(states['person.laura'].last_changed)) <= (arrival_person_door_window_seconds + 300)\n}}"
+          arrived_stefano: "{{ stefano_arrived_recently and not laura_arrived_recently }}"
+          arrived_laura: "{{ laura_arrived_recently and not stefano_arrived_recently }}"
+          arrived_now_couple: "{{ stefano_arrived_recently and laura_arrived_recently }}"
           welcome_name: "{% if arrived_now_couple %}\n  {{ couple_nicknames | random
             }}\n{% elif arrived_stefano %}\n  {{ stefano_nicknames | random }}\n{% elif
             arrived_laura %}\n  {{ laura_nicknames | random }}\n{% elif arrived_now_count
@@ -391,13 +395,7 @@
             elif states(weather_entity) in ['rainy', 'pouring', 'lightning', 'hail'] %}\n
             \ Oggi è prevista pioggia o maltempo, tieni l'ombrello a portata di mano.\n{%
             else %}\n  {{ '' }}\n{% endif %}"
-          occasion_text: "{% if special_day_text != 'Nessuna data speciale personale.'
-            %}\n  {{ special_day_text }}\n{% elif italian_holiday_text != 'Nessuna
-            festività italiana principale.' %}\n  {{ italian_holiday_text }}\n{% elif
-            is_friday_evening %}\n  Weekend in avvicinamento, finalmente.\n{% elif
-            is_sunday_evening %}\n  Domenica sera tranquilla: si rallenta senza sensi
-            di colpa.\n{% elif is_weekend %}\n  Ritmo da weekend confermato.\n{% else
-            %}\n  {{ '' }}\n{% endif %}"
+          occasion_text: "{% if special_day_text | trim != '' %}\n  {{ special_day_text | trim }}\n{% elif italian_holiday_text | trim != '' %}\n  {{ italian_holiday_text | trim }}\n{% elif is_friday_evening %}\n  Weekend in avvicinamento, finalmente.\n{% elif is_sunday_evening %}\n  Domenica sera tranquilla: si rallenta senza sensi di colpa.\n{% elif is_weekend %}\n  Ritmo da weekend confermato.\n{% else %}\n  {{ '' }}\n{% endif %}"
           final_extra_text: "{% if occasion_text | trim != '' and not is_night %}\n
             \ {{ occasion_text | trim }}\n{% else %}\n  {{ '' }}\n{% endif %}"
       - choose:
@@ -769,6 +767,14 @@
               entity_id: input_datetime.eco_home_ultimo_annuncio
             data:
               datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+          - action: input_datetime.set_datetime
+            target:
+              entity_id:
+              - input_datetime.input_datetime_echo_home_ultimo_arrivo
+              - input_datetime.eco_home_ultimo_arrivo
+            data:
+              datetime: '1970-01-01 00:00:00'
+            continue_on_error: true
           - action: input_text.set_value
             target:
               entity_id: input_text.eco_home_ultimo_esito
@@ -916,10 +922,9 @@
       / 60) | int(0) }}\n{% else %}\n  999\n{% endif %}"
     door_opened_recently: "{{\n  states(door_sensor) not in ['unknown', 'unavailable']\n  and (as_timestamp(now())
       - as_timestamp(states[door_sensor].last_changed)) <= arrival_person_door_window_seconds\n}}"
-    person_arrived_recently: "{% set ns = namespace(ok=false) %} {% for person_id
-      in tracked_people %}\n  {% if is_state(person_id, 'home')\n     and states[person_id] is defined\n     and states[person_id].last_changed is not none\n     and (as_timestamp(now())
-      - as_timestamp(states[person_id].last_changed)) <= arrival_person_door_window_seconds
-      %}\n    {% set ns.ok = true %}\n  {% endif %}\n{% endfor %} {{ ns.ok }}"
+    last_arrival_ts: "{% set ts1 = as_timestamp(states('input_datetime.input_datetime_echo_home_ultimo_arrivo'), default=0) %} {% set ts2 = as_timestamp(states('input_datetime.eco_home_ultimo_arrivo'), default=0) %} {{ [ts1, ts2] | max }}"
+    seconds_from_last_arrival: "{{ (as_timestamp(now()) - (last_arrival_ts | float(0))) | int(999999) }}"
+    person_arrived_recently: "{{ seconds_from_last_arrival | int(999999) <= arrival_person_door_window_seconds }}"
     trigger_person_arrival_valid: "{{\n  trigger_type == 'person_arrived'\n  and trigger_entity_id
       in tracked_people\n  and trigger_to_state == 'home'\n  and trigger_from_state
       not in ['home', 'unknown', 'unavailable']\n  and away_minutes_before_arrival | int(0) >= min_away_minutes\n
@@ -950,21 +955,8 @@
       default=0) %} {{ (as_timestamp(now()) - ts) | int(999999) }}'
     welcome_cooldown_ok: '{{ seconds_from_last_announcement | int(999999) > welcome_cooldown_seconds
       }}'
-    special_day_text: "{% if today_md == '12-28' %}\n  Oggi è il compleanno di Stefano.
-      Auguri Stefano!\n{% elif today_md == '03-31' %}\n  Oggi è il compleanno di Laura.
-      Auguri Laura!\n{% elif today_md == '07-06' %}\n  Oggi è il compleanno di Simone! Tanti auguri Simone!\n{% elif today_md == '09-12' %}\n  Oggi è il compleanno di Monica! Tanti auguri Monica!\n{% elif today_md in ['04-26', '04-27', '04-28', '04-29'] %}\n  Siamo nei giorni del compleanno di Mauro! Tanti auguri Mauro!\n{% elif today_md == '11-02' %}\n  Oggi è il compleanno della micia Luna! Tanti auguri alla nostra splendida Luna!\n{% elif today_md == '08-01' %}\n  Oggi è il vostro anniversario
-      del primo agosto.\n{% elif today_md == '08-28' %}\n  Oggi è il 28 agosto, la
-      data del vostro primo appuntamento.\n{% else %}\n  Nessuna data speciale personale.\n{%
-      endif %}"
-    italian_holiday_text: "{% set md = today_md %}\n{% if md == '01-01' %}\n  Oggi
-      è Capodanno.\n{% elif md == '01-05' %}\n  Oggi è la Vigilia dell'Epifania.\n{% elif md == '01-06' %}\n  Oggi è l'Epifania.\n{% elif md ==
-      '04-24' %}\n  Oggi è la Vigilia della Liberazione.\n{% elif md == '04-25' %}\n  Oggi è la Festa della Liberazione.\n{% elif md == '04-30' %}\n  Oggi è la Vigilia del Primo Maggio.\n{% elif md == '05-01' %}\n
-      Oggi è la Festa dei Lavoratori.\n{% elif md == '06-01' %}\n  Oggi è la Vigilia della Festa della Repubblica.\n{% elif md == '06-02' %}\n  Oggi è la Festa
-      della Repubblica.\n{% elif md == '08-14' %}\n  Oggi è la Vigilia di Ferragosto.\n{% elif md == '08-15' %}\n  Oggi è Ferragosto.\n{% elif md == '10-31' %}\n  Oggi è la Vigilia di Ognissanti e serata di Halloween.\n{% elif md
-      == '11-01' %}\n  Oggi è Ognissanti.\n{% elif md == '12-07' %}\n  Oggi è la Vigilia dell'Immacolata.\n{% elif md == '12-08' %}\n  Oggi è l'Immacolata.\n{% elif md == '12-24' %}\n  Oggi è la Vigilia di Natale! Buona Vigilia!\n{%
-      elif md == '12-25' %}\n  Oggi è Natale! Buon Natale!\n{% elif md == '12-26' %}\n  Oggi è
-      Santo Stefano.\n{% elif md == '12-31' %}\n  Oggi è San Silvestro e la Vigilia di Capodanno! Prepararsi a festeggiare!\n{% else %}\n
-      Nessuna festività o prefestività italiana principale.\n{% endif %}"
+    special_day_text: "{% if today_md == '12-28' %}\n  Oggi è il compleanno di Stefano. Auguri Stefano!\n{% elif today_md == '03-31' %}\n  Oggi è il compleanno di Laura. Auguri Laura!\n{% elif today_md == '07-06' %}\n  Oggi è il compleanno di Simone! Tanti auguri Simone!\n{% elif today_md == '09-12' %}\n  Oggi è il compleanno di Monica! Tanti auguri Monica!\n{% elif today_md in ['04-26', '04-27', '04-28', '04-29'] %}\n  Siamo nei giorni del compleanno di Mauro! Tanti auguri Mauro!\n{% elif today_md == '11-02' %}\n  Oggi è il compleanno della micia Luna! Tanti auguri alla nostra splendida Luna!\n{% elif today_md == '08-01' %}\n  Oggi è il vostro anniversario del primo agosto. Auguri!\n{% elif today_md == '08-28' %}\n  Oggi è il 28 agosto, la data del vostro primo appuntamento.\n{% else %}\n  {{ '' }}\n{% endif %}"
+    italian_holiday_text: "{% set md = today_md %}\n{% if md == '01-01' %}\n  Oggi è Capodanno.\n{% elif md == '01-05' %}\n  Oggi è la Vigilia dell'Epifania.\n{% elif md == '01-06' %}\n  Oggi è l'Epifania.\n{% elif md == '04-24' %}\n  Oggi è la Vigilia della Liberazione.\n{% elif md == '04-25' %}\n  Oggi è la Festa della Liberazione.\n{% elif md == '04-30' %}\n  Oggi è la Vigilia del Primo Maggio.\n{% elif md == '05-01' %}\n  Oggi è la Festa dei Lavoratori.\n{% elif md == '06-01' %}\n  Oggi è la Vigilia della Festa della Repubblica.\n{% elif md == '06-02' %}\n  Oggi è la Festa della Repubblica.\n{% elif md == '08-14' %}\n  Oggi è la Vigilia di Ferragosto.\n{% elif md == '08-15' %}\n  Oggi è Ferragosto.\n{% elif md == '10-31' %}\n  Oggi è la Vigilia di Ognissanti e serata di Halloween.\n{% elif md == '11-01' %}\n  Oggi è Ognissanti.\n{% elif md == '12-07' %}\n  Oggi è la Vigilia dell'Immacolata.\n{% elif md == '12-08' %}\n  Oggi è l'Immacolata.\n{% elif md == '12-24' %}\n  Oggi è la Vigilia di Natale! Buona Vigilia!\n{% elif md == '12-25' %}\n  Oggi è Natale! Buon Natale!\n{% elif md == '12-26' %}\n  Oggi è Santo Stefano.\n{% elif md == '12-31' %}\n  Oggi è San Silvestro e la Vigilia di Capodanno! Prepararsi a festeggiare!\n{% else %}\n  {{ '' }}\n{% endif %}"
     dryer_finished_states:
     - 'off'
     - idle
