@@ -131,9 +131,12 @@
           hvac_mode: 'cool'
       - action: tts.speak
         target:
-          entity_id: tts.google_en_com
+          entity_id: tts.google_translate_it_lt
         data:
           media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
           message: "Condizionatori accesi come richiesto da notifica!"
     - conditions:
       - condition: template
@@ -149,8 +152,11 @@
           hvac_mode: 'heat'
       - action: tts.speak
         target:
-          entity_id: tts.google_en_com
+          entity_id: tts.google_translate_it_lt
         data:
           media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
           message: "Riscaldamento avviato come richiesto da notifica!"
   mode: single

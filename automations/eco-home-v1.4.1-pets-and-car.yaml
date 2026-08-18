@@ -19,9 +19,12 @@
   actions:
   - action: tts.speak
     target:
-      entity_id: tts.google_en_com
+      entity_id: tts.google_translate_it_lt
     data:
       media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
       message: >-
         {{ [
           "Pasto erogato! Servita la pappa alle principesse pelose Piccola e Luna!",
@@ -58,9 +61,12 @@
   actions:
   - action: tts.speak
     target:
-      entity_id: tts.google_en_com
+      entity_id: tts.google_translate_it_lt
     data:
       media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
       message: >-
         {{ [
           "Stefano, promemoria per la Discovery! Ricordati di verificare l'autonomia ed il carburante prima di domani mattina!",

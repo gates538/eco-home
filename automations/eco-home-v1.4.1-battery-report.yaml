@@ -30,9 +30,12 @@
           message: "🪫 Eco Home Report Batterie: Le seguenti batterie sono sotto il 15%: {{ low_batteries }}"
       - action: tts.speak
         target:
-          entity_id: tts.google_en_com
+          entity_id: tts.google_translate_it_lt
         data:
           media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
           message: "Attenzione Stefano e Laura! Alcune batterie dei sensori domotici sono scariche. Ho inviato l'elenco su WhatsApp!"
       - action: input_text.set_value
         target:

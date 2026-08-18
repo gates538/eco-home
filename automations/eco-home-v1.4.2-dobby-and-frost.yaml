@@ -22,9 +22,12 @@
   actions:
   - action: tts.speak
     target:
-      entity_id: tts.google_en_com
+      entity_id: tts.google_translate_it_lt
     data:
       media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
       message: >-
         {{ [
           "Dobby ha completato la pulizia ed è tornato a riposare nella sua nicchia! La casa è splendente!",

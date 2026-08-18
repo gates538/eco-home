@@ -213,6 +213,9 @@
             data:
               media_player_entity_id: '{{ speaker }}'
               message: '{{ test_message | trim }}'
+              language: "it"
+              options:
+                tld: "it"
               cache: false
             continue_on_error: true
           - delay:
