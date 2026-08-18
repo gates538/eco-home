@@ -38,8 +38,11 @@
           "Attenzione! Qualcuno ha scambiato il frigorifero per un condizionatore d'ambiente! Chiudete subito quel portellone!",
           "Allarme frigo aperto! Avviso per la casa: la banchisa si sta sciogliendo e la società elettrica ringrazia per la donazione!",
           "Chiudere il frigorifero, grazie! I pinguini all'interno stanno già chiedendo le coperte!",
-          "Attenzione! Sportello del frigo spalancato da un minuto! Guardare il cibo non lo fa cucinare da solo, chiudete!",
-          "Allerta Gourmet! Se lasciate ancora il frigo aperto, stasera ceniamo con la mozzarella fusa ed il latte caldo!"
+          "Attenzione! Sportello del frigo spalancato da un minuto! Guardare il cibo con insistenza non lo farà cucinare da solo, chiudete!",
+          "Allerta Gourmet! Se lasciate ancora il frigo aperto, stasera ceniamo con la mozzarella fusa ed il latte caldo!",
+          "Il frigorifero non è una galleria d'arte moderna, scegliere cosa mangiare richiede meno di sessanta secondi!",
+          "Chiudete quel frigo! Stiamo rinfrescando tutto il quartiere a nostre spese!",
+          "Frigorifero aperto da oltre un minuto! I formaggi stanno organizzando una fuga di massa!"
         ] | random }}
     continue_on_error: true
   - action: input_text.set_value
@@ -89,7 +92,9 @@
           "Allarme freezer aperto! L'Era Glaciale in cucina sta finendo! Chiudete subito il congelatore prima che si sciolga il Polo Nord!",
           "Chiudere il freezer, grazie! Se va avanti così, al posto dei surgelati stasera ritroviamo una piscina olimpionica!",
           "Attenzione! Sportello del congelatore aperto da un minuto! I pinguini dentro hanno già la febbre, chiudete!",
-          "Emergenza Gelati! Sportello del freezer aperto! Salvate i coni ed il ghiaccio prima del disastro!"
+          "Emergenza Gelati! Sportello del freezer aperto! Salvate i coni ed il ghiaccio prima del disastro termico!",
+          "Allarme congelatore! Chiudete la porta prima che i piselli surgelati prendano vita e colonizzino la cucina!",
+          "Il Polo Nord ringrazia ma il freezer deve rimanere chiuso! Correte a chiudere quello sportello!"
         ] | random }}
     continue_on_error: true
   - action: input_text.set_value
@@ -131,7 +136,15 @@
           language: "it"
           options:
             tld: "it"
-          message: "Attenzione! Vento forte in terrazza sopra i 15 km all'ora! Se avete steso le camicie, probabilmente ora stanno sorvolando il quartiere!"
+          message: >-
+            {{ [
+              "Attenzione! Vento forte in terrazza sopra i quindici chilometri orari! Se avete steso le camicie, probabilmente ora stanno sorvolando il quartiere!",
+              "Allarme raffiche di vento! Chiudete le tende in terrazza prima che decollino verso nuovi orizzonti!",
+              "Attenzione vento forte! Se ci sono oggetti leggeri in terrazza, considerateli già dispersi o andate a recuperarli subito!",
+              "Bora in arrivo in terrazza! Legate le piante e ritirate i panni stesi prima che prendano il brevetto di volo!",
+              "Raffiche violente rilevate! La terrazza sembra una pista di lancio, controllate tende e vasi prima che sia tardi!",
+              "Allerta meteo terrazza: il vento sta mettendo alla prova la tenuta dei vostri stendini! Intervenire subito!"
+            ] | random }}
     - conditions:
       - condition: template
         value_template: "{{ trigger.id == 'inizio_pioggia' }}"
@@ -144,7 +157,14 @@
           language: "it"
           options:
             tld: "it"
-          message: "Allarme pioggia in terrazza! I panni stesi stanno facendo il secondo lavaggio gratuito, andate subito a salvarli!"
+          message: >-
+            {{ [
+              "Allarme pioggia in terrazza! I panni stesi stanno facendo il secondo lavaggio gratuito, andate subito a salvarli!",
+              "Attenzione, pioggia rilevata dal pluviometro! Ritirare immediatamente lo stendibiancheria prima che anneghi!",
+              "Cielo a catinelle! La terrazza si sta trasformando in un parco acquatico, panni da mettere in salvo immediatamente!",
+              "Doccia non richiesta in arrivo in terrazza! Chi ha steso il bucato corra a ritirarlo!",
+              "Pluviometro allagato! Pioggia in corso, chiudete le finestre e salvate il bucato steso!"
+            ] | random }}
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
@@ -183,7 +203,10 @@
         {{ [
           "Promemoria asciugatrice: il ciclo è terminato da mezz'ora! Svuotatela prima che i panni diventino più stropicciati di una fisarmonica!",
           "Attenzione! I panni nell'asciugatrice sono pronti da mezz'ora! È ora di ritirarli prima che prendano la residenza lì dentro!",
-          "Asciugatrice pronta! Ricordatevi di piegare i panni o dovrete passarli con il ferro a vapore ad alta pressione!"
+          "Asciugatrice pronta! Ricordatevi di piegare i panni o dovrete passarli con il ferro a vapore ad alta pressione!",
+          "I vestiti nell'asciugatrice chiedono asilo politico! Mezz'ora al calduccio è bastata, andate a svuotarla!",
+          "Allarme stropicciamento acuto! L'asciugatrice aspetta solo voi prima che le camicie diventino origami!",
+          "Bucato asciutto e pronto! Se aspettate ancora un quarto d'ora per svuotarla, servirà una pressa idraulica per stirarli!"
         ] | random }}
   - action: input_text.set_value
     target:

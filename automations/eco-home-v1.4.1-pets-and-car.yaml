@@ -26,7 +26,10 @@
         {{ [
           "Pasto erogato! Servita la colazione alle principesse pelose Piccola e Luna!",
           "Crocchette pronte in ciotola! Buon appetito a Piccola e Luna!",
-          "Attenzione! Rifornimento cibo effettuato nel dispenser delle micie!"
+          "Attenzione! Rifornimento croccantini effettuato con successo nel dispenser delle micie!",
+          "Suona la campanella della pappa! Piccola e Luna, il banchetto reale è servito!",
+          "Dispenser attivato! Crocchette fresche a disposizione per le padrone di casa a quattro zampe!",
+          "Pasto servito per Piccola e Luna! Tenersi pronti alle fusa di ringraziamento!"
         ] | random }}
   - action: input_text.set_value
     target:
@@ -60,7 +63,10 @@
       message: >-
         {{ [
           "Stefano, promemoria per la Discovery! Ricordati di verificare l'autonomia ed il carburante prima di domani mattina!",
-          "Attenzione Stefano! Controlla il serbatoio della Discovery prima di iniziare la nuova settimana!"
+          "Attenzione Stefano! Controlla il serbatoio della Discovery prima di iniziare la nuova settimana!",
+          "Promemoria auto della domenica: verifica livello carburante e consumi su Drivvo per la Discovery!",
+          "Domenica sera, tempo di check per la Discovery: siamo pronti a partire o serve una sosta dal benzinaio domani?",
+          "Avviso capitano Stefano: controlla che la Discovery sia pronta per i viaggi della nuova settimana!"
         ] | random }}
   - action: input_text.set_value
     target:

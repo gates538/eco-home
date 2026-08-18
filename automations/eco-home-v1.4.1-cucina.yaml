@@ -61,24 +61,32 @@
         {% set laura_home = is_state('person.laura', 'home') %}
         {% if laura_home and not stefano_home %}
           {{ [
-            "Attenzione! Chef Laura la Commercialista è ai fornelli! Stasera niente F24, ma speriamo che la pentola sopravviva!",
-            "Laura in cucina! Stasera si fatturano le ricette stellate o ordiniamo una pizza al volo?",
+            "Attenzione! Chef Laura è ai fornelli! Stasera niente F24, ma speriamo che la pentola sopravviva!",
+            "Laura in cucina! Stasera si cucinano ricette stellate o teniamo Just Eat pronto sul telefono?",
             "Allarme gourmet! Laura ha appena acceso i fornelli, l'IVA sulla cena è al ventidue percento!",
-            "Esperimento culinario di Laura in corso! Tenersi pronti a tutto, bilanci compresi!"
+            "Esperimento culinario di Laura in corso! Tenersi pronti a tutto, bilanci compresi!",
+            "Laura ha preso possesso dei fornelli! Stefano è avvisato: stasera si mangia raffinato o si digiuna!",
+            "Cottura avviata da Laura! Ricordati di non usare il sale come se fosse un credito d'imposta!",
+            "Profumino in arrivo! Laura sta dando lezioni di alta cucina, speriamo senza detrazioni!"
           ] | random }}
         {% elif stefano_home and not laura_home %}
           {{ [
             "Esperimento culinario in corso! Stefano, ricordati di controllare la cottura ed il timer!",
             "Chef Stefano alla riscossa! Estintore a portata di mano per sicurezza!",
-            "Cottura in avvio! Speriamo che la cena rimanga deliziosa e non troppo ben cotta!",
-            "Cucina attiva! Attenzione a non far traboccare la pentola o dimenticare il forno!"
+            "Cottura in avvio! Speriamo che la cena rimanga deliziosa e non troppo carbonizzata!",
+            "Cucina attiva! Stefano ai fornelli: attenzione a non far traboccare la pentola o dimenticare il forno!",
+            "Attenzione! Stefano sta cucinando! Ricordati che i tempi di cottura non si possono velocizzare con l'overclock!",
+            "Piano cottura acceso da Stefano! Le micie sono già in attesa di eventuali scarti prelibati!",
+            "Chef Stefano in azione! Speriamo che la ricetta sia open source e ben collaudata!"
           ] | random }}
         {% else %}
           {{ [
             "Qualcosa sta bollando in pentola! Chissà chi dei due sta preparando la cena stasera!",
             "Profumino in arrivo! Sfida culinaria tra Stefano e Laura ufficialmente aperta!",
-            "Cucina in funzione! Chiunque sia ai fornelli stasera, buon appetito!",
-            "Cottura in corso! Stasera la casa inizia a profumare di buono!"
+            "Cucina in funzione! Chiunque sia ai fornelli stasera, buon appetito e niente bruciature!",
+            "Cottura in corso! Stasera la casa inizia a profumare di buono!",
+            "Fornelli accesi! Masterchef Casa è ufficialmente iniziato, vediamo chi vince la stella Michelin stasera!",
+            "Attenzione in cucina! Chi sta cucinando ha diritto a non lavare i piatti dopo cena, è la legge di casa!"
           ] | random }}
         {% endif %}
     continue_on_error: true

@@ -37,7 +37,12 @@
         - action: '{{ default_notification_service }}'
           data:
             title: "Guardiano Eco Home"
-            message: "Tutti sono usciti ma la luce {{ state_attr(light_entity, 'friendly_name') }} è accesa. Vuoi spegnerla?"
+            message: >-
+              {{ [
+                "Tutti sono usciti ma la luce " ~ state_attr(light_entity, 'friendly_name') ~ " è rimasta accesa. Vuoi spegnerla?",
+                "Avviso Guardiano: luce " ~ state_attr(light_entity, 'friendly_name') ~ " ancora accesa a casa vuota. La spengo?",
+                "Qualcuno ha dimenticato accesa la luce " ~ state_attr(light_entity, 'friendly_name') ~ "! Premi per spegnerla subito."
+              ] | random }}
             data:
               actions:
                 - action: "TURN_OFF_LIGHT_{{ context.id }}"
@@ -52,7 +57,12 @@
         - action: '{{ default_notification_service }}'
           data:
             title: "Guardiano Eco Home"
-            message: "Attenzione: avete lasciato aperto: {{ windows_open }}."
+            message: >-
+              {{ [
+                "Attenzione: avete lasciato aperto: " ~ windows_open ~ " mentre siete fuori casa!",
+                "Allarme finestre: risulta aperto: " ~ windows_open ~ "! Occhio a pioggia e correnti d'aria!",
+                "Guardiano casa: non dimenticate che " ~ windows_open ~ " è ancora aperto!"
+              ] | random }}
           continue_on_error: true
       - if:
         - condition: template
@@ -61,7 +71,12 @@
         - action: '{{ default_notification_service }}'
           data:
             title: "Guardiano Eco Home"
-            message: "L'asciugatrice è ancora in funzione mentre siete fuori."
+            message: >-
+              {{ [
+                "L'asciugatrice è ancora in funzione mentre siete fuori casa.",
+                "Promemoria Guardiano: il ciclo asciugatrice sta proseguendo in vostra assenza.",
+                "Bucato in corso: l'asciugatrice sta terminando mentre la casa è vuota."
+              ] | random }}
           continue_on_error: true
 
     - conditions:

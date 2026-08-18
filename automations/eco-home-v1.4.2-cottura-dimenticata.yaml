@@ -35,7 +35,12 @@
   actions:
   - action: rest_command.whatsapp_group_notify
     data:
-      message: "⚠️ Attenzione! La cucina o il forno sono in funzione da oltre 60 minuti. Verificare se vi siete dimenticati la pentola sul fuoco!"
+      message: >-
+        {{ [
+          "⚠️ Attenzione! La cucina o il forno sono in funzione da oltre 60 minuti. Verificare se vi siete dimenticati la pentola sul fuoco!",
+          "🔥 Allarme Cucina! Fornelli o forno accesi da oltre un'ora! Controllate che non ci sia del carbone vegetale in preparazione!",
+          "⚠️ Promemoria Cucina: Cottura attiva da più di 60 minuti! Se non è uno spezzatino a cottura lenta, andate a controllare!"
+        ] | random }}
   - if:
       - condition: state
         entity_id: input_boolean.eco_home_silenzioso
@@ -46,7 +51,13 @@
           entity_id: tts.google_en_com
         data:
           media_player_entity_id: media_player.nest_hub_sala
-          message: "Attenzione Stefano e Laura! La cottura in cucina è attiva da oltre un'ora! Controllate che le pentole ed il forno siano sotto controllo!"
+          message: >-
+            {{ [
+              "Attenzione Stefano e Laura! La cottura in cucina è attiva da oltre un'ora! Controllate che le pentole ed il forno siano sotto controllo!",
+              "Allarme cucina! Fornelli accesi da sessanta minuti! Se non state preparando il brasato delle grandi occasioni, correte a spegnere prima del fumo!",
+              "Attenzione ai fornelli! È passata un'ora dall'accensione, verificate che l'acqua non sia tutta evaporata!",
+              "Avviso culinario d'emergenza: la cucina sta lavorando da oltre sessanta minuti, andate a dare un'occhiata prima che suoni l'allarme fumo!"
+            ] | random }}
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
