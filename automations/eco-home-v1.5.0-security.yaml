@@ -136,3 +136,56 @@
     window_sensors:
     - binary_sensor.finestra_sala
     - binary_sensor.finestra_camera
+
+- id: 'eco_home_check_silenzioso_buonanotte'
+  alias: 'Eco Home - Check Silenzioso Buonanotte (Ore 00:00)'
+  description: 'Controllo a mezzanotte a suoni spenti: silenzio totale se tutto è chiuso/spento, notifica discreta se qualcosa è rimasto aperto'
+  triggers:
+  - trigger: time
+    at: '00:00:00'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  actions:
+  - variables:
+      portone_aperto: "{{ is_state('binary_sensor.porta_contact', 'on') }}"
+      finestre_aperte: >-
+        {% set open = expand(['binary_sensor.finestra_sala', 'binary_sensor.finestra_camera']) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
+        {{ open | join(', ') if open | length > 0 else '' }}
+      luci_accese: >-
+        {% set on_lights = expand(['light.luceambiente', 'light.faretti_cucina']) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
+        {{ on_lights | join(', ') if on_lights | length > 0 else '' }}
+      asciugatrice_attiva: >-
+        {{ states('sensor.esterno_asciugatrice_machine_state') not in ['off', 'idle', 'stop', 'stopped', 'complete', 'completed', 'finish', 'finished', 'end', 'ended', 'none', 'standby', 'unknown', 'unavailable'] }}
+      anomalie: >-
+        {% set lista = [] %}
+        {% if portone_aperto %}
+          {% set lista = lista + ['Portone principale aperto'] %}
+        {% endif %}
+        {% if finestre_aperte != '' %}
+          {% set lista = lista + [finestre_aperte] %}
+        {% endif %}
+        {% if luci_accese != '' %}
+          {% set lista = lista + [luci_accese] %}
+        {% endif %}
+        {% if asciugatrice_attiva %}
+          {% set lista = lista + ['Asciugatrice ancora in funzione'] %}
+        {% endif %}
+        {{ lista | join(' • ') }}
+  - if:
+    - condition: template
+      value_template: "{{ anomalie | trim != '' }}"
+    then:
+    - action: notify.notify
+      data:
+        title: "🌙 Check Notturno Eco Home"
+        message: "Attenzione: prima di dormire risultano ancora aperti o accesi:\n• {{ anomalie }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: "Check Buonanotte: Notificate anomalie aperte/accese"
+  mode: single

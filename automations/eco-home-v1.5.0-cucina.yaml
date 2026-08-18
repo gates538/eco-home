@@ -101,3 +101,108 @@
         {% elif stefano_home and not laura_home %}Annuncio Cucina: Chef Stefano
         {% else %}Annuncio Cucina: Sfida Culinaria{% endif %}
     continue_on_error: true
+
+- id: 'eco_home_timer_pranzo_stefano'
+  alias: 'Eco Home - Timer Pit-Stop Pranzo Stefano (Cottura > 25 min)'
+  description: 'Promemoria vocale durante la pausa pranzo (13:05-14:30) se la cottura supera 25 minuti per non fare tardi'
+  triggers:
+  - trigger: state
+    entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+    to:
+    - 'run'
+    - 'running'
+    - 'on'
+    for:
+      minutes: 25
+  - trigger: numeric_state
+    entity_id: sensor.cucina_piano_cottura_potenza
+    above: 15
+    for:
+      minutes: 25
+  conditions:
+  - condition: template
+    value_template: "{{ now().weekday() < 6 }}"
+  - condition: time
+    after: '13:05:00'
+    before: '14:30:00'
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: state
+    entity_id: person.stefano
+    state: 'home'
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Capitano Ste, sono passati venticinque minuti di cottura: controlla la padella per mangiare con calma prima che scada la pausa pranzo!",
+          "Timer pausa pranzo per Stefano: venticinque minuti di fornelli, la pappa dovrebbe essere pronta in tavola!",
+          "Attenzione Stefano: cottura attiva da venticinque minuti, controlla la cucina e buon appetito!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Cucina Alert: Timer 25 min pausa pranzo Stefano"
+  mode: single
+
+- id: 'eco_home_check_uscita_pomeriggio_stefano'
+  alias: 'Eco Home - Check Pre-Uscita Pomeriggio Stefano (Ore 15:45)'
+  description: 'Avviso vocale alle 15:45 se Stefano è a casa e risultano luci accese o fornelli ancora attivi prima di tornare al lavoro'
+  triggers:
+  - trigger: time
+    at: '15:45:00'
+  conditions:
+  - condition: template
+    value_template: "{{ now().weekday() < 6 }}"
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.eco_home_modalita_ferie', 'on') }}"
+  - condition: state
+    entity_id: person.stefano
+    state: 'home'
+  actions:
+  - variables:
+      cucina_accesa: >-
+        {{ states('sensor.cucina_piano_cottura_stato_di_funzionamento') in ['run', 'running', 'on'] or states('sensor.cucina_piano_cottura_potenza') | float(0) > 15 }}
+      luci_accese: >-
+        {{ is_state('light.luceambiente', 'on') or is_state('light.faretti_cucina', 'on') }}
+  - if:
+    - condition: template
+      value_template: "{{ cucina_accesa or luci_accese }}"
+    then:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: "it"
+        options:
+          tld: "it"
+        message: >-
+          {{ [
+            "Attenzione Stefano: sono le quindici e quarantacinque! Controlla che le luci e la cucina siano spente prima di ripartire!",
+            "Promemoria pre-uscita per Stefano: check rapido a luci e fornelli prima di tornare a lavoro alle quindici e cinquanta!",
+            "Capitano Ste, quasi ora di ripartire: assicurati che sia tutto spento prima di uscire!"
+          ] | random }}
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: "Check Pomeriggio: Avviso pre-uscita 15:45 Stefano"
+  mode: single

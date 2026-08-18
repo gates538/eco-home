@@ -223,3 +223,152 @@
     data:
       value: "Meteo Flash: Avviso pioggia/gelo pre-partenza Discovery"
   mode: single
+
+- id: 'eco_home_allarme_temporale_finestre_micie'
+  alias: 'Eco Home - Allarme Temporale & Finestre per le Micie (Casa Vuota)'
+  description: 'Notifica smartphone urgente se scatta temporale o vento forte a casa vuota nel caso ci siano finestre aperte per le gatte'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.terrazza_pulvirometro_precipitazione
+    above: 0.01
+  - trigger: numeric_state
+    entity_id: sensor.sala_anemometro_gust_strength
+    above: 20
+  - trigger: state
+    entity_id: weather.home
+    to:
+    - rainy
+    - pouring
+    - lightning
+    - hail
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'not_home') and is_state('person.laura', 'not_home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 10800 }}"
+  actions:
+  - action: notify.notify
+    data:
+      title: "⛈️ Allarme Temporale Improvviso in Paese!"
+      message: >-
+        {% set pioggia = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 %}
+        {% set vento = states('sensor.sala_anemometro_gust_strength') | float(0) %}
+        Attenzione Stefano e Laura! Siete fuori casa e in terrazza {% if pioggia %}sta piovendo{% else %}ci sono raffiche di vento a {{ vento }} km/h{% endif %}!
+        Se avete lasciato finestre aperte per il fresco alle micie (Piccola e Luna), verificate se rientrare o far controllare!
+      data:
+        push:
+          sound: default
+          critical: 1
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Meteo Alert: Temporale improvviso a casa vuota con finestre micie"
+  mode: single
+
+- id: 'eco_home_controllo_batteria_smartphone_mattina'
+  alias: 'Eco Home - Salva-Batteria Smartphone Pre-Partenza (Ore 07:30, Discovery & Punto Blu)'
+  description: 'Avviso vocale prima di uscire alle 07:30 se il telefono di Stefano o Laura è sotto il 20%'
+  triggers:
+  - trigger: time
+    at: '07:30:00'
+  conditions:
+  - condition: template
+    value_template: "{{ now().weekday() < 5 }}"
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.eco_home_modalita_ferie', 'on') }}"
+  - condition: template
+    value_template: >-
+      {% set m = now().month %}
+      {% set d = now().day %}
+      {% set is_holiday = (
+        (m == 1 and d in [1, 6]) or
+        (m == 4 and d == 25) or
+        (m == 5 and d == 1) or
+        (m == 6 and d == 2) or
+        (m == 8 and d == 15) or
+        (m == 11 and d == 1) or
+        (m == 12 and d in [8, 25, 26])
+      ) %}
+      {{ not is_holiday }}
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  actions:
+  - variables:
+      stefano_low: >-
+        {% set b = states.sensor | selectattr('entity_id', 'search', 'stefano.*battery|battery.*stefano') | map(attribute='state') | map('int', 100) | list | min | default(100) %}
+        {{ b < 20 and is_state('person.stefano', 'home') }}
+      laura_low: >-
+        {% set b = states.sensor | selectattr('entity_id', 'search', 'laura.*battery|battery.*laura') | map(attribute='state') | map('int', 100) | list | min | default(100) %}
+        {{ b < 20 and is_state('person.laura', 'home') }}
+  - if:
+    - condition: template
+      value_template: "{{ stefano_low and laura_low }}"
+    then:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: "it"
+        options:
+          tld: "it"
+        message: >-
+          {{ [
+            "Attenzione ragazzi: avete entrambi i telefoni quasi scarichi prima di uscire! Metteteli subito in carica prima di salire sulla Discovery e sulla Punto Blu!",
+            "Promemoria batterie del mattino: Stefano e Laura, telefoni sotto il venti percento! Una ricarica rapida al volo prima della partenza!",
+            "Avviso prima di partire: caricate i cellulari ragazzi, prima di salire sulla Discovery e sulla Punto Blu!"
+          ] | random }}
+    - else:
+      - if:
+        - condition: template
+          value_template: "{{ stefano_low }}"
+        then:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: "it"
+            options:
+              tld: "it"
+            message: >-
+              {{ [
+                "Stefano, promemoria batteria: il tuo telefono è quasi scarico! Mettilo subito in carica prima di salire sulla Discovery!",
+                "Capitano Stefano, attenzione al telefono: batteria sotto il venti percento prima di partire con la Discovery!",
+                "Promemoria per Stefano: attacca il telefono alla ricarica prima dell'uscita delle sette e cinquanta!"
+              ] | random }}
+        - else:
+          - if:
+            - condition: template
+              value_template: "{{ laura_low }}"
+            then:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                language: "it"
+                options:
+                  tld: "it"
+                message: >-
+                  {{ [
+                    "Laura, promemoria batteria: il tuo telefono è quasi scarico! Attaccalo alla ricarica rapida prima di salire sulla Punto Blu!",
+                    "Attenzione Laura: batteria del telefono sotto il venti percento! Mettilo in carica prima di partire con la Punto Blu!",
+                    "Promemoria per Laura: una carica veloce al telefono prima di iniziare la giornata!"
+                  ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Batteria Alert: Controllo smartphone pre-uscita 07:30"
+  mode: single

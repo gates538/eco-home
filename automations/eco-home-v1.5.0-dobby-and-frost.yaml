@@ -71,3 +71,39 @@
     data:
       value: "Meteo Alert: Possibile gelo parabrezza auto"
   mode: single
+
+- id: 'eco_home_dobby_rientro_su_presenza'
+  alias: 'Eco Home - Dobby Rientro Immediato alla Base al Rientro Persone'
+  description: 'Se Dobby sta pulendo e qualcuno apre il portone o rientra a casa, torna istantaneamente alla base'
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.porta_contact
+    to: 'on'
+  - trigger: state
+    entity_id:
+    - person.stefano
+    - person.laura
+    to: 'home'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: template
+    value_template: >-
+      {% set s1 = states('vacuum.dreame_l40_pro') %}
+      {% set s2 = states('vacuum.dobby') %}
+      {{ s1 in ['cleaning', 'sweeping', 'mopping', 'cleaning_auto', 'zone_cleaning', 'spot_cleaning'] or
+         s2 in ['cleaning', 'sweeping', 'mopping', 'cleaning_auto', 'zone_cleaning', 'spot_cleaning'] }}
+  actions:
+  - action: vacuum.return_to_base
+    target:
+      entity_id:
+      - vacuum.dreame_l40_pro
+      - vacuum.dobby
+    continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Dobby: Rientro immediato alla base per rientro persone"
+  mode: single
