@@ -13,6 +13,7 @@ Se possiedi già helper `echo_home_*`, non crearne altri: segui
 |---|---|---|
 | Eco Home attivo | `input_boolean.eco_home_attivo` | `mdi:home-assistant` |
 | Eco Home silenzioso | `input_boolean.eco_home_silenzioso` | `mdi:volume-off` |
+| Eco Home modalità ferie | `input_boolean.eco_home_modalita_ferie` | `mdi:beach` |
 | Eco Home asciugatrice da annunciare | `input_boolean.eco_home_asciugatrice_da_annunciare` | `mdi:tumble-dryer-alert` |
 | Eco Home notifiche foto | `input_boolean.eco_home_notifiche_foto` | `mdi:camera` |
 

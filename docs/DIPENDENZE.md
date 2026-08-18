@@ -62,6 +62,7 @@ Il file completo definisce:
 ```text
 input_boolean.eco_home_attivo
 input_boolean.eco_home_silenzioso
+input_boolean.eco_home_modalita_ferie
 input_boolean.eco_home_notifiche_foto
 input_boolean.eco_home_asciugatrice_da_annunciare
 input_datetime.eco_home_asciugatrice_fine

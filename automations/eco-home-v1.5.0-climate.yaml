@@ -160,3 +160,99 @@
             tld: "it"
           message: "Riscaldamento avviato come richiesto da notifica!"
   mode: single
+
+- id: 'eco_home_brezza_naturale_estiva'
+  alias: 'Eco Home - Effetto Brezza Naturale Estiva (Netatmo vs Climatizzatore)'
+  description: 'Suggerimento vocale quando la temperatura esterna serale scende sensibilmente sotto quella interna mentre il clima è attivo'
+  triggers:
+  - trigger: time_pattern
+    minutes: '/15'
+  - trigger: state
+    entity_id:
+    - climate.condizionatore_sala
+    - climate.condizionatore_camera
+    to: 'cool'
+  conditions:
+  - condition: time
+    after: '19:00:00'
+    before: '23:30:00'
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ is_state('climate.condizionatore_sala', 'cool') or is_state('climate.condizionatore_camera', 'cool') }}"
+  - condition: template
+    value_template: >-
+      {% set temp_in = states('sensor.temperatura_media') | float(99) %}
+      {% set temp_out = states('sensor.temperatura_media_esterna') | float(-99) %}
+      {{ temp_in != 99 and temp_out != -99 and temp_out < (temp_in - 1.5) }}
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Attenzione: fuori in terrazza si sta facendo fresco! Conviene spegnere il condizionatore e aprire le finestre per far entrare l'aria fresca di paese!",
+          "Buone notizie: la temperatura all'esterno è scesa sotto quella di casa! Potete spegnere il clima e spalancare le finestre!",
+          "Serata fresca in arrivo: fuori fa più fresco che dentro casa! Spegnete i condizionatori e godetevi la brezza naturale!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Clima: Suggerimento brezza naturale estiva"
+  mode: single
+
+- id: 'eco_home_promemoria_termocamino_serale'
+  alias: 'Eco Home - Promemoria Serbatoio Termocamino a Pellet Serale'
+  description: 'Promemoria vocale alle 22:30 nei mesi invernali per verificare la carica di pellet del termocamino prima di dormire'
+  triggers:
+  - trigger: time
+    at: '22:30:00'
+  conditions:
+  - condition: template
+    value_template: "{{ now().month in [10, 11, 12, 1, 2, 3, 4] }}"
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: numeric_state
+    entity_id: sensor.temperatura_media_esterna
+    below: 13
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Promemoria serale per il termocamino: ricordatevi di controllare il serbatoio del pellet prima di andare a letto, così domattina troverete la casa calda!",
+          "Attenzione capitano Stefano: controllo pellet al termocamino in sala prima di dormire, per una notte calda e serena!",
+          "Promemoria per la notte: verificate la carica di pellet del termocamino prima di coricarvi!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Promemoria Serale: Controllo pellet termocamino"
+  mode: single
