@@ -1008,64 +1008,94 @@
     - duo delle meraviglie
     - squadra di casa
     laura_phrase_starts:
-    - Bentornata Laura la Commercialista
-    - Sua Maestà la Dottoressa Laura è rientrata
-    - Presenza di Laura rilevata
-    - Ecco la Regina dei Bilanci
-    - Rientro contabile registrato
-    - Dottoressa Laura a casa
+    - Bentornata a casa,
+    - Ma chi si vede, la regina della casa!
+    - Ingresso trionfale per Laura rilevato,
+    - Allarme relax attivato per Laura,
+    - Finalmente a casa,
+    - Dottoressa Laura in the house,
+    - Evviva, è tornata Laura!
+    - Fermi tutti, è arrivata Laura,
+    - Modalità "Zero Stress" attivata per te,
+    - Rientro morbido per Laura confermato,
     laura_phrase_tails:
-    - stasera niente F24 e niente 730, solo relax!
-    - ricordati di fatturare anche il tempo speso a riposare!
-    - l'IVA sul riposo domestico è finalmente allo zero percento!
-    - chiudi i bilanci e pretendi subito un calice di vino!
-    - stasera le tasse sulla pigrizia le paga Stefano!
-    - la casa ha già fatto la dichiarazione dei redditi e ti approva pienamente!
+    - stasera si stacca il cervello e si coccolano le micie!
+    - ho già pre-riscaldato l'atmosfera per il massimo relax.
+    - la tua missione di oggi è finita: adesso solo divano.
+    - spero tu abbia portato dei croccantini, le gatte sono in sciopero.
+    - dimentica le fatture, qui si pensa solo a stare bene!
+    - togliti le scarpe e lascia fuori il caos del mondo.
+    - la casa ti accoglie a braccia aperte!
+    - ricordati che il riposo non è tassabile, almeno per ora!
+    - è ufficialmente l'ora di farsi servire e riverire da Stefano.
+    - metti in pausa i pensieri e goditi la serata.
     stefano_phrase_starts:
-    - Bentornato Boss
-    - Presenza di Stefano rilevata
-    - Il Re del telecomando è tornato
-    - Capo casa di rientro
-    - Il grande capo è di nuovo in porto
-    - Stefano in posizione
+    - Bentornato a casa, capitano,
+    - Presenza VIP di Stefano confermata,
+    - Il capo supremo dell'ecosistema smart è rientrato,
+    - Attenzione, rientro del boss rilevato,
+    - Eccoti qua,
+    - Missione quotidiana completata per Stefano,
+    - Ehi Ste, ben rientrato,
+    - Allerta rossa annullata, Stefano è a casa,
+    - Ingresso autorizzato per il padrone di casa,
+    - Finalmente sei tornato,
     stefano_phrase_tails:
-    - il divano ti aspettava per il collaudo ufficiale!
-    - nessun allarme sul ponte, o almeno così crediamo.
-    - ricordati che nessuna password ti cucinerà la cena!
-    - puoi toglierti le scarpe e fare finta di riposare.
-    - tutto sotto controllo, tranne forse le micie!
-    - speriamo tu abbia portato qualcosa di buono da mangiare!
+    - il telecomando ha sentito la tua mancanza per tutto il giorno!
+    - i server sono stabili e le micie hanno fame.
+    - hai il permesso ufficiale di crollare sul divano.
+    - la casa è ancora intera, puoi tirare un sospiro di sollievo!
+    - stasera niente sbattimenti, solo puro relax domestico.
+    - spero tu sia pronto a farti fare le feste dalle gatte.
+    - ricordati di lasciare lo stress sullo zerbino!
+    - i tuoi sensori smart ti danno il bentornato ufficiale.
+    - togliti il mantello da supereroe e mettiti le pantofole.
+    - la tua casa smart ti aspettava a gloria!
     couple_phrase_starts:
-    - Bentornati i due sopravvissuti della giornata
-    - La strana coppia è di nuovo a casa
-    - Attenzione, rientro di coppia registrato
-    - I piccioncini sono tornati al nido
-    - Ecco la squadra del cuore al completo
-    - Doppio rientro confermato
+    - Bentornati ragazzi,
+    - Rientro di squadra confermato,
+    - I padroni di casa sono tornati insieme,
+    - Che bello vedervi rientrare in coppia,
+    - Allarme dolcezza, la coppia è a casa,
+    - Finalmente siete qui,
+    - La squadra del cuore è di nuovo nel nido,
+    - Doppio rientro registrato con successo,
+    - Eccovi qua, sopravvissuti alla giornata,
+    - Il duo dinamico ha fatto ritorno,
     couple_phrase_tails:
-    - ora potete litigare per il telecomando in totale relax!
-    - sperate che le micie vi abbiano lasciato la casa intera!
-    - il divano ha già prenotato entrambi i posti.
-    - finalmente potete svestire i panni da adulti!
-    - vediamo chi di voi due cederà per primo a cucinare stasera!
-    - la casa è ancora in piedi, tirate un sospiro di sollievo!
+    - ora potete decidere insieme chi non ha voglia di cucinare stasera!
+    - le micie vi stavano aspettando... o forse aspettavano solo la pappa.
+    - il divano è pronto ad accogliervi entrambi.
+    - chiudete fuori il mondo e godetevi la vostra serata.
+    - spero non abbiate intenzione di fare le pulizie, è vietato!
+    - stasera si entra in modalità relax sincronizzato.
+    - potete finalmente abbassare le difese e rilassarvi.
+    - la casa è felice di avervi di nuovo tra le sue mura.
+    - preparatevi a una serata di puro comfort domestico.
+    - vediamo chi di voi due si addormenterà prima davanti alla TV!
     night_phrase_starts:
-    - Rientro notturno silenzioso
-    - Casa in modalità notturna
-    - Bentornati nell'ombra
-    - Ingresso felpato registrato
+    - Rientro notturno rilevato,
+    - Bentornati nell'ombra,
+    - Ingresso silenzioso confermato,
+    - Che ore sono queste per rientrare?
+    - Modalità ninja attivata,
+    - Finalmente a casa, anche se è tardissimo,
     night_phrase_tails:
-    - la casa dorme, fate piano!
-    - dritto a letto senza passare dal via.
-    - sussurro i saluti per non svegliare il quartiere.
-    - luci basse e tutti a riposare.
+    - parlo a bassa voce per non svegliare il vicinato.
+    - spero abbiate sonno, perché la casa sta già dormendo.
+    - andate dritti a letto senza passare dal frigorifero!
+    - cercherò di fare meno rumore possibile.
+    - non svegliate le gatte, o ve ne pentirete.
+    - è ora di ricaricare le batterie, buonanotte!
     generic_phrase_starts:
-    - Bentornati a casa
-    - Ingresso registrato
-    - Casa ripopolata
-    - Rientro confermato
+    - Bentornati a casa,
+    - Rientro generico confermato,
+    - Ingresso rilevato dai sensori,
+    - La casa vi saluta,
+    - Finalmente qualcuno è tornato,
     generic_phrase_tails:
-    - si salvi chi può!
-    - finalmente la casa riprende vita.
-    - il divano vi attendeva con ansia.
-    - mettetevi comodi e rilassatevi!
+    - mettetevi comodi e respirate profondamente.
+    - la vostra oasi di pace vi aspetta.
+    - lasciate lo stress fuori dalla porta.
+    - è il momento di iniziare la vera parte bella della giornata.
+    - vi auguro una serata fantastica.
