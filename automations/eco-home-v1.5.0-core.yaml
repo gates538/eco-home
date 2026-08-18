@@ -1019,6 +1019,8 @@
     - Laura a rapporto nella sua oasi di pace,
     - Modalità relax attivata per Lau,
     - La casa riprende vita: bentornata Laura!
+    - Buon venerdì sera Lau, settimana lavorativa archiviata!
+    - Punto Blu parcheggiata e weekend ufficialmente iniziato per Laura!
     laura_phrase_tails:
     - stasera niente pensieri: solo divano, coccole e relax!
     - hai la casa tutta per te prima che rientri Stefano!
@@ -1030,6 +1032,8 @@
     - Piccola e Luna ti hanno già riservato il posto d'onore sul lettone!
     - atmosfera perfetta: mettiti comoda e goditi la serata.
     - chiudi la porta e lascia tutte le scartoffie fuori dal paese!
+    - la Punto Blu è a riposo, niente F24 o bilanci fino a lunedì!
+    - la settimana è finita: stasera solo divano, Emby e relax con le micie!
     stefano_phrase_starts:
     - Bentornato a casa Ste,
     - Presenza del capitano Stefano confermata!
@@ -1041,6 +1045,8 @@
     - Missione quotidiana finita per Ste,
     - Ingresso autorizzato per il capo di casa,
     - Centralina smart attiva: bentornato Stefano!
+    - Buon venerdì sera Stefano, weekend alle porte!
+    - Discovery parcheggiata: rientro confermato per Ste!
     stefano_phrase_tails:
     - se è pausa pranzo fai un pit-stop veloce, altrimenti divano immediato!
     - le micie ti aspettavano per il controllo coccole serale!
@@ -1052,6 +1058,8 @@
     - il divano della sala ti ha tenuto il posto caldo tutto il giorno!
     - ricordati che lo stress si lascia sullo zerbino di casa!
     - missione compiuta per oggi: ora solo comfort casalingo!
+    - la Discovery è al sicuro in garage e il weekend si avvicina!
+    - venerdì sera a casa: stasera film su Emby e relax con Laura e le gatte!
     couple_phrase_starts:
     - Bentornati ragazzi,
     - Rientro di coppia confermato,
@@ -1061,6 +1069,8 @@
     - Attenzione, duo dinamico a casa!
     - Doppio rientro registrato con successo,
     - Eccovi qua, bentornati a casa insieme!
+    - Buon venerdì sera Stefano e Laura, la squadra è a casa per il weekend!
+    - Punto Blu e Discovery a riposo: rientro di coppia del venerdì!
     couple_phrase_tails:
     - ora potete decidere insieme chi non ha voglia di cucinare stasera!
     - Piccola e Luna vi aspettavano sul lettone per fare festa!
@@ -1071,6 +1081,8 @@
     - la casa torna viva e accogliente quando siete insieme!
     - vediamo chi di voi due cederà per primo al fascino del divano!
     - serata di coppia ufficialmente aperta: rilassatevi!
+    - la settimana di lavoro è finita, stasera film su Emby, divano e fusa delle micie!
+    - modalità weekend ufficialmente attivata per entrambi: godetevi la serata!
     night_phrase_starts:
     - Rientro notturno rilevato,
     - Bentornati nell'ombra,

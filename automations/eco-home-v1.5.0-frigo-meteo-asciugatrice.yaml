@@ -215,3 +215,56 @@
       value: "Promemoria Asciugatrice Sarcastico: Panni da svuotare"
     continue_on_error: true
   mode: single
+
+- id: 'eco_home_salva_bucato_terrazza_vento_pioggia'
+  alias: 'Eco Home - Salva-Bucato in Terrazza (Vento Forte & Pioggia con Asciugatrice Pronta)'
+  description: 'Avviso vocale tempestivo se l asciugatrice ha finito e in terrazza scatta pioggia o vento forte prima che i panni volino via'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.sala_anemometro_gust_strength
+    above: 25
+  - trigger: numeric_state
+    entity_id: sensor.terrazza_pulvirometro_precipitazione
+    above: 0.01
+  - trigger: state
+    entity_id: weather.home
+    to:
+    - rainy
+    - pouring
+    - lightning
+    - hail
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('input_boolean.eco_home_asciugatrice_da_annunciare', 'on') or states('sensor.esterno_asciugatrice_machine_state') in ['complete', 'completed', 'finish', 'finished', 'end', 'ended'] }}"
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Allarme bucato in terrazza! Il ciclo dell'asciugatrice è terminato e si sta alzando un forte vento in paese: correte a ritirare i panni prima che decollino verso la piazza!",
+          "Attenzione bucato! Prime gocce di pioggia in terrazza con asciugatrice terminata: salvate i vestiti prima che si bagnino di nuovo!",
+          "Allerta meteo terrazza: raffiche di vento con bucato ancora fuori! Un volontario vada a scaricare l'asciugatrice!",
+          "Meteo terrazza in peggioramento: mettete al riparo il bucato prima che il vento di paese faccia danni!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Asciugatrice Alert: Vento/Pioggia con bucato in terrazza"
+  mode: single

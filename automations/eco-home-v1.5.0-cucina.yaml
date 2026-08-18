@@ -206,3 +206,66 @@
       data:
         value: "Check Pomeriggio: Avviso pre-uscita 15:45 Stefano"
   mode: single
+
+- id: 'eco_home_fine_cottura_fornelli_masterchef'
+  alias: 'Eco Home - Fischio Finale Masterchef (Fine Cottura Fornelli Serale)'
+  description: 'Battuta vocale a sorpresa sul Nest Hub quando si spengono i fornelli o il forno la sera tra le 19:30 e le 22:00'
+  triggers:
+  - trigger: state
+    entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+    from:
+    - 'run'
+    - 'running'
+    - 'on'
+    to:
+    - 'ready'
+    - 'off'
+    - 'Spento'
+    - '0'
+  - trigger: state
+    entity_id: sensor.cucina_forno_machine_state
+    from:
+    - 'running'
+    - 'run'
+    - 'preheating'
+    to:
+    - 'ready'
+    - 'off'
+    - 'idle'
+  conditions:
+  - condition: time
+    after: '19:30:00'
+    before: '22:00:00'
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Fornelli spenti! Masterchef Casa si conclude qui: adesso tocca al coraggioso volontario per il lavaggio dei piatti!",
+          "Cottura terminata! Pentole a riposo: le micie Piccola e Luna sono già pronte per l'assaggio di controllo!",
+          "Cena pronta in tavola! Complimenti agli chef e buon appetito a Stefano e Laura!",
+          "Sessione cucina completata con successo! Chi ha cucinato si rilassa, chi non ha cucinato lava le pentole!",
+          "Fischio finale in cucina! La cena è servita, godetevi il pasto e la serata!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Cucina: Fine cottura fornelli e cena pronta"
+  mode: single
