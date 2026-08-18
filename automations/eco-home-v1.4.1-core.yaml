@@ -833,7 +833,7 @@
             attivo: {{ eco_home_enabled }}. Silenzioso: {{ eco_home_silent }}. Rientro
             confermato: {{ arrival_confirmed_by_person_and_door }}. Esito: {{ diagnostic_reason | trim }}.'
           entity_id: media_player.nest_hub_sala
-  mode: parallel
+  mode: queued
   max: 10
   max_exceeded: silent
   trace:
