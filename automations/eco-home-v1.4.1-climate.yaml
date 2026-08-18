@@ -38,7 +38,7 @@
         {{ [
           "Attenzione, stai disperdendo calore o fresco! Ho spento i condizionatori perché la finestra è aperta da più di 3 minuti.",
           "Allarme dispersione termica! Climatizzatore disattivato: una o più finestre sono spalancate da oltre 3 minuti!",
-          "Risparmio energetico attivato: condizionatori spenti per evitare di rinfrescare l'intero quartiere attraverso le finestre aperte!"
+          "Risparmio energetico attivato: condizionatori spenti per evitare di rinfrescare l'intero paese attraverso le finestre aperte!"
         ] | random }}
     continue_on_error: true
 

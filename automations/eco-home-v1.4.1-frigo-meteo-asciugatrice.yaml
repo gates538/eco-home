@@ -41,7 +41,7 @@
           "Attenzione! Sportello del frigo spalancato da un minuto! Guardare il cibo con insistenza non lo farà cucinare da solo, chiudete!",
           "Allerta Gourmet! Se lasciate ancora il frigo aperto, stasera ceniamo con la mozzarella fusa ed il latte caldo!",
           "Il frigorifero non è una galleria d'arte moderna, scegliere cosa mangiare richiede meno di sessanta secondi!",
-          "Chiudete quel frigo! Stiamo rinfrescando tutto il quartiere a nostre spese!",
+          "Chiudete quel frigo! Stiamo rinfrescando tutto il paese a nostre spese!",
           "Frigorifero aperto da oltre un minuto! I formaggi stanno organizzando una fuga di massa!"
         ] | random }}
     continue_on_error: true
@@ -138,7 +138,7 @@
             tld: "it"
           message: >-
             {{ [
-              "Attenzione! Vento forte in terrazza sopra i quindici chilometri orari! Se avete steso le camicie, probabilmente ora stanno sorvolando il quartiere!",
+              "Attenzione! Vento forte in terrazza sopra i quindici chilometri orari! Se avete steso le camicie, probabilmente ora stanno sorvolando il paese!",
               "Allarme raffiche di vento! Chiudete le tende in terrazza prima che decollino verso nuovi orizzonti!",
               "Attenzione vento forte! Se ci sono oggetti leggeri in terrazza, considerateli già dispersi o andate a recuperarli subito!",
               "Bora in arrivo in terrazza! Legate le piante e ritirate i panni stesi prima che prendano il brevetto di volo!",
