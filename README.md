@@ -2,91 +2,53 @@
 
 # Eco Home
 
-**Benvenuto intelligente per Home Assistant, confermato da presenza e apertura del portone.**
+**Benvenuto intelligente e domotica vocale per Home Assistant, confermato da presenza e apertura del portone.**
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Automation-41BDF5?style=flat-square&logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
-[![Versione](https://img.shields.io/badge/versione-1.4.3-2ea44f?style=flat-square)](CHANGELOG.md)
+[![Versione](https://img.shields.io/badge/versione-1.5.0-2ea44f?style=flat-square)](CHANGELOG.md)
 [![Formato](https://img.shields.io/badge/formato-YAML-CB171E?style=flat-square&logo=yaml&logoColor=white)](CHANGELOG.md)
 
 </div>
 
-## Novità della versione 1.4.3
+## Novità della versione 1.5.0
 
-- **Voce Femminile Italiana Nativa**: Chiamate TTS riprodotte in voce femminile italiana naturale su Nest Hub con impostazione esplicita `language: "it"` e `tld: "it"`.
-- **Tracciamento Persone Esteso (Rita & Mauro)**: Supporto per Rita (`person.rita`) e Mauro (`person.mauro`) con helper dedicati per gli annunci.
-- **Allerta Porta Freezer Sarcastica**: Annunci vocali scherzosi e sarcastici se lo sportello del congelatore resta aperto per più di 60 secondi.
-- **Fix Annunci Cucina**: Eliminati annunci ad ogni cambio di potenza; ora scatta 1 solo annuncio ad inizio sessione con blocco di 2 ore (`7200s`).
-- **Fix Saluti al Rientro al Portone**: Corretto bug Jinja template e portato il cooldown dei saluti a 15 minuti per evitare saluti durante le brevi aperture da dentro.
-- **Riorganizzazione Frigo & Meteo**: Notifica porta frigorifero aperta (>60s) con frasi sarcastiche e notifiche per pioggia/vento in terrazza.
+- **Riorganizzazione Modulare**: Architettura pulita e divisa in cartelle logiche (`/automations`, `/docs`, `/scripts`, `/archive`).
+- **Fix Race Condition su Rientri di Coppia**: Modalità `queued` (`max: 10`) nel modulo principale per eliminare accavallamenti e mutismo su Google Nest Hub.
+- **Voce Femminile Vivace & Naturale**: Uniformate tutte le 16 chiamate TTS su `tts.google_translate_it_lt` con `language: "it"` e `options: { tld: "it" }`.
+- **Personalizzazione Sartoriale Routine**: Riconoscimento pausa pranzo, rientri scaglionati di Stefano e Laura, citazioni simpatiche per le micie Piccola e Luna (e Luna nel lavandino!), riscaldamento con termocamino a pellet / climatizzatore sala 18.000 BTU e dual-split.
+- **Allerte Sarcastiche Esparse**: Nuove varianti spiritose per frigo/freezer aperti, vento forte in terrazza, pioggia, cottura dimenticata (>60 min), asciugatrice e dispenser pappa.
+- **Sicurezza e Privacy**: Sanitizzazione completa dei repository con esclusione di credenziali e file temporanei tramite `.gitignore`.
 
-<details>
-<summary>Novità delle versioni precedenti</summary>
+---
 
-### Novità della versione 1.1.8
-- **Rimozione ritardo iniziale**: rimosso il ritardo fisso di 3 secondi prima dell'annuncio vocale (`arrival_group_window_seconds: 0`);
-- **Aggiornamento documentazione**: riallineati tutti i riferimenti e i numeri di riga delle guide alla personalizzazione e all'aggiornamento.
+## Struttura del Progetto
 
-### Novità della versione 1.1.8
-- **Notifiche Push con Foto**: scatto di uno snapshot (tramite telecamera compatibile, es. `camera.sala_2`) e invio push con immagine allegata al rientro dei residenti;
-- **Controllo Sicurezza Presenza**: lo snapshot e la notifica con immagine vengono inviati **solo se la casa era completamente vuota** prima del rientro rilevato (evitando notifiche superflue se ci sono già persone in casa);
-- **Controllo tramite Card**: aggiunto il nuovo helper `input_boolean.eco_home_notifiche_foto` per disattivare/attivare le notifiche con foto direttamente dalla dashboard;
-- **Servizi di Notifica Personalizzati**: variabili configurabili nell'automazione per associare le notifiche push ai singoli cellulari (es. `notify.mobile_app_stefano`);
-- Aggiornati tutti i file di configurazione, card e documentazione alla release 1.1.8.
+- **`/automations`**: Contiene tutti i moduli YAML (`eco-home-v1.5.0-*.yaml`, `luci.yaml`, `notifiche.yaml`).
+- **`/docs`**: Contiene guide, documentazione di configurazione e requisiti.
+- **`/scripts`**: Contiene script di utilità e automazione locale.
+- **`/archive`**: Raccolta delle release storiche precedenti.
 
-</details>
-
-La logica di rientro principale continua a funzionare in entrambi gli ordini:
-
-```text
-persona home → apertura portone
-apertura portone → persona home
-```
-
-## Funzioni principali
-
-- conferma presenza-portone entro 5 minuti;
-- saluti e nomignoli casuali per Stefano, Laura o entrambi;
-- notifiche push ricche con foto sul telefono al rientro (solo se la casa era vuota);
-- messaggi diversi per giorno, sera, notte, fine settimana e ricorrenze;
-- accensione della luce ambiente soltanto quando fuori è buio;
-- volume differenziato per fascia oraria e successivo ripristino;
-- silenziamento temporaneo della TV senza alterare un mute già presente;
-- promemoria dell'asciugatrice terminata durante l'assenza;
-- test vocale per scenario;
-- diagnostica consultabile dalla card e dal Logbook;
-- protezione dagli annunci duplicati.
-
-## Installazione nuova
-
-1. Controlla i dispositivi necessari in [REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md).
-2. Leggi l'elenco di entità e helper in [DIPENDENZE.md](DIPENDENZE.md).
-3. Installa [eco-home-v1.1.8-helpers.yaml](eco-home-v1.1.8-helpers.yaml) come package oppure segui [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md).
-4. Copia [eco-home-v1.1.8.yaml](eco-home-v1.1.8.yaml) in `automations.yaml`.
-5. Non sostituire l'intero `automations.yaml` se contiene altre automazioni.
-6. Adatta gli entity ID seguendo [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
-7. Esegui **Controlla configurazione** e poi **Ricarica automazioni**.
-8. Installa la card seguendo [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md).
-
-## Aggiornamento dalla 1.1.8 o precedente
-
-Segui [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md). Prima di installare l'automazione devi creare la cartella per gli snapshot locali ed aggiungere il nuovo helper `input_boolean.eco_home_notifiche_foto`.
+---
 
 ## File della versione corrente
 
 | File | Contenuto |
 |---|---|
-| [eco-home-v1.1.8.yaml](eco-home-v1.1.8.yaml) | Automazione standalone |
-| [eco-home-v1.1.8-dashboard-card.yaml](eco-home-v1.1.8-dashboard-card.yaml) | Card Lovelace completa |
-| [eco-home-v1.1.8-helpers.yaml](eco-home-v1.1.8-helpers.yaml) | Package completo degli helper |
-| [eco-home-v1.1.8-dashboard-tuttacasa.yaml](eco-home-v1.1.8-dashboard-tuttacasa.yaml) | Plancia completa "Tutta Casa" |
-| [DIPENDENZE.md](DIPENDENZE.md) | Entità e integrazioni richieste |
-| [REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md) | Hardware necessario, esempi e prove di compatibilità |
-| [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md) | Creazione o verifica dei 15 helper dalla UI |
-| [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md) | Entity ID e impostazioni da adattare |
-| [GUIDA_PULSANTE_TEST.md](GUIDA_PULSANTE_TEST.md) | Scenari del test vocale |
-| [GUIDA_CARD_TEST.md](GUIDA_CARD_TEST.md) | Installazione e utilizzo della card |
-| [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md) | Procedura di migrazione e setup degli snapshot |
-| [GUIDA_DIAGNOSTICA.md](GUIDA_DIAGNOSTICA.md) | Interpretazione degli esiti diagnostici |
+| [automations/eco-home-v1.5.0-core.yaml](automations/eco-home-v1.5.0-core.yaml) | Modulo Core principale (Presenza, Portone, Saluto Vocale Nest Hub) |
+| [automations/eco-home-v1.5.0-cucina.yaml](automations/eco-home-v1.5.0-cucina.yaml) | Modulo Cucina & Annunci avvio cottura |
+| [automations/eco-home-v1.5.0-climate.yaml](automations/eco-home-v1.5.0-climate.yaml) | Modulo Clima & Risparmio Energetico Finestre |
+| [automations/eco-home-v1.5.0-frigo-meteo-asciugatrice.yaml](automations/eco-home-v1.5.0-frigo-meteo-asciugatrice.yaml) | Allerte Frigo, Freezer, Vento in Terrazza & Asciugatrice |
+| [automations/eco-home-v1.5.0-pets-and-car.yaml](automations/eco-home-v1.5.0-pets-and-car.yaml) | Modulo Animali (Piccola & Luna) e Promemoria Auto (Discovery) |
+| [automations/eco-home-v1.5.0-security.yaml](automations/eco-home-v1.5.0-security.yaml) | Modulo Guardiano Uscite & Allarme Intrusione |
+| [automations/eco-home-v1.5.0-cottura-dimenticata.yaml](automations/eco-home-v1.5.0-cottura-dimenticata.yaml) | Allerta fornelli/forno accesi oltre 60 minuti |
+| [automations/eco-home-v1.5.0-dobby-and-frost.yaml](automations/eco-home-v1.5.0-dobby-and-frost.yaml) | Modulo Robot Dobby & Allerta Gelo Notturno Auto |
+| [automations/eco-home-v1.5.0-emby-cinema-silenzioso.yaml](automations/eco-home-v1.5.0-emby-cinema-silenzioso.yaml) | Modalità Silenziosa automatica durante Film Emby/TV |
+| [automations/eco-home-v1.5.0-zero-sprechi-luci.yaml](automations/eco-home-v1.5.0-zero-sprechi-luci.yaml) | Spegnimento automatico luci all'uscita |
+| [docs/DIPENDENZE.md](docs/DIPENDENZE.md) | Entità e integrazioni richieste |
+| [docs/REQUISITI_HARDWARE.md](docs/REQUISITI_HARDWARE.md) | Hardware necessario e compatibilità |
+| [docs/GUIDA_HELPER_UI.md](docs/GUIDA_HELPER_UI.md) | Creazione o verifica helper dalla UI |
+| [docs/GUIDA_PERSONALIZZAZIONE.md](docs/GUIDA_PERSONALIZZAZIONE.md) | Entity ID e impostazioni personalizzabili |
+| [docs/GUIDA_CARD_TEST.md](docs/GUIDA_CARD_TEST.md) | Installazione e utilizzo card test Lovelace |
 | [CHANGELOG.md](CHANGELOG.md) | Cronologia delle versioni |
 
 ## Versioni archiviate

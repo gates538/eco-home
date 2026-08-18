@@ -1,9 +1,7 @@
 - id: '1783777716602'
   alias: Eco home
-  description: Eco home v1.1.8 - Rientro bidirezionale presenza-portone, scenari
-    di test, diagnostica persistente, ripristino volume Nest Hub, protezione dagli
-    stati non validi, asciugatrice, luce, TV, frasi locali casuali e notifiche push
-    con foto da telecamera (Cam Sala 2).
+  description: Eco Home v1.5.0 - Benvenuto intelligente modulare su Nest Hub con
+    gestione code, routine personalizzate, riscaldamento e climatizzazione.
   triggers:
   - trigger: state
     entity_id:

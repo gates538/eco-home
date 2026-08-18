@@ -26,7 +26,7 @@ if not token:
 urls = [
     "http://127.0.0.1:8123/api/services/automation/reload",
     "http://localhost:8123/api/services/automation/reload",
-    "http://192.168.179.140:8123/api/services/automation/reload"
+    f"http://{os.environ.get('HA_HOST', 'homeassistant.local')}:8123/api/services/automation/reload"
 ]
 
 success = False

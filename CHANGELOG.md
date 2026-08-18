@@ -2,10 +2,24 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [1.5.0] - 2026-08-18
+
+### Riorganizzazione Modulare, Affidabilità & Personalizzazione Avanzata
+- **Riorganizzazione Struttura Repository**: Progetto ripulito con alberatura ordinata divisa in `/automations`, `/docs`, `/scripts` e `/archive`.
+- **Risoluzione Race Condition Rientri di Coppia**: Configurato `mode: queued` (con `max: 10`) nel modulo principale (`eco-home-v1.5.0-core.yaml`), risolvendo il mutismo del Nest Hub causato dall'accavallamento di trigger simultanei.
+- **Armonizzazione TTS Voce Femminile Vivace**: Uniformate tutte le 16 chiamate `tts.speak` su `tts.google_translate_it_lt` con `language: "it"` e `options: { tld: "it" }` per un timbro femminile chiaro, veloce e naturale in ogni modulo.
+- **Personalizzazione Sartoriale Routine & Casa**: 
+  - Integrazione routine lavorative (pausa pranzo Stefano, rientro Laura alle 18:40, weekend).
+  - Riferimenti affettuosi e divertenti alle gatte **Piccola e Luna** (abitudini sul lettone, Luna nel lavandino del bagnetto).
+  - Gestione specifica impianto di riscaldamento (termocamino a pellet / termosifoni) e climatizzazione estiva (18000 BTU sala + dual split camere).
+  - Adattamento vocabolario locale a misura di "paese".
+- **Espansione Sarcasmo & Allerte Vocali**: Arricchito il repertorio di battute casuali per allerta vento forte in terrazza, pioggia, cucina/fornelli, frigo/freezer aperti, cottura dimenticata, asciugatrice e dispenser pappa.
+- **Sicurezza e Privacy Dati**: Pulizia e sanitizzazione del repository con esclusione credenziali e script locali tramite `.gitignore`.
+
 ## [1.4.3] - 2026-07-30
 
 ### Nuove Caratteristiche & Miglioramenti Avanzati
-- **Voce Femminile Italiana Nativa**: Forzata la lingua ed il dominio italiano (`language: "it"`, `options: { tld: "it" }`) in tutte le chiamate TTS (`EcoHome.yaml`, `cucina.yaml`, `frigo_meteo.yaml`), garantendo una voce femminile naturale, fluida ed in italiano nativo.
+- **Voce Femminile Italiana Nativa**: Forzata la lingua ed il dominio italiano (`language: "it"`, `options: { tld: "it" }`) in tutte le chiamate TTS, garantendo una voce femminile naturale, fluida ed in italiano nativo.
 - **Tracciamento Esteso Persone (Rita & Mauro)**: Registrati e tracciati Rita (`person.rita`) e Mauro (`person.mauro`) con helper dedicati (`input_boolean.eco_home_saluti_rita` e `input_boolean.eco_home_saluti_mauro`) e logica di rientro integrata.
 - **Allerta Porta Freezer Sarcastica**: Creata l'automazione allerta per la porta del congelatore (`binary_sensor.cucina_frigorifero_freezer_door`) con battute esilaranti e scherzose dopo 60 secondi di apertura.
 - **Fix Definitivo Annunci Cucina**:
@@ -21,7 +35,7 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
 ### Nuove Caratteristiche & Miglioramenti Avanzati
 - **Regola d'Oro Casa Vuota**: Blindatura completa che impedisce qualsiasi annuncio vocale TTS sul Nest Hub se nessuno è fisicamente a casa (`person.*` home == 0).
-- **Tracciamento Persone Esteso**: Aggiunto tracciamento di presenza ed accoglienza vocale al rientro per **Simone Mancini** (`person.simone`) e **Monica** (`person.monica`).
+- **Tracciamento Persone Esteso**: Aggiunto tracciamento di presenza ed accoglienza vocale al rientro per **Simone** (`person.simone`) e **Monica** (`person.monica`).
 - **Interruttore Saluti Mauro**: Aggiunto `input_boolean.eco_home_saluti_mauro` per abilitare/disabilitare dall'interfaccia gli annunci vocali per Mauro ed evitare falsi positivi dal piano superiore.
 - **Notifica Clima con Conferma Esplicita**: Notifiche interattive su smartphone per caldo (>26°C) e freddo (<19°C) con pulsanti di conferma esplicita (*Sì, Accendi Clima* / *No, Finestre Aperte*) prima di eseguire qualsiasi azione, evitando sprechi energetici.
 - **Automazione Dobby Robot Vacuum (Dreame L40 Pro)**: Pausa e ritorno automatico alla base di Dobby non appena qualcuno rientra a casa, più controlli di stato e batteria integrati nella scheda Lovelace.

@@ -2,11 +2,11 @@ import yaml, os
 
 dir_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "automations")
 files = [
-    os.path.join(dir_path, "eco-home-v1.4.1-core.yaml"),
-    os.path.join(dir_path, "eco-home-v1.4.1-cucina.yaml"),
-    os.path.join(dir_path, "eco-home-v1.4.1-climate.yaml"),
-    os.path.join(dir_path, "eco-home-v1.4.1-actions.yaml"),
-    os.path.join(dir_path, "eco-home-v1.4.1-security.yaml"),
+    os.path.join(dir_path, "eco-home-v1.5.0-core.yaml"),
+    os.path.join(dir_path, "eco-home-v1.5.0-cucina.yaml"),
+    os.path.join(dir_path, "eco-home-v1.5.0-climate.yaml"),
+    os.path.join(dir_path, "eco-home-v1.5.0-actions.yaml"),
+    os.path.join(dir_path, "eco-home-v1.5.0-security.yaml"),
     os.path.join(dir_path, "luci.yaml"),
     os.path.join(dir_path, "notifiche.yaml")
 ]

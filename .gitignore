@@ -1,0 +1,14 @@
+# Private scripts and credentials
+scripts/reload_ha.ps1
+scripts/sshpass.vbs
+scripts/plink.exe
+
+# Local configs and storage
+.storage/
+*.log
+restart_log.txt
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
