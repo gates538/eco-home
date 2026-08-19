@@ -42,6 +42,8 @@
     for:
       minutes: 60
   conditions:
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: state
     entity_id: input_boolean.eco_home_attivo
     state: 'on'
@@ -51,9 +53,8 @@
   - condition: state
     entity_id: sun.sun
     state: 'above_horizon'
-  - condition: time
-    after: '10:00:00'
-    before: '17:00:00'
+  - condition: template
+    value_template: "{{ state_attr('sun.sun', 'elevation') | float(0) > 15 }}"
   - condition: template
     value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
   - condition: template
@@ -69,9 +70,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Promemoria risparmio: le luci sono accese da oltre un'ora con piena luce solare all'esterno! Volete spegnerle per risparmiare energia?",
-          "Avviso zero sprechi: c'è una bella luce naturale all'esterno, verificate se i faretti della cucina o la luce ambiente servono ancora!",
-          "Consiglio eco-friendly: bella giornata di sole fuori, possiamo spegnere le luci interne e risparmiare corrente!"
+          "Promemoria risparmio: le luci sono accese da un'ora con pieno sole fuori! Volete spegnerle?",
+          "Avviso zero sprechi: c'è una bella luce naturale all'esterno, verificate se le luci interne servono ancora!",
+          "Consiglio eco: splendida giornata di sole fuori, possiamo spegnere le luci e risparmiare corrente!"
         ] | random }}
   - action: input_text.set_value
     target:

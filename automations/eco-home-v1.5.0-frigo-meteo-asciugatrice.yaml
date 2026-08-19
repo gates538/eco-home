@@ -1,6 +1,6 @@
 - id: 'eco_home_frigo_porta_aperta'
   alias: 'Eco Home - Allerta Porta Frigorifero Aperta (Sensore Ufficiale)'
-  description: 'Annuncio vocale sarcastico se la porta del frigorifero rimane aperta per più di 60 secondi'
+  description: 'Annuncio vocale sarcastico o notifica silenziosa se la porta del frigorifero rimane aperta per più di 60 secondi'
   triggers:
   - trigger: state
     entity_id:
@@ -19,43 +19,53 @@
   - condition: template
     value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
   actions:
-  - action: media_player.volume_set
-    target:
-      entity_id: media_player.nest_hub_sala
-    data:
-      volume_level: 0.8
-    continue_on_error: true
-  - action: tts.speak
-    target:
-      entity_id: tts.google_translate_it_lt
-    data:
-      media_player_entity_id: media_player.nest_hub_sala
-      language: "it"
-      options:
-        tld: "it"
-      message: >-
+  - variables:
+      is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+      frigo_msg: >-
         {{ [
-          "Attenzione! Qualcuno ha scambiato il frigorifero per un condizionatore d'ambiente! Chiudete subito quel portellone!",
-          "Allarme frigo aperto! Avviso per la casa: la banchisa si sta sciogliendo e la società elettrica ringrazia per la donazione!",
-          "Chiudere il frigorifero, grazie! I pinguini all'interno stanno già chiedendo le coperte!",
-          "Attenzione! Sportello del frigo spalancato da un minuto! Guardare il cibo con insistenza non lo farà cucinare da solo, chiudete!",
-          "Allerta Gourmet! Se lasciate ancora il frigo aperto, stasera ceniamo con la mozzarella fusa ed il latte caldo!",
-          "Il frigorifero non è una galleria d'arte moderna, scegliere cosa mangiare richiede meno di sessanta secondi!",
-          "Chiudete quel frigo! Stiamo rinfrescando tutto il paese a nostre spese!",
-          "Frigorifero aperto da oltre un minuto! I formaggi stanno organizzando una fuga di massa!"
+          "Attenzione! Frigo aperto da oltre un minuto: chiudete lo sportello!",
+          "Allarme frigo aperto! Chiudete subito, stiamo rinfrescando tutto il paese!",
+          "Chiudere il frigorifero! I pinguini all'interno chiedono coperte!",
+          "Sportello del frigo aperto da un minuto: decidete in fretta cosa mangiare!",
+          "Attenzione! Frigorifero aperto: chiudete prima che il fresco scappi!"
         ] | random }}
-    continue_on_error: true
+  - if:
+    - condition: template
+      value_template: "{{ is_daytime }}"
+    then:
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_sala
+      data:
+        volume_level: 0.8
+      continue_on_error: true
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: "it"
+        options:
+          tld: "it"
+        message: "{{ frigo_msg }}"
+      continue_on_error: true
+    else:
+    - action: notify.notify
+      data:
+        title: "❄️ Frigorifero Aperto"
+        message: "Lo sportello del frigorifero è aperto da oltre 60 secondi!"
+      continue_on_error: true
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
     data:
-      value: "Allarme Sarcastico: Porta Frigorifero aperta da 60s"
+      value: "Allarme Frigo: Porta aperta oltre 60s"
     continue_on_error: true
   mode: single
 
 - id: 'eco_home_freezer_porta_aperta'
   alias: 'Eco Home - Allerta Porta Freezer Aperta (Congelatore SmartThings)'
-  description: 'Annuncio vocale sarcastico se la porta del congelatore rimane aperta per più di 60 secondi'
+  description: 'Annuncio vocale sarcastico o notifica silenziosa se la porta del congelatore rimane aperta per più di 60 secondi'
   triggers:
   - trigger: state
     entity_id:
@@ -72,42 +82,52 @@
   - condition: template
     value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
   actions:
-  - action: media_player.volume_set
-    target:
-      entity_id: media_player.nest_hub_sala
-    data:
-      volume_level: 0.8
-    continue_on_error: true
-  - action: tts.speak
-    target:
-      entity_id: tts.google_translate_it_lt
-    data:
-      media_player_entity_id: media_player.nest_hub_sala
-      language: "it"
-      options:
-        tld: "it"
-      message: >-
+  - variables:
+      is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+      freezer_msg: >-
         {{ [
-          "Attenzione! La porta del congelatore è rimasta aperta! I gelati stanno facendo le valigie ed i bastoncini di pesce chiedono asilo!",
-          "Allarme freezer aperto! L'Era Glaciale in cucina sta finendo! Chiudete subito il congelatore prima che si sciolga il Polo Nord!",
-          "Chiudere il freezer, grazie! Se va avanti così, al posto dei surgelati stasera ritroviamo una piscina olimpionica!",
-          "Attenzione! Sportello del congelatore aperto da un minuto! I pinguini dentro hanno già la febbre, chiudete!",
-          "Emergenza Gelati! Sportello del freezer aperto! Salvate i coni ed il ghiaccio prima del disastro termico!",
-          "Allarme congelatore! Chiudete la porta prima che i piselli surgelati prendano vita e colonizzino la cucina!",
-          "Il Polo Nord ringrazia ma il freezer deve rimanere chiuso! Correte a chiudere quello sportello!"
+          "Attenzione! Freezer aperto da un minuto: salvate i gelati!",
+          "Allarme congelatore aperto! Chiudete prima che si sciolga il Polo Nord!",
+          "Chiudere il freezer! I surgelati stanno chiedendo asilo!",
+          "Emergenza freezer aperto! Chiudete subito lo sportello!"
         ] | random }}
-    continue_on_error: true
+  - if:
+    - condition: template
+      value_template: "{{ is_daytime }}"
+    then:
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_sala
+      data:
+        volume_level: 0.8
+      continue_on_error: true
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: "it"
+        options:
+          tld: "it"
+        message: "{{ freezer_msg }}"
+      continue_on_error: true
+    else:
+    - action: notify.notify
+      data:
+        title: "🧊 Freezer Aperto"
+        message: "Lo sportello del congelatore è aperto da oltre 60 secondi!"
+      continue_on_error: true
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
     data:
-      value: "Allarme Sarcastico: Porta Freezer aperta da 60s"
+      value: "Allarme Freezer: Porta aperta oltre 60s"
     continue_on_error: true
   mode: single
 
 - id: 'eco_home_meteo_vento_pioggia_terrazza'
   alias: 'Eco Home - Allerta Vento Forte e Pioggia (Netatmo Terrazza)'
-  description: 'Annuncio vocale sarcastico quando scattano pioggia o vento forte in terrazza'
+  description: 'Annuncio vocale sarcastico quando scattano pioggia o vento forte in terrazza di giorno'
   triggers:
   - trigger: numeric_state
     entity_id: sensor.sala_anemometro_gust_strength
@@ -119,9 +139,13 @@
     id: inizio_pioggia
   conditions:
   - condition: template
-    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: template
     value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
   actions:
   - choose:
     - conditions:
@@ -138,12 +162,9 @@
             tld: "it"
           message: >-
             {{ [
-              "Attenzione! Vento forte in terrazza sopra i quindici chilometri orari! Se avete steso le camicie, probabilmente ora stanno sorvolando il paese!",
-              "Allarme raffiche di vento! Chiudete le tende in terrazza prima che decollino verso nuovi orizzonti!",
-              "Attenzione vento forte! Se ci sono oggetti leggeri in terrazza, considerateli già dispersi o andate a recuperarli subito!",
-              "Bora in arrivo in terrazza! Legate le piante e ritirate i panni stesi prima che prendano il brevetto di volo!",
-              "Raffiche violente rilevate! La terrazza sembra una pista di lancio, controllate tende e vasi prima che sia tardi!",
-              "Allerta meteo terrazza: il vento sta mettendo alla prova la tenuta dei vostri stendini! Intervenire subito!"
+              "Attenzione! Vento sopra i quindici chilometri orari in terrazza: occhio a stendini e tende!",
+              "Allarme raffiche in terrazza! Ritirate gli oggetti leggeri prima che volino in paese!",
+              "Vento forte in terrazza! Controllate stendini e piante all'esterno!"
             ] | random }}
     - conditions:
       - condition: template
@@ -159,17 +180,15 @@
             tld: "it"
           message: >-
             {{ [
-              "Allarme pioggia in terrazza! I panni stesi stanno facendo il secondo lavaggio gratuito, andate subito a salvarli!",
-              "Attenzione, pioggia rilevata dal pluviometro! Ritirare immediatamente lo stendibiancheria prima che anneghi!",
-              "Cielo a catinelle! La terrazza si sta trasformando in un parco acquatico, panni da mettere in salvo immediatamente!",
-              "Doccia non richiesta in arrivo in terrazza! Chi ha steso il bucato corra a ritirarlo!",
-              "Pluviometro allagato! Pioggia in corso, chiudete le finestre e salvate il bucato steso!"
+              "Allarme pioggia in terrazza! Ritirate subito lo stendibiancheria!",
+              "Attenzione, pioggia rilevata dal pluviometro! Salvate il bucato steso!",
+              "Doccia in arrivo in terrazza! Chiudete le finestre e ritirate i panni!"
             ] | random }}
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
     data:
-      value: "Meteo Alert Sarcastico: Vento/Pioggia in terrazza"
+      value: "Meteo Alert: Vento/Pioggia in terrazza"
     continue_on_error: true
   mode: single
 
@@ -187,6 +206,8 @@
       minutes: 30
   conditions:
   - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+  - condition: template
     value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
   - condition: template
     value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
@@ -201,18 +222,16 @@
         tld: "it"
       message: >-
         {{ [
-          "Promemoria asciugatrice: il ciclo è terminato da mezz'ora! Svuotatela prima che i panni diventino più stropicciati di una fisarmonica!",
-          "Attenzione! I panni nell'asciugatrice sono pronti da mezz'ora! È ora di ritirarli prima che prendano la residenza lì dentro!",
-          "Asciugatrice pronta! Ricordatevi di piegare i panni o dovrete passarli con il ferro a vapore ad alta pressione!",
-          "I vestiti nell'asciugatrice chiedono asilo politico! Mezz'ora al calduccio è bastata, andate a svuotarla!",
-          "Allarme stropicciamento acuto! L'asciugatrice aspetta solo voi prima che le camicie diventino origami!",
-          "Bucato asciutto e pronto! Se aspettate ancora un quarto d'ora per svuotarla, servirà una pressa idraulica per stirarli!"
+          "Promemoria asciugatrice: ciclo finito da mezz'ora, panni pronti da ritirare!",
+          "Attenzione asciugatrice: svuotatela prima che i vestiti diventino origami!",
+          "Bucato asciutto e pronto! È ora di svuotare l'asciugatrice!",
+          "I panni nell'asciugatrice vi aspettano al calduccio: andate a svuotarla!"
         ] | random }}
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
     data:
-      value: "Promemoria Asciugatrice Sarcastico: Panni da svuotare"
+      value: "Promemoria Asciugatrice: Panni da svuotare"
     continue_on_error: true
   mode: single
 
@@ -234,6 +253,8 @@
     - lightning
     - hail
   conditions:
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: state
     entity_id: input_boolean.eco_home_attivo
     state: 'on'
@@ -257,10 +278,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Allarme bucato in terrazza! Il ciclo dell'asciugatrice è terminato e si sta alzando un forte vento in paese: correte a ritirare i panni prima che decollino verso la piazza!",
-          "Attenzione bucato! Prime gocce di pioggia in terrazza con asciugatrice terminata: salvate i vestiti prima che si bagnino di nuovo!",
-          "Allerta meteo terrazza: raffiche di vento con bucato ancora fuori! Un volontario vada a scaricare l'asciugatrice!",
-          "Meteo terrazza in peggioramento: mettete al riparo il bucato prima che il vento di paese faccia danni!"
+          "Allarme bucato in terrazza! Asciugatrice terminata e vento forte: ritirate i panni prima che decollino!",
+          "Attenzione bucato! Prime gocce di pioggia in terrazza con asciugatrice terminata: salvate i vestiti!",
+          "Allerta meteo terrazza: raffiche di vento con bucato fuori, andate a scaricare l'asciugatrice!"
         ] | random }}
   - action: input_text.set_value
     target:
@@ -277,6 +297,8 @@
     entity_id: sensor.sala_anemometro_gust_strength
     above: 30
   conditions:
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: state
     entity_id: input_boolean.eco_home_attivo
     state: 'on'
@@ -298,10 +320,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Attenzione: si sono alzate raffiche di vento a oltre trenta chilometri orari in terrazza! Occhio a porte e finestre per evitare che sbattano con la corrente!",
-          "Allerta vento in paese! Raffiche sostenute all'esterno: controllate che le porte di casa non sbattano all'improvviso!",
-          "Attenzione vento forte: raffiche sostenute in terrazza, verificate le aperture di casa per evitare colpi d'aria e spaventi alle micie!",
-          "Vento forte in arrivo in paese! Chiudete o bloccate le porte per non farle sbattere con la corrente!"
+          "Attenzione: raffiche di vento sopra i trenta chilometri orari in terrazza! Occhio alle porte che sbattono!",
+          "Allerta vento in paese! Raffiche sostenute: controllate porte e finestre per evitare correnti d'aria!",
+          "Vento forte in terrazza! Verificate le aperture di casa per evitare colpi d'aria e spaventi alle micie!"
         ] | random }}
   - action: input_text.set_value
     target:

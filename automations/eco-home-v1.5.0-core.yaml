@@ -396,7 +396,7 @@
             elif states(weather_entity) in ['rainy', 'pouring', 'lightning', 'hail'] %}\n
             \ Oggi è prevista pioggia o maltempo, tieni l'ombrello a portata di mano.\n{%
             else %}\n  {{ '' }}\n{% endif %}"
-          occasion_text: "{% if special_day_text | trim != '' %}\n  {{ special_day_text | trim }}\n{% elif italian_holiday_text | trim != '' %}\n  {{ italian_holiday_text | trim }}\n{% elif is_friday_evening %}\n  Weekend in avvicinamento, finalmente.\n{% elif is_sunday_evening %}\n  Domenica sera tranquilla: si rallenta senza sensi di colpa.\n{% elif is_weekend %}\n  Ritmo da weekend confermato.\n{% else %}\n  {{ '' }}\n{% endif %}"
+          occasion_text: "{% if special_day_text | trim != '' %}\n  {{ special_day_text | trim }}\n{% elif italian_holiday_text | trim != '' %}\n  {{ italian_holiday_text | trim }}\n{% else %}\n  {{ '' }}\n{% endif %}"
           final_extra_text: "{% if occasion_text | trim != '' and not is_night %}\n
             \ {{ occasion_text | trim }}\n{% else %}\n  {{ '' }}\n{% endif %}"
       - choose:

@@ -22,12 +22,19 @@
         {% endfor %}
         {{ ns.items | join(', ') }}
   - if:
-      - condition: template
-        value_template: "{{ low_batteries | trim != '' }}"
+    - condition: template
+      value_template: "{{ low_batteries | trim != '' }}"
     then:
-      - action: rest_command.whatsapp_group_notify
-        data:
-          message: "🪫 Eco Home Report Batterie: Le seguenti batterie sono sotto il 15%: {{ low_batteries }}"
+    - action: rest_command.whatsapp_group_notify
+      data:
+        message: "🪫 Eco Home Report Batterie: Le seguenti batterie sono sotto il 15%: {{ low_batteries }}"
+    - if:
+      - condition: state
+        entity_id: input_boolean.eco_home_silenzioso
+        state: 'off'
+      - condition: template
+        value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+      then:
       - action: tts.speak
         target:
           entity_id: tts.google_translate_it_lt
@@ -36,10 +43,10 @@
           language: "it"
           options:
             tld: "it"
-          message: "Attenzione Stefano e Laura! Alcune batterie dei sensori domotici sono scariche. Ho inviato l'elenco su WhatsApp!"
-      - action: input_text.set_value
-        target:
-          entity_id: input_text.eco_home_ultimo_messaggio
-        data:
-          value: "Report Batterie Scariche inviato su WhatsApp"
+          message: "Attenzione: alcune batterie dei sensori sono scariche. Dettagli inviati su WhatsApp!"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: "Report Batterie Scariche inviato su WhatsApp"
   mode: single

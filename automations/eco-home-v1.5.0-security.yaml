@@ -192,7 +192,7 @@
 
 - id: 'eco_home_allarme_portone_aperto_lungo_micie'
   alias: 'Eco Home - Allarme Portone Aperto a Lungo (> 3 Minuti - Sicurezza Micie)'
-  description: 'Avviso vocale tempestivo se il portone resta aperto per più di 3 minuti continui per non far scappare Piccola e Luna'
+  description: 'Avviso vocale tempestivo o notifica silenziosa se il portone resta aperto per più di 3 minuti continui'
   triggers:
   - trigger: state
     entity_id: binary_sensor.porta_contact
@@ -211,21 +211,32 @@
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 600 }}"
   actions:
-  - action: tts.speak
-    target:
-      entity_id: tts.google_translate_it_lt
-    data:
-      media_player_entity_id: media_player.nest_hub_sala
-      language: "it"
-      options:
-        tld: "it"
-      message: >-
+  - variables:
+      is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+      portone_msg: >-
         {{ [
-          "Attenzione! Il portone d'ingresso è rimasto aperto da oltre tre minuti: controllate che sia ben chiuso per non far scappare Piccola e Luna!",
-          "Allarme portone: la porta principale è aperta da tre minuti! Verificate che sia chiusa per la sicurezza della casa e delle gatte!",
-          "Promemoria sicurezza: portone principale aperto da oltre tre minuti, occhio agli spifferi e alle micie!",
-          "Attenzione Stefano e Laura: portone aperto da più di tre minuti! Verificate che le gatte siano al sicuro e richiudete la porta!"
+          "Attenzione! Portone aperto da oltre tre minuti: controllate che sia ben chiuso per la sicurezza delle micie!",
+          "Allarme portone: la porta principale è aperta da tre minuti! Verificate la chiusura per la sicurezza di casa!",
+          "Attenzione Stefano e Laura: portone aperto da tre minuti, occhio alle micie e richiudete la porta!"
         ] | random }}
+  - if:
+    - condition: template
+      value_template: "{{ is_daytime }}"
+    then:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: "it"
+        options:
+          tld: "it"
+        message: "{{ portone_msg }}"
+    else:
+    - action: notify.notify
+      data:
+        title: "🚪 Portone Aperto"
+        message: "Il portone principale è aperto da oltre 3 minuti!"
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio

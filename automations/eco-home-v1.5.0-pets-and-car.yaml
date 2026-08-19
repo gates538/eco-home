@@ -8,6 +8,8 @@
     - unknown
     - unavailable
   conditions:
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: state
     entity_id: input_boolean.eco_home_attivo
     state: 'on'
@@ -27,13 +29,10 @@
         tld: "it"
       message: >-
         {{ [
-          "Pasto erogato! Servita la pappa alle principesse pelose Piccola e Luna!",
-          "Crocchette pronte in ciotola! Buon appetito a Piccola e Luna!",
-          "Attenzione! Rifornimento croccantini effettuato con successo nel dispenser delle micie!",
-          "Suona la campanella della pappa! Piccola e Luna, il banchetto reale è servito!",
-          "Dispenser attivato! Luna, abbandona il lavandino del bagnetto e corri alla ciotola!",
-          "Pasto servito! Piccola e Luna sono autorizzate a saltare giù dal lettone per la pappa!",
-          "Crocchette a terra! Luna e Piccola, la dispensa reale vi attende a braccia aperte!"
+          "Pasto erogato! Crocchette servite per Piccola e Luna!",
+          "Pappa pronta in ciotola! Buon appetito a Piccola e Luna!",
+          "Dispenser attivato! Luna, scendi dal lavandino, la pappa è servita!",
+          "Crocchette pronte! Piccola e Luna, banchetto reale servito!"
         ] | random }}
   - action: input_text.set_value
     target:
@@ -69,11 +68,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Stefano, promemoria per la Discovery! Ricordati di verificare l'autonomia ed il carburante prima di domani mattina!",
-          "Attenzione Stefano! Controlla il serbatoio della Discovery prima di iniziare la nuova settimana!",
-          "Promemoria auto della domenica: verifica livello carburante e consumi su Drivvo per la Discovery!",
-          "Domenica sera, tempo di check per la Discovery: siamo pronti a partire o serve una sosta dal benzinaio domani?",
-          "Avviso capitano Stefano: controlla che la Discovery sia pronta per i viaggi della nuova settimana!"
+          "Stefano, promemoria Discovery: verifica carburante e autonomia prima di domani mattina!",
+          "Attenzione Stefano: check serbatoio per la Discovery prima della nuova settimana!",
+          "Promemoria domenica: controlla il livello carburante della Discovery!"
         ] | random }}
   - action: input_text.set_value
     target:
@@ -111,7 +108,7 @@
   - action: notify.notify
     data:
       title: "🐱 Comfort Termico Micie (Piccola e Luna)"
-      message: "In casa ci sono {{ states('sensor.temperatura_media') }}°C: fa molto caldo per Piccola e Luna (anche se Luna cerca il fresco nel lavandino!). Vuoi accendere il condizionatore in sala a 25°C in modalità eco?"
+      message: "In casa ci sono {{ states('sensor.temperatura_media') }}°C: fa caldo per Piccola e Luna. Vuoi accendere il clima sala a 25°C in modalità eco?"
       data:
         actions:
         - action: "ACCENDI_CLIMA_MICIE"
@@ -162,6 +159,8 @@
     at: '07:40:00'
   conditions:
   - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+  - condition: template
     value_template: "{{ now().weekday() < 5 }}"
   - condition: state
     entity_id: input_boolean.eco_home_attivo
@@ -206,15 +205,14 @@
         {% set frost_active = states('sensor.temperatura_media_esterna') | float(10) <= 2 %}
         {% if rain_active %}
           {{ [
-            "Attenzione Stefano e Laura prima di uscire: in terrazza sta piovendo! Ricordatevi di prendere gli ombrelli prima di salire sulla Discovery!",
-            "Meteo flash del mattino: pioggia rilevata in terrazza! Non dimenticate gli ombrelli prima di uscire di casa!",
-            "Avviso per la partenza: fuori piove, tenete gli ombrelli a portata di mano per la giornata!"
+            "Attenzione Stefano e Laura: piove in terrazza! Ricordatevi gli ombrelli prima di salire sulla Discovery!",
+            "Meteo flash: pioggia in corso all'esterno! Non dimenticate gli ombrelli!",
+            "Avviso partenza: fuori piove, ombrelli a portata di mano!"
           ] | random }}
         {% elif frost_active %}
           {{ [
             "Attenzione prima di uscire: fuori ci sono solo " ~ states('sensor.temperatura_media_esterna') ~ " gradi! Il parabrezza della Discovery potrebbe essere gelato!",
-            "Meteo flash: mattinata con ghiaccio e gelo all'esterno! Preparatevi al freddo e verificate i vetri dell'auto!",
-            "Attenzione capitano Stefano: temperature prossime allo zero all'esterno, occhio al parabrezza della Discovery prima di partire!"
+            "Meteo flash: mattinata con ghiaccio all'esterno, occhio ai vetri dell'auto!"
           ] | random }}
         {% endif %}
   - action: input_text.set_value
@@ -252,12 +250,12 @@
   actions:
   - action: notify.notify
     data:
-      title: "⛈️ Allarme Temporale Improvviso in Paese!"
+      title: "⛈️ Allarme Temporale in Paese!"
       message: >-
         {% set pioggia = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 %}
         {% set vento = states('sensor.sala_anemometro_gust_strength') | float(0) %}
-        Attenzione Stefano e Laura! Siete fuori casa e in terrazza {% if pioggia %}sta piovendo{% else %}ci sono raffiche di vento a {{ vento }} km/h{% endif %}!
-        Se avete lasciato finestre aperte per il fresco alle micie (Piccola e Luna), verificate se rientrare o far controllare!
+        Attenzione! Siete fuori casa e in terrazza {% if pioggia %}sta piovendo{% else %}ci sono raffiche a {{ vento }} km/h{% endif %}!
+        Se avete lasciato finestre aperte per le micie (Piccola e Luna), verificate se rientrare!
       data:
         push:
           sound: default
@@ -271,11 +269,13 @@
 
 - id: 'eco_home_controllo_batteria_smartphone_mattina'
   alias: 'Eco Home - Salva-Batteria Smartphone Pre-Partenza (Ore 07:30, Discovery & Punto Blu)'
-  description: 'Avviso vocale prima di uscire alle 07:30 se il telefono di Stefano o Laura è sotto il 20%'
+  description: 'Avviso vocale prima di uscire alle 07:30 se lo smartphone di Stefano o Laura è sotto il 20%'
   triggers:
   - trigger: time
     at: '07:30:00'
   conditions:
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: template
     value_template: "{{ now().weekday() < 5 }}"
   - condition: state
@@ -304,12 +304,14 @@
     value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
   actions:
   - variables:
-      stefano_low: >-
-        {% set b = states.sensor | selectattr('entity_id', 'search', 'stefano.*battery|battery.*stefano') | map(attribute='state') | map('int', 100) | list | min | default(100) %}
-        {{ b < 20 and is_state('person.stefano', 'home') }}
-      laura_low: >-
-        {% set b = states.sensor | selectattr('entity_id', 'search', 'laura.*battery|battery.*laura') | map(attribute='state') | map('int', 100) | list | min | default(100) %}
-        {{ b < 20 and is_state('person.laura', 'home') }}
+      stefano_phones: >-
+        {% set s_list = states.sensor | selectattr('entity_id', 'search', 'stefano.*(battery|batteria)|(battery|batteria).*stefano') | rejectattr('entity_id', 'search', 'watch|orologio|tablet|ipad|tag|tile|fitbit') | map(attribute='state') | select('is_number') | map('int') | list %}
+        {{ s_list | min | default(100) }}
+      laura_phones: >-
+        {% set l_list = states.sensor | selectattr('entity_id', 'search', 'laura.*(battery|batteria)|(battery|batteria).*laura') | rejectattr('entity_id', 'search', 'watch|orologio|tablet|ipad|tag|tile|fitbit') | map(attribute='state') | select('is_number') | map('int') | list %}
+        {{ l_list | min | default(100) }}
+      stefano_low: "{{ stefano_phones < 20 and is_state('person.stefano', 'home') }}"
+      laura_low: "{{ laura_phones < 20 and is_state('person.laura', 'home') }}"
   - if:
     - condition: template
       value_template: "{{ stefano_low and laura_low }}"
@@ -324,9 +326,8 @@
           tld: "it"
         message: >-
           {{ [
-            "Attenzione ragazzi: avete entrambi i telefoni quasi scarichi prima di uscire! Metteteli subito in carica prima di salire sulla Discovery e sulla Punto Blu!",
-            "Promemoria batterie del mattino: Stefano e Laura, telefoni sotto il venti percento! Una ricarica rapida al volo prima della partenza!",
-            "Avviso prima di partire: caricate i cellulari ragazzi, prima di salire sulla Discovery e sulla Punto Blu!"
+            "Attenzione ragazzi: avete entrambi i telefoni quasi scarichi! Metteteli in carica prima di salire sulla Discovery e sulla Punto Blu!",
+            "Promemoria batterie del mattino: telefoni sotto il venti percento! Una ricarica rapida al volo prima della partenza!"
           ] | random }}
     - else:
       - if:
@@ -343,9 +344,8 @@
               tld: "it"
             message: >-
               {{ [
-                "Stefano, promemoria batteria: il tuo telefono è quasi scarico! Mettilo subito in carica prima di salire sulla Discovery!",
-                "Capitano Stefano, attenzione al telefono: batteria sotto il venti percento prima di partire con la Discovery!",
-                "Promemoria per Stefano: attacca il telefono alla ricarica prima dell'uscita delle sette e cinquanta!"
+                "Stefano, promemoria batteria: il telefono è quasi scarico! Mettilo in carica prima di salire sulla Discovery!",
+                "Capitano Stefano, attenzione al telefono: batteria sotto il venti percento prima di partire con la Discovery!"
               ] | random }}
         - else:
           - if:
@@ -362,9 +362,8 @@
                   tld: "it"
                 message: >-
                   {{ [
-                    "Laura, promemoria batteria: il tuo telefono è quasi scarico! Attaccalo alla ricarica rapida prima di salire sulla Punto Blu!",
-                    "Attenzione Laura: batteria del telefono sotto il venti percento! Mettilo in carica prima di partire con la Punto Blu!",
-                    "Promemoria per Laura: una carica veloce al telefono prima di iniziare la giornata!"
+                    "Laura, promemoria batteria: il telefono è quasi scarico! Attaccalo alla ricarica prima di salire sulla Punto Blu!",
+                    "Attenzione Laura: batteria del telefono sotto il venti percento prima di partire con la Punto Blu!"
                   ] | random }}
   - action: input_text.set_value
     target:

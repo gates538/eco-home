@@ -11,6 +11,8 @@
     - returning
     from: cleaning
   conditions:
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: state
     entity_id: input_boolean.eco_home_attivo
     state: 'on'
@@ -30,11 +32,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Dobby ha completato la pulizia ed è tornato a riposare nella sua nicchia! La casa è splendente!",
-          "Pulizia completata! Dobby ha finito il suo dovere ed è un elfo domestico libero... o quasi!",
-          "Dobby ha terminato! I pavimenti di casa sono puliti, splendenti e tirati a lucido!",
-          "Missione compiuta per Dobby! Polvere e peli di gatto sono stati sconfitti con successo!",
-          "Dobby è tornato alla base di ricarica! Potete camminare a piedi scalzi senza timore!"
+          "Dobby ha completato la pulizia ed è tornato alla base! Casa splendente!",
+          "Pulizia completata! Dobby ha finito il suo dovere ed è tornato in carica!",
+          "Pavimenti splendenti e tirati a lucido: Dobby ha completato il giro!"
         ] | random }}
   - action: input_text.set_value
     target:
@@ -61,9 +61,8 @@
     data:
       message: >-
         {{ [
-          "❄️ Attenzione! La temperatura esterna stasera è di " ~ states('sensor.temperatura_media_esterna') ~ "°C. Domani mattina la Discovery potrebbe avere il parabrezza ghiacciato!",
-          "🥶 Allerta Gelo! Fuori ci sono " ~ states('sensor.temperatura_media_esterna') ~ "°C. Preparare il raschietto per il ghiaccio o anticipare la sveglia di 5 minuti!",
-          "🧊 Notte glaciale in arrivo (" ~ states('sensor.temperatura_media_esterna') ~ "°C). Domani mattina vetri dell'auto probabilmente congelati!"
+          "❄️ Attenzione! Temperatura esterna di " ~ states('sensor.temperatura_media_esterna') ~ "°C: domani possibile parabrezza gelato per la Discovery!",
+          "🥶 Allerta Gelo! Fuori ci sono " ~ states('sensor.temperatura_media_esterna') ~ "°C: preparare il raschietto per l'auto!"
         ] | random }}
   - action: input_text.set_value
     target:

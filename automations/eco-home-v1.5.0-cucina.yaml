@@ -34,6 +34,8 @@
     id: forno_acceso
   conditions:
   - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+  - condition: template
     value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
   - condition: template
     value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
@@ -61,32 +63,23 @@
         {% set laura_home = is_state('person.laura', 'home') %}
         {% if laura_home and not stefano_home %}
           {{ [
-            "Attenzione! Chef Laura è ai fornelli! Stasera niente F24, ma speriamo che la pentola sopravviva!",
-            "Laura in cucina! Stasera si cucinano ricette stellate o teniamo Just Eat pronto sul telefono?",
-            "Allarme gourmet! Laura ha appena acceso i fornelli, l'IVA sulla cena è al ventidue percento!",
-            "Esperimento culinario di Laura in corso! Tenersi pronti a tutto, bilanci compresi!",
-            "Laura ha preso possesso dei fornelli! Stefano è avvisato: stasera si mangia raffinato o si digiuna!",
-            "Cottura avviata da Laura! Ricordati di non usare il sale come se fosse un credito d'imposta!",
-            "Profumino in arrivo! Laura sta dando lezioni di alta cucina, speriamo senza detrazioni!"
+            "Chef Laura ai fornelli! Stasera ricette stellate, speriamo senza detrazioni!",
+            "Laura in cucina! Profumino in arrivo, stasera si mangia raffinato!",
+            "Cottura avviata da Laura! Ricordati di non usare il sale come un F ventiquattro!",
+            "Esperimento culinario di Laura in corso: buon appetito!"
           ] | random }}
         {% elif stefano_home and not laura_home %}
           {{ [
-            "Esperimento culinario in corso! Stefano, ricordati di controllare la cottura ed il timer!",
             "Chef Stefano alla riscossa! Estintore a portata di mano per sicurezza!",
-            "Cottura in avvio! Speriamo che la cena rimanga deliziosa e non troppo carbonizzata!",
-            "Cucina attiva! Stefano ai fornelli: attenzione a non far traboccare la pentola o dimenticare il forno!",
-            "Attenzione! Stefano sta cucinando! Ricordati che i tempi di cottura non si possono velocizzare con l'overclock!",
-            "Piano cottura acceso da Stefano! Le micie sono già in attesa di eventuali scarti prelibati!",
-            "Chef Stefano in azione! Speriamo che la ricetta sia open source e ben collaudata!"
+            "Cucina attiva da Stefano! Ricordati che la cottura non si velocizza con l'overclock!",
+            "Stefano ai fornelli! Le micie sono già in attesa degli scarti prelibati!",
+            "Cottura in avvio da Stefano: speriamo sia una ricetta collaudata!"
           ] | random }}
         {% else %}
           {{ [
-            "Qualcosa sta bollando in pentola! Chissà chi dei due sta preparando la cena stasera!",
-            "Profumino in arrivo! Sfida culinaria tra Stefano e Laura ufficialmente aperta!",
-            "Cucina in funzione! Chiunque sia ai fornelli stasera, buon appetito e niente bruciature!",
-            "Cottura in corso! Stasera la casa inizia a profumare di buono!",
-            "Fornelli accesi! Masterchef Casa è ufficialmente iniziato, vediamo chi vince la stella Michelin stasera!",
-            "Attenzione in cucina! Chi sta cucinando ha diritto a non lavare i piatti dopo cena, è la legge di casa!"
+            "Qualcosa bolle in pentola! Sfida Masterchef aperta tra Stefano e Laura!",
+            "Profumino in cucina! Chi cucina stasera non lava i piatti, è la regola!",
+            "Fornelli accesi! Buon appetito a Stefano e Laura!"
           ] | random }}
         {% endif %}
     continue_on_error: true
@@ -121,6 +114,8 @@
       minutes: 25
   conditions:
   - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+  - condition: template
     value_template: "{{ now().weekday() < 6 }}"
   - condition: time
     after: '13:05:00'
@@ -145,9 +140,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Capitano Ste, sono passati venticinque minuti di cottura: controlla la padella per mangiare con calma prima che scada la pausa pranzo!",
-          "Timer pausa pranzo per Stefano: venticinque minuti di fornelli, la pappa dovrebbe essere pronta in tavola!",
-          "Attenzione Stefano: cottura attiva da venticinque minuti, controlla la cucina e buon appetito!"
+          "Capitano Ste, venticinque minuti di cottura: controlla la padella per mangiare con calma prima che scada la pausa!",
+          "Timer pausa pranzo per Stefano: la pappa è pronta in tavola, buon appetito!",
+          "Attenzione Stefano: cottura attiva da venticinque minuti, controlla la cucina!"
         ] | random }}
   - action: input_text.set_value
     target:
@@ -196,9 +191,9 @@
           tld: "it"
         message: >-
           {{ [
-            "Attenzione Stefano: sono le quindici e quarantacinque! Controlla che le luci e la cucina siano spente prima di ripartire!",
-            "Promemoria pre-uscita per Stefano: check rapido a luci e fornelli prima di tornare a lavoro alle quindici e cinquanta!",
-            "Capitano Ste, quasi ora di ripartire: assicurati che sia tutto spento prima di uscire!"
+            "Attenzione Stefano: sono le quindici e quarantacinque! Controlla che luci e cucina siano spente prima di uscire!",
+            "Promemoria pre-uscita per Stefano: check rapido a luci e fornelli prima di tornare a lavoro!",
+            "Capitano Ste, quasi ora di ripartire: assicurati che sia tutto spento!"
           ] | random }}
     - action: input_text.set_value
       target:
@@ -233,6 +228,8 @@
     - 'off'
     - 'idle'
   conditions:
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: time
     after: '19:30:00'
     before: '22:00:00'
@@ -257,11 +254,10 @@
         tld: "it"
       message: >-
         {{ [
-          "Fornelli spenti! Masterchef Casa si conclude qui: adesso tocca al coraggioso volontario per il lavaggio dei piatti!",
-          "Cottura terminata! Pentole a riposo: le micie Piccola e Luna sono già pronte per l'assaggio di controllo!",
+          "Fornelli spenti! Masterchef Casa si conclude qui: chi ha cucinato si riposa, l'altro lava i piatti!",
+          "Cottura terminata! Pentole a riposo: le micie Piccola e Luna attendono l'assaggio di controllo!",
           "Cena pronta in tavola! Complimenti agli chef e buon appetito a Stefano e Laura!",
-          "Sessione cucina completata con successo! Chi ha cucinato si rilassa, chi non ha cucinato lava le pentole!",
-          "Fischio finale in cucina! La cena è servita, godetevi il pasto e la serata!"
+          "Fischio finale in cucina! La cena è servita, godetevi la serata!"
         ] | random }}
   - action: input_text.set_value
     target:

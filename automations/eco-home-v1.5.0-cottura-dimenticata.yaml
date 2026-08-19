@@ -37,30 +37,30 @@
     data:
       message: >-
         {{ [
-          "⚠️ Attenzione! La cucina o il forno sono in funzione da oltre 60 minuti. Verificare se vi siete dimenticati la pentola sul fuoco!",
-          "🔥 Allarme Cucina! Fornelli o forno accesi da oltre un'ora! Controllate che non ci sia del carbone vegetale in preparazione!",
-          "⚠️ Promemoria Cucina: Cottura attiva da più di 60 minuti! Se non è uno spezzatino a cottura lenta, andate a controllare!"
+          "⚠️ Attenzione! Cottura o forno attivi da oltre 60 minuti: verificate le pentole!",
+          "🔥 Allarme Cucina! Fornelli accesi da oltre un'ora: controllate la cottura!"
         ] | random }}
   - if:
-      - condition: state
-        entity_id: input_boolean.eco_home_silenzioso
-        state: 'off'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
     then:
-      - action: tts.speak
-        target:
-          entity_id: tts.google_translate_it_lt
-        data:
-          media_player_entity_id: media_player.nest_hub_sala
-          language: "it"
-          options:
-            tld: "it"
-          message: >-
-            {{ [
-              "Attenzione Stefano e Laura! La cottura in cucina è attiva da oltre un'ora! Controllate che le pentole ed il forno siano sotto controllo!",
-              "Allarme cucina! Fornelli accesi da sessanta minuti! Se non state preparando il brasato delle grandi occasioni, correte a spegnere prima del fumo!",
-              "Attenzione ai fornelli! È passata un'ora dall'accensione, verificate che l'acqua non sia tutta evaporata!",
-              "Avviso culinario d'emergenza: la cucina sta lavorando da oltre sessanta minuti, andate a dare un'occhiata prima che suoni l'allarme fumo!"
-            ] | random }}
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: "it"
+        options:
+          tld: "it"
+        message: >-
+          {{ [
+            "Attenzione Stefano e Laura! Cottura attiva da oltre un'ora: controllate pentole e forno!",
+            "Allarme cucina! Fornelli accesi da sessanta minuti: verificate la cottura prima che bruci tutto!",
+            "Avviso fornelli: è passata un'ora dall'accensione, controllate che l'acqua non sia evaporata!"
+          ] | random }}
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio

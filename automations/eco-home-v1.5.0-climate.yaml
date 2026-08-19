@@ -36,9 +36,9 @@
       title: "Risparmio Energetico"
       message: >-
         {{ [
-          "Attenzione, stai disperdendo calore o fresco! Ho spento i condizionatori perché la finestra è aperta da più di 3 minuti.",
-          "Allarme dispersione termica! Climatizzatore disattivato: una o più finestre sono spalancate da oltre 3 minuti!",
-          "Risparmio energetico attivato: condizionatori spenti per evitare di rinfrescare l'intero paese attraverso le finestre aperte!"
+          "Attenzione, dispersione termica: ho spento i condizionatori perché la finestra è aperta da oltre 3 minuti.",
+          "Allarme dispersione termica! Climatizzatore spento: finestre aperte da oltre 3 minuti!",
+          "Risparmio energetico: condizionatori spenti per finestre aperte!"
         ] | random }}
     continue_on_error: true
 
@@ -129,15 +129,19 @@
           entity_id: climate.condizionatore_sala
         data:
           hvac_mode: 'cool'
-      - action: tts.speak
-        target:
-          entity_id: tts.google_translate_it_lt
-        data:
-          media_player_entity_id: media_player.nest_hub_sala
-          language: "it"
-          options:
-            tld: "it"
-          message: "Condizionatori accesi come richiesto da notifica!"
+      - if:
+        - condition: template
+          value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+        then:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: "it"
+            options:
+              tld: "it"
+            message: "Condizionatori accesi come richiesto!"
     - conditions:
       - condition: template
         value_template: "{{ trigger.id == 'accendi_riscaldamento' }}"
@@ -150,15 +154,19 @@
           entity_id: climate.condizionatore_sala
         data:
           hvac_mode: 'heat'
-      - action: tts.speak
-        target:
-          entity_id: tts.google_translate_it_lt
-        data:
-          media_player_entity_id: media_player.nest_hub_sala
-          language: "it"
-          options:
-            tld: "it"
-          message: "Riscaldamento avviato come richiesto da notifica!"
+      - if:
+        - condition: template
+          value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+        then:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: "it"
+            options:
+              tld: "it"
+            message: "Riscaldamento avviato come richiesto!"
   mode: single
 
 - id: 'eco_home_brezza_naturale_estiva'
@@ -173,9 +181,10 @@
     - climate.condizionatore_camera
     to: 'cool'
   conditions:
-  - condition: time
-    after: '19:00:00'
-    before: '23:30:00'
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+  - condition: template
+    value_template: "{{ is_state('sun.sun', 'below_horizon') or state_attr('sun.sun', 'elevation') | float(90) < 12 }}"
   - condition: state
     entity_id: input_boolean.eco_home_attivo
     state: 'on'
@@ -204,9 +213,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Attenzione: fuori in terrazza si sta facendo fresco! Conviene spegnere il condizionatore e aprire le finestre per far entrare l'aria fresca di paese!",
-          "Buone notizie: la temperatura all'esterno è scesa sotto quella di casa! Potete spegnere il clima e spalancare le finestre!",
-          "Serata fresca in arrivo: fuori fa più fresco che dentro casa! Spegnete i condizionatori e godetevi la brezza naturale!"
+          "Attenzione: fuori in terrazza è arrivato il fresco! Potete spegnere il clima e aprire le finestre!",
+          "Buone notizie: temperatura esterna più fresca di quella di casa! Spegnete il clima e aprite le finestre!",
+          "Serata fresca: fuori fa più fresco che dentro! Spegnete il clima e godetevi la brezza naturale!"
         ] | random }}
   - action: input_text.set_value
     target:
@@ -246,9 +255,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Promemoria serale per il termocamino: ricordatevi di controllare il serbatoio del pellet prima di andare a letto, così domattina troverete la casa calda!",
-          "Attenzione capitano Stefano: controllo pellet al termocamino in sala prima di dormire, per una notte calda e serena!",
-          "Promemoria per la notte: verificate la carica di pellet del termocamino prima di coricarvi!"
+          "Promemoria termocamino: controllate il pellet prima di dormire, così domattina la casa sarà calda!",
+          "Capitano Stefano: controllo pellet al termocamino in sala prima di andare a letto!",
+          "Promemoria notte: verificate la carica del pellet per trovare la casa calda domattina!"
         ] | random }}
   - action: input_text.set_value
     target:
@@ -267,6 +276,8 @@
     - climate.condizionatore_camera
     to: 'cool'
   conditions:
+  - condition: template
+    value_template: "{{ not (now().hour >= 23 or now().hour < 7) }}"
   - condition: template
     value_template: "{{ now().month in [6, 7, 8, 9] }}"
   - condition: numeric_state
@@ -293,10 +304,9 @@
         tld: "it"
       message: >-
         {{ [
-          "Clima avviato! Temperatura in discesa: Luna può ufficialmente abbandonare il lavandino del bagnetto e tornare a dormire comoda sul lettone!",
-          "Aria fresca in arrivo! Piccola e Luna approvano la scelta, e Luna ringrazia per il refrigerio fuori dal lavandino!",
-          "Raffrescamento attivo: il caldo è sconfitto! Comfort garantito per Stefano, Laura e le micie!",
-          "Climatizzatore in azione: finalmente si respira! Luna, puoi lasciare il lavandino, il fresco è arrivato in tutta la casa!"
+          "Clima avviato! Luna può abbandonare il lavandino del bagnetto e tornare a riposare sul lettone!",
+          "Aria fresca in arrivo! Piccola e Luna approvano la scelta per il refrigerio in casa!",
+          "Climatizzatore attivo: il caldo è sconfitto, finalmente si respira!"
         ] | random }}
   - action: input_text.set_value
     target:
