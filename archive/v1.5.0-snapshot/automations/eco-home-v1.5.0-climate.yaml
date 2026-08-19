@@ -1,0 +1,306 @@
+- id: 'eco_home_climate_120'
+  alias: Eco Home Risparmio Energetico Clima
+  description: Spegne i condizionatori se le finestre restano aperte per più di 3 minuti
+  mode: single
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.finestra_sala
+    - binary_sensor.finestra_camera
+    to: 'on'
+    for: 00:03:00
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity_id: climate.condizionatore_sala
+      state: 'cool'
+    - condition: state
+      entity_id: climate.condizionatore_sala
+      state: 'heat'
+    - condition: state
+      entity_id: climate.condizionatore_camera
+      state: 'cool'
+    - condition: state
+      entity_id: climate.condizionatore_camera
+      state: 'heat'
+  actions:
+  - action: climate.turn_off
+    target:
+      entity_id:
+      - climate.condizionatore_sala
+      - climate.condizionatore_camera
+    continue_on_error: true
+  - action: notify.notify
+    data:
+      title: "Risparmio Energetico"
+      message: >-
+        {{ [
+          "Attenzione, stai disperdendo calore o fresco! Ho spento i condizionatori perché la finestra è aperta da più di 3 minuti.",
+          "Allarme dispersione termica! Climatizzatore disattivato: una o più finestre sono spalancate da oltre 3 minuti!",
+          "Risparmio energetico attivato: condizionatori spenti per evitare di rinfrescare l'intero paese attraverso le finestre aperte!"
+        ] | random }}
+    continue_on_error: true
+
+- id: 'eco_home_notifica_clima_conferma'
+  alias: 'Eco Home - Notifica Clima con Conferma Esplicita'
+  description: 'Invia una notifica con pulsanti di conferma a Stefano e Laura prima di accendere il clima quando fa troppo caldo o troppo freddo'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.temperatura_media
+    above: 26
+    for:
+      minutes: 10
+    id: troppo_caldo
+  - trigger: numeric_state
+    entity_id: sensor.temperatura_media
+    below: 19
+    for:
+      minutes: 10
+    id: troppo_freddo
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity_id: person.stefano
+      state: 'home'
+    - condition: state
+      entity_id: person.laura
+      state: 'home'
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'troppo_caldo' }}"
+      sequence:
+      - action: notify.notify
+        data:
+          title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
+          message: "Fa caldo in casa! Vuoi che accenda i condizionatori o avete le finestre aperte per far arieggiare?"
+          data:
+            actions:
+            - action: "ACCENDI_CONDIZIONATORI"
+              title: "❄️ Sì, Accendi Clima"
+            - action: "NO_FINESTRE_APERTE"
+              title: "🪟 No, Finestre Aperte"
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'troppo_freddo' }}"
+      sequence:
+      - action: notify.notify
+        data:
+          title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
+          message: "Fa freddino in casa! Vuoi accendere il termocamino a pellet o la pompa di calore per scaldare?"
+          data:
+            actions:
+            - action: "ACCENDI_RISCALDAMENTO"
+              title: "🔥 Sì, Riscalda Casa"
+            - action: "NO_FINESTRE_APERTE"
+              title: "🪟 No, Finestre Aperte"
+  mode: single
+
+- id: 'eco_home_risposta_notifica_clima'
+  alias: 'Eco Home - Esecuzione Azione Clima su Conferma Utente'
+  description: 'Esegue accensione clima/riscaldamento SOLO ed ESCLUSIVAMENTE quando Stefano o Laura premono Sì sulla notifica'
+  triggers:
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "ACCENDI_CONDIZIONATORI"
+    id: accendi_condizionatori
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "ACCENDI_RISCALDAMENTO"
+    id: accendi_riscaldamento
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'accendi_condizionatori' }}"
+      sequence:
+      - action: climate.turn_on
+        target:
+          entity_id: climate.condizionatore_sala
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: climate.condizionatore_sala
+        data:
+          hvac_mode: 'cool'
+      - action: tts.speak
+        target:
+          entity_id: tts.google_translate_it_lt
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
+          message: "Condizionatori accesi come richiesto da notifica!"
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.id == 'accendi_riscaldamento' }}"
+      sequence:
+      - action: climate.turn_on
+        target:
+          entity_id: climate.condizionatore_sala
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: climate.condizionatore_sala
+        data:
+          hvac_mode: 'heat'
+      - action: tts.speak
+        target:
+          entity_id: tts.google_translate_it_lt
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
+          message: "Riscaldamento avviato come richiesto da notifica!"
+  mode: single
+
+- id: 'eco_home_brezza_naturale_estiva'
+  alias: 'Eco Home - Effetto Brezza Naturale Estiva (Netatmo vs Climatizzatore)'
+  description: 'Suggerimento vocale quando la temperatura esterna serale scende sensibilmente sotto quella interna mentre il clima è attivo'
+  triggers:
+  - trigger: time_pattern
+    minutes: '/15'
+  - trigger: state
+    entity_id:
+    - climate.condizionatore_sala
+    - climate.condizionatore_camera
+    to: 'cool'
+  conditions:
+  - condition: time
+    after: '19:00:00'
+    before: '23:30:00'
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ is_state('climate.condizionatore_sala', 'cool') or is_state('climate.condizionatore_camera', 'cool') }}"
+  - condition: template
+    value_template: >-
+      {% set temp_in = states('sensor.temperatura_media') | float(99) %}
+      {% set temp_out = states('sensor.temperatura_media_esterna') | float(-99) %}
+      {{ temp_in != 99 and temp_out != -99 and temp_out < (temp_in - 1.5) }}
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Attenzione: fuori in terrazza si sta facendo fresco! Conviene spegnere il condizionatore e aprire le finestre per far entrare l'aria fresca di paese!",
+          "Buone notizie: la temperatura all'esterno è scesa sotto quella di casa! Potete spegnere il clima e spalancare le finestre!",
+          "Serata fresca in arrivo: fuori fa più fresco che dentro casa! Spegnete i condizionatori e godetevi la brezza naturale!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Clima: Suggerimento brezza naturale estiva"
+  mode: single
+
+- id: 'eco_home_promemoria_termocamino_serale'
+  alias: 'Eco Home - Promemoria Serbatoio Termocamino a Pellet Serale'
+  description: 'Promemoria vocale alle 22:30 nei mesi invernali per verificare la carica di pellet del termocamino prima di dormire'
+  triggers:
+  - trigger: time
+    at: '22:30:00'
+  conditions:
+  - condition: template
+    value_template: "{{ now().month in [10, 11, 12, 1, 2, 3, 4] }}"
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: numeric_state
+    entity_id: sensor.temperatura_media_esterna
+    below: 13
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Promemoria serale per il termocamino: ricordatevi di controllare il serbatoio del pellet prima di andare a letto, così domattina troverete la casa calda!",
+          "Attenzione capitano Stefano: controllo pellet al termocamino in sala prima di dormire, per una notte calda e serena!",
+          "Promemoria per la notte: verificate la carica di pellet del termocamino prima di coricarvi!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Promemoria Serale: Controllo pellet termocamino"
+  mode: single
+
+- id: 'eco_home_luna_bagnetto_clima_estivo'
+  alias: 'Eco Home - Termo-Alert Bagnetto per Luna (Avvio Clima Estivo)'
+  description: 'Battuta vocale sul Nest Hub all avvio del climatizzatore estivo quando fa molto caldo'
+  triggers:
+  - trigger: state
+    entity_id:
+    - climate.condizionatore_sala
+    - climate.condizionatore_camera
+    to: 'cool'
+  conditions:
+  - condition: template
+    value_template: "{{ now().month in [6, 7, 8, 9] }}"
+  - condition: numeric_state
+    entity_id: sensor.temperatura_media
+    above: 26.5
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 14400 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Clima avviato! Temperatura in discesa: Luna può ufficialmente abbandonare il lavandino del bagnetto e tornare a dormire comoda sul lettone!",
+          "Aria fresca in arrivo! Piccola e Luna approvano la scelta, e Luna ringrazia per il refrigerio fuori dal lavandino!",
+          "Raffrescamento attivo: il caldo è sconfitto! Comfort garantito per Stefano, Laura e le micie!",
+          "Climatizzatore in azione: finalmente si respira! Luna, puoi lasciare il lavandino, il fresco è arrivato in tutta la casa!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Clima: Refrigerio estivo e relax per Luna"
+  mode: single

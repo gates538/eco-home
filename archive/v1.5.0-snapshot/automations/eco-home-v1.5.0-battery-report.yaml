@@ -1,0 +1,45 @@
+- id: 'eco_home_report_batterie_lunedi'
+  alias: 'Eco Home - Report Settimanale Batterie Scariche'
+  description: 'Scansione automatica ogni lunedì alle 10:00 per notificare eventuali batterie scariche (< 15%)'
+  triggers:
+  - trigger: time
+    at: '10:00:00'
+  conditions:
+  - condition: time
+    weekday:
+    - mon
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  actions:
+  - variables:
+      low_batteries: >-
+        {% set ns = namespace(items=[]) %}
+        {% for s in states.sensor if 'battery' in s.entity_id or 'batteria' in s.entity_id or s.attributes.device_class == 'battery' %}
+          {% if s.state | int(100) < 15 and s.state not in ['unknown', 'unavailable'] %}
+            {% set ns.items = ns.items + [s.name ~ ' (' ~ s.state ~ '%)'] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items | join(', ') }}
+  - if:
+      - condition: template
+        value_template: "{{ low_batteries | trim != '' }}"
+    then:
+      - action: rest_command.whatsapp_group_notify
+        data:
+          message: "🪫 Eco Home Report Batterie: Le seguenti batterie sono sotto il 15%: {{ low_batteries }}"
+      - action: tts.speak
+        target:
+          entity_id: tts.google_translate_it_lt
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
+          message: "Attenzione Stefano e Laura! Alcune batterie dei sensori domotici sono scariche. Ho inviato l'elenco su WhatsApp!"
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.eco_home_ultimo_messaggio
+        data:
+          value: "Report Batterie Scariche inviato su WhatsApp"
+  mode: single

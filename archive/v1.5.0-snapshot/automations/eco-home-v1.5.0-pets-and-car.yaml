@@ -1,0 +1,374 @@
+- id: 'eco_home_pet_alert_crocchette'
+  alias: 'Eco Home - Pet Alert (Crocchette Rilasciate)'
+  description: 'Annuncio vocale ed eventuale notifica quando il dispenser rilascia il pasto per Piccola e Luna'
+  triggers:
+  - trigger: state
+    entity_id: image.dispenser_crocchette_ultimo_pasto
+    not_from:
+    - unknown
+    - unavailable
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') or is_state('person.simone', 'home') or is_state('person.monica', 'home') }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Pasto erogato! Servita la pappa alle principesse pelose Piccola e Luna!",
+          "Crocchette pronte in ciotola! Buon appetito a Piccola e Luna!",
+          "Attenzione! Rifornimento croccantini effettuato con successo nel dispenser delle micie!",
+          "Suona la campanella della pappa! Piccola e Luna, il banchetto reale è servito!",
+          "Dispenser attivato! Luna, abbandona il lavandino del bagnetto e corri alla ciotola!",
+          "Pasto servito! Piccola e Luna sono autorizzate a saltare giù dal lettone per la pappa!",
+          "Crocchette a terra! Luna e Piccola, la dispensa reale vi attende a braccia aperte!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Pet Alert: Pasto erogato per Piccola e Luna"
+  mode: single
+
+- id: 'eco_home_promemoria_auto_domenica'
+  alias: 'Eco Home - Promemoria Carburante Auto (Drivvo & Discovery)'
+  description: 'Promemoria domenica sera per verificare rifornimento e consumi della Discovery'
+  triggers:
+  - trigger: time
+    at: '20:30:00'
+  conditions:
+  - condition: time
+    weekday:
+    - sun
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Stefano, promemoria per la Discovery! Ricordati di verificare l'autonomia ed il carburante prima di domani mattina!",
+          "Attenzione Stefano! Controlla il serbatoio della Discovery prima di iniziare la nuova settimana!",
+          "Promemoria auto della domenica: verifica livello carburante e consumi su Drivvo per la Discovery!",
+          "Domenica sera, tempo di check per la Discovery: siamo pronti a partire o serve una sosta dal benzinaio domani?",
+          "Avviso capitano Stefano: controlla che la Discovery sia pronta per i viaggi della nuova settimana!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Promemoria Auto: Verifica carburante Discovery"
+  mode: single
+
+- id: 'eco_home_comfort_termico_micie'
+  alias: 'Eco Home - Comfort Termico Micie nei Giorni Torridi (Piccola e Luna)'
+  description: 'Notifica interattiva agli smartphone se la casa è vuota e la temperatura interna supera 28.5°C in estate'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.temperatura_media
+    above: 28.5
+    for:
+      minutes: 20
+  conditions:
+  - condition: template
+    value_template: "{{ now().month in [6, 7, 8, 9] }}"
+  - condition: time
+    after: '10:00:00'
+    before: '17:30:00'
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'not_home') and is_state('person.laura', 'not_home') }}"
+  - condition: state
+    entity_id: climate.condizionatore_sala
+    state: 'off'
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 14400 }}"
+  actions:
+  - action: notify.notify
+    data:
+      title: "🐱 Comfort Termico Micie (Piccola e Luna)"
+      message: "In casa ci sono {{ states('sensor.temperatura_media') }}°C: fa molto caldo per Piccola e Luna (anche se Luna cerca il fresco nel lavandino!). Vuoi accendere il condizionatore in sala a 25°C in modalità eco?"
+      data:
+        actions:
+        - action: "ACCENDI_CLIMA_MICIE"
+          title: "❄️ Accendi Clima Sala"
+        - action: "FINESTRE_APERTE_MICIE"
+          title: "🪟 No, Finestre già Aperte"
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Pet Alert: Notifica comfort termico estivo per micie"
+  mode: single
+
+- id: 'eco_home_risposta_clima_micie'
+  alias: 'Eco Home - Esecuzione Clima Sala per Comfort Micie'
+  description: 'Accende il clima sala a 25°C quando si preme Accendi Clima Sala dalla notifica micie'
+  triggers:
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: "ACCENDI_CLIMA_MICIE"
+  actions:
+  - action: climate.turn_on
+    target:
+      entity_id: climate.condizionatore_sala
+  - action: climate.set_hvac_mode
+    target:
+      entity_id: climate.condizionatore_sala
+    data:
+      hvac_mode: 'cool'
+  - action: climate.set_temperature
+    target:
+      entity_id: climate.condizionatore_sala
+    data:
+      temperature: 25
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Comfort Micie: Clima sala attivato a 25°C da notifica"
+  mode: single
+
+- id: 'eco_home_meteo_flash_mattutino'
+  alias: 'Eco Home - Meteo Flash Pre-Uscita Mattutina (Ore 07:40, Discovery)'
+  description: 'Avviso vocale 10 minuti prima dell uscita lavorativa solo se piove in terrazza o c è gelo (esclude weekend, festività e modalità ferie)'
+  triggers:
+  - trigger: time
+    at: '07:40:00'
+  conditions:
+  - condition: template
+    value_template: "{{ now().weekday() < 5 }}"
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.eco_home_modalita_ferie', 'on') }}"
+  - condition: template
+    value_template: >-
+      {% set m = now().month %}
+      {% set d = now().day %}
+      {% set is_holiday = (
+        (m == 1 and d in [1, 6]) or
+        (m == 4 and d == 25) or
+        (m == 5 and d == 1) or
+        (m == 6 and d == 2) or
+        (m == 8 and d == 15) or
+        (m == 11 and d == 1) or
+        (m == 12 and d in [8, 25, 26])
+      ) %}
+      {{ not is_holiday }}
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: >-
+      {% set rain_active = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 or states('weather.home') in ['rainy', 'pouring', 'lightning', 'hail'] %}
+      {% set frost_active = states('sensor.temperatura_media_esterna') | float(10) <= 2 %}
+      {{ rain_active or frost_active }}
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {% set rain_active = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 or states('weather.home') in ['rainy', 'pouring', 'lightning', 'hail'] %}
+        {% set frost_active = states('sensor.temperatura_media_esterna') | float(10) <= 2 %}
+        {% if rain_active %}
+          {{ [
+            "Attenzione Stefano e Laura prima di uscire: in terrazza sta piovendo! Ricordatevi di prendere gli ombrelli prima di salire sulla Discovery!",
+            "Meteo flash del mattino: pioggia rilevata in terrazza! Non dimenticate gli ombrelli prima di uscire di casa!",
+            "Avviso per la partenza: fuori piove, tenete gli ombrelli a portata di mano per la giornata!"
+          ] | random }}
+        {% elif frost_active %}
+          {{ [
+            "Attenzione prima di uscire: fuori ci sono solo " ~ states('sensor.temperatura_media_esterna') ~ " gradi! Il parabrezza della Discovery potrebbe essere gelato!",
+            "Meteo flash: mattinata con ghiaccio e gelo all'esterno! Preparatevi al freddo e verificate i vetri dell'auto!",
+            "Attenzione capitano Stefano: temperature prossime allo zero all'esterno, occhio al parabrezza della Discovery prima di partire!"
+          ] | random }}
+        {% endif %}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Meteo Flash: Avviso pioggia/gelo pre-partenza Discovery"
+  mode: single
+
+- id: 'eco_home_allarme_temporale_finestre_micie'
+  alias: 'Eco Home - Allarme Temporale & Finestre per le Micie (Casa Vuota)'
+  description: 'Notifica smartphone urgente se scatta temporale o vento forte a casa vuota nel caso ci siano finestre aperte per le gatte'
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.terrazza_pulvirometro_precipitazione
+    above: 0.01
+  - trigger: numeric_state
+    entity_id: sensor.sala_anemometro_gust_strength
+    above: 20
+  - trigger: state
+    entity_id: weather.home
+    to:
+    - rainy
+    - pouring
+    - lightning
+    - hail
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'not_home') and is_state('person.laura', 'not_home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 10800 }}"
+  actions:
+  - action: notify.notify
+    data:
+      title: "⛈️ Allarme Temporale Improvviso in Paese!"
+      message: >-
+        {% set pioggia = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 %}
+        {% set vento = states('sensor.sala_anemometro_gust_strength') | float(0) %}
+        Attenzione Stefano e Laura! Siete fuori casa e in terrazza {% if pioggia %}sta piovendo{% else %}ci sono raffiche di vento a {{ vento }} km/h{% endif %}!
+        Se avete lasciato finestre aperte per il fresco alle micie (Piccola e Luna), verificate se rientrare o far controllare!
+      data:
+        push:
+          sound: default
+          critical: 1
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Meteo Alert: Temporale improvviso a casa vuota con finestre micie"
+  mode: single
+
+- id: 'eco_home_controllo_batteria_smartphone_mattina'
+  alias: 'Eco Home - Salva-Batteria Smartphone Pre-Partenza (Ore 07:30, Discovery & Punto Blu)'
+  description: 'Avviso vocale prima di uscire alle 07:30 se il telefono di Stefano o Laura è sotto il 20%'
+  triggers:
+  - trigger: time
+    at: '07:30:00'
+  conditions:
+  - condition: template
+    value_template: "{{ now().weekday() < 5 }}"
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.eco_home_modalita_ferie', 'on') }}"
+  - condition: template
+    value_template: >-
+      {% set m = now().month %}
+      {% set d = now().day %}
+      {% set is_holiday = (
+        (m == 1 and d in [1, 6]) or
+        (m == 4 and d == 25) or
+        (m == 5 and d == 1) or
+        (m == 6 and d == 2) or
+        (m == 8 and d == 15) or
+        (m == 11 and d == 1) or
+        (m == 12 and d in [8, 25, 26])
+      ) %}
+      {{ not is_holiday }}
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  actions:
+  - variables:
+      stefano_low: >-
+        {% set b = states.sensor | selectattr('entity_id', 'search', 'stefano.*battery|battery.*stefano') | map(attribute='state') | map('int', 100) | list | min | default(100) %}
+        {{ b < 20 and is_state('person.stefano', 'home') }}
+      laura_low: >-
+        {% set b = states.sensor | selectattr('entity_id', 'search', 'laura.*battery|battery.*laura') | map(attribute='state') | map('int', 100) | list | min | default(100) %}
+        {{ b < 20 and is_state('person.laura', 'home') }}
+  - if:
+    - condition: template
+      value_template: "{{ stefano_low and laura_low }}"
+    then:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: "it"
+        options:
+          tld: "it"
+        message: >-
+          {{ [
+            "Attenzione ragazzi: avete entrambi i telefoni quasi scarichi prima di uscire! Metteteli subito in carica prima di salire sulla Discovery e sulla Punto Blu!",
+            "Promemoria batterie del mattino: Stefano e Laura, telefoni sotto il venti percento! Una ricarica rapida al volo prima della partenza!",
+            "Avviso prima di partire: caricate i cellulari ragazzi, prima di salire sulla Discovery e sulla Punto Blu!"
+          ] | random }}
+    - else:
+      - if:
+        - condition: template
+          value_template: "{{ stefano_low }}"
+        then:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: "it"
+            options:
+              tld: "it"
+            message: >-
+              {{ [
+                "Stefano, promemoria batteria: il tuo telefono è quasi scarico! Mettilo subito in carica prima di salire sulla Discovery!",
+                "Capitano Stefano, attenzione al telefono: batteria sotto il venti percento prima di partire con la Discovery!",
+                "Promemoria per Stefano: attacca il telefono alla ricarica prima dell'uscita delle sette e cinquanta!"
+              ] | random }}
+        - else:
+          - if:
+            - condition: template
+              value_template: "{{ laura_low }}"
+            then:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                language: "it"
+                options:
+                  tld: "it"
+                message: >-
+                  {{ [
+                    "Laura, promemoria batteria: il tuo telefono è quasi scarico! Attaccalo alla ricarica rapida prima di salire sulla Punto Blu!",
+                    "Attenzione Laura: batteria del telefono sotto il venti percento! Mettilo in carica prima di partire con la Punto Blu!",
+                    "Promemoria per Laura: una carica veloce al telefono prima di iniziare la giornata!"
+                  ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Batteria Alert: Controllo smartphone pre-uscita 07:30"
+  mode: single

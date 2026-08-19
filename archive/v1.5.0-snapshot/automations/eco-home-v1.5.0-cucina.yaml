@@ -1,0 +1,271 @@
+- id: 'eco_home_annunci_cucina'
+  alias: Eco Home - Annunci Vocali Cucina Sarcastici (Pure Battute)
+  mode: single
+  description: Riproduce battute vocali su Nest Hub al massimo 1 volta ogni 2 ore all'avvio della cottura.
+  triggers:
+  - trigger: state
+    entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+    from:
+    - 'ready'
+    - 'off'
+    - 'Spento'
+    - '0'
+    - 'unknown'
+    - 'unavailable'
+    to:
+    - 'run'
+    - 'running'
+    - 'on'
+    id: induzione_accesa
+  - trigger: state
+    entity_id:
+    - sensor.cucina_forno_machine_state
+    - sensor.cucina_forno_second_cavity_machine_state
+    from:
+    - 'ready'
+    - 'off'
+    - 'unknown'
+    - 'unavailable'
+    to:
+    - 'running'
+    - 'run'
+    - 'preheating'
+    - 'on'
+    id: forno_acceso
+  conditions:
+  - condition: template
+    value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+  - condition: template
+    value_template: "{{ is_state('input_boolean.eco_home_annunci_cucina', 'on') or states('input_boolean.eco_home_annunci_cucina') in ['unknown', 'unavailable'] }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  actions:
+  - action: media_player.volume_set
+    target:
+      entity_id: media_player.nest_hub_sala
+    data:
+      volume_level: 0.8
+    continue_on_error: true
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {% set stefano_home = is_state('person.stefano', 'home') %}
+        {% set laura_home = is_state('person.laura', 'home') %}
+        {% if laura_home and not stefano_home %}
+          {{ [
+            "Attenzione! Chef Laura è ai fornelli! Stasera niente F24, ma speriamo che la pentola sopravviva!",
+            "Laura in cucina! Stasera si cucinano ricette stellate o teniamo Just Eat pronto sul telefono?",
+            "Allarme gourmet! Laura ha appena acceso i fornelli, l'IVA sulla cena è al ventidue percento!",
+            "Esperimento culinario di Laura in corso! Tenersi pronti a tutto, bilanci compresi!",
+            "Laura ha preso possesso dei fornelli! Stefano è avvisato: stasera si mangia raffinato o si digiuna!",
+            "Cottura avviata da Laura! Ricordati di non usare il sale come se fosse un credito d'imposta!",
+            "Profumino in arrivo! Laura sta dando lezioni di alta cucina, speriamo senza detrazioni!"
+          ] | random }}
+        {% elif stefano_home and not laura_home %}
+          {{ [
+            "Esperimento culinario in corso! Stefano, ricordati di controllare la cottura ed il timer!",
+            "Chef Stefano alla riscossa! Estintore a portata di mano per sicurezza!",
+            "Cottura in avvio! Speriamo che la cena rimanga deliziosa e non troppo carbonizzata!",
+            "Cucina attiva! Stefano ai fornelli: attenzione a non far traboccare la pentola o dimenticare il forno!",
+            "Attenzione! Stefano sta cucinando! Ricordati che i tempi di cottura non si possono velocizzare con l'overclock!",
+            "Piano cottura acceso da Stefano! Le micie sono già in attesa di eventuali scarti prelibati!",
+            "Chef Stefano in azione! Speriamo che la ricetta sia open source e ben collaudata!"
+          ] | random }}
+        {% else %}
+          {{ [
+            "Qualcosa sta bollando in pentola! Chissà chi dei due sta preparando la cena stasera!",
+            "Profumino in arrivo! Sfida culinaria tra Stefano e Laura ufficialmente aperta!",
+            "Cucina in funzione! Chiunque sia ai fornelli stasera, buon appetito e niente bruciature!",
+            "Cottura in corso! Stasera la casa inizia a profumare di buono!",
+            "Fornelli accesi! Masterchef Casa è ufficialmente iniziato, vediamo chi vince la stella Michelin stasera!",
+            "Attenzione in cucina! Chi sta cucinando ha diritto a non lavare i piatti dopo cena, è la legge di casa!"
+          ] | random }}
+        {% endif %}
+    continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: >-
+        {% set stefano_home = is_state('person.stefano', 'home') %}
+        {% set laura_home = is_state('person.laura', 'home') %}
+        {% if laura_home and not stefano_home %}Annuncio Cucina: Chef Laura
+        {% elif stefano_home and not laura_home %}Annuncio Cucina: Chef Stefano
+        {% else %}Annuncio Cucina: Sfida Culinaria{% endif %}
+    continue_on_error: true
+
+- id: 'eco_home_timer_pranzo_stefano'
+  alias: 'Eco Home - Timer Pit-Stop Pranzo Stefano (Cottura > 25 min)'
+  description: 'Promemoria vocale durante la pausa pranzo (13:05-14:30) se la cottura supera 25 minuti per non fare tardi'
+  triggers:
+  - trigger: state
+    entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+    to:
+    - 'run'
+    - 'running'
+    - 'on'
+    for:
+      minutes: 25
+  - trigger: numeric_state
+    entity_id: sensor.cucina_piano_cottura_potenza
+    above: 15
+    for:
+      minutes: 25
+  conditions:
+  - condition: template
+    value_template: "{{ now().weekday() < 6 }}"
+  - condition: time
+    after: '13:05:00'
+    before: '14:30:00'
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: state
+    entity_id: person.stefano
+    state: 'home'
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Capitano Ste, sono passati venticinque minuti di cottura: controlla la padella per mangiare con calma prima che scada la pausa pranzo!",
+          "Timer pausa pranzo per Stefano: venticinque minuti di fornelli, la pappa dovrebbe essere pronta in tavola!",
+          "Attenzione Stefano: cottura attiva da venticinque minuti, controlla la cucina e buon appetito!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Cucina Alert: Timer 25 min pausa pranzo Stefano"
+  mode: single
+
+- id: 'eco_home_check_uscita_pomeriggio_stefano'
+  alias: 'Eco Home - Check Pre-Uscita Pomeriggio Stefano (Ore 15:45)'
+  description: 'Avviso vocale alle 15:45 se Stefano è a casa e risultano luci accese o fornelli ancora attivi prima di tornare al lavoro'
+  triggers:
+  - trigger: time
+    at: '15:45:00'
+  conditions:
+  - condition: template
+    value_template: "{{ now().weekday() < 6 }}"
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ not is_state('input_boolean.eco_home_modalita_ferie', 'on') }}"
+  - condition: state
+    entity_id: person.stefano
+    state: 'home'
+  actions:
+  - variables:
+      cucina_accesa: >-
+        {{ states('sensor.cucina_piano_cottura_stato_di_funzionamento') in ['run', 'running', 'on'] or states('sensor.cucina_piano_cottura_potenza') | float(0) > 15 }}
+      luci_accese: >-
+        {{ is_state('light.luceambiente', 'on') or is_state('light.faretti_cucina', 'on') }}
+  - if:
+    - condition: template
+      value_template: "{{ cucina_accesa or luci_accese }}"
+    then:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: "it"
+        options:
+          tld: "it"
+        message: >-
+          {{ [
+            "Attenzione Stefano: sono le quindici e quarantacinque! Controlla che le luci e la cucina siano spente prima di ripartire!",
+            "Promemoria pre-uscita per Stefano: check rapido a luci e fornelli prima di tornare a lavoro alle quindici e cinquanta!",
+            "Capitano Ste, quasi ora di ripartire: assicurati che sia tutto spento prima di uscire!"
+          ] | random }}
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: "Check Pomeriggio: Avviso pre-uscita 15:45 Stefano"
+  mode: single
+
+- id: 'eco_home_fine_cottura_fornelli_masterchef'
+  alias: 'Eco Home - Fischio Finale Masterchef (Fine Cottura Fornelli Serale)'
+  description: 'Battuta vocale a sorpresa sul Nest Hub quando si spengono i fornelli o il forno la sera tra le 19:30 e le 22:00'
+  triggers:
+  - trigger: state
+    entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+    from:
+    - 'run'
+    - 'running'
+    - 'on'
+    to:
+    - 'ready'
+    - 'off'
+    - 'Spento'
+    - '0'
+  - trigger: state
+    entity_id: sensor.cucina_forno_machine_state
+    from:
+    - 'running'
+    - 'run'
+    - 'preheating'
+    to:
+    - 'ready'
+    - 'off'
+    - 'idle'
+  conditions:
+  - condition: time
+    after: '19:30:00'
+    before: '22:00:00'
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Fornelli spenti! Masterchef Casa si conclude qui: adesso tocca al coraggioso volontario per il lavaggio dei piatti!",
+          "Cottura terminata! Pentole a riposo: le micie Piccola e Luna sono già pronte per l'assaggio di controllo!",
+          "Cena pronta in tavola! Complimenti agli chef e buon appetito a Stefano e Laura!",
+          "Sessione cucina completata con successo! Chi ha cucinato si rilassa, chi non ha cucinato lava le pentole!",
+          "Fischio finale in cucina! La cena è servita, godetevi il pasto e la serata!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Cucina: Fine cottura fornelli e cena pronta"
+  mode: single

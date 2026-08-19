@@ -1,0 +1,81 @@
+- id: 'eco_home_zero_sprechi_spegnimento_luci'
+  alias: 'Eco Home - Zero Sprechi Spegnimento Luci all Uscita'
+  description: 'Spegne automaticamente tutte le luci della casa quando tutti i membri escono di casa'
+  triggers:
+  - trigger: state
+    entity_id:
+    - person.stefano
+    - person.laura
+    - person.simone
+    - person.monica
+    to: 'not_home'
+    id: persona_uscita
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'not_home') and is_state('person.laura', 'not_home') and is_state('person.simone', 'not_home') and is_state('person.monica', 'not_home') }}"
+  actions:
+  - action: light.turn_off
+    target:
+      entity_id:
+      - light.luceambiente
+      - light.faretti_cucina
+    continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Zero Sprechi: Luci spente all'uscita di tutti"
+  mode: single
+
+- id: 'eco_home_luci_accese_pieno_giorno'
+  alias: 'Eco Home - Zero Sprechi: Luci Accese in Pieno Giorno (> 1 Ora)'
+  description: 'Suggerimento vocale discreto se la luce ambiente o i faretti restano accesi per oltre 60 minuti con pieno sole'
+  triggers:
+  - trigger: state
+    entity_id:
+    - light.luceambiente
+    - light.faretti_cucina
+    to: 'on'
+    for:
+      minutes: 60
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.eco_home_silenzioso
+    state: 'off'
+  - condition: state
+    entity_id: sun.sun
+    state: 'above_horizon'
+  - condition: time
+    after: '10:00:00'
+    before: '17:00:00'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  - condition: template
+    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  actions:
+  - action: tts.speak
+    target:
+      entity_id: tts.google_translate_it_lt
+    data:
+      media_player_entity_id: media_player.nest_hub_sala
+      language: "it"
+      options:
+        tld: "it"
+      message: >-
+        {{ [
+          "Promemoria risparmio: le luci sono accese da oltre un'ora con piena luce solare all'esterno! Volete spegnerle per risparmiare energia?",
+          "Avviso zero sprechi: c'è una bella luce naturale all'esterno, verificate se i faretti della cucina o la luce ambiente servono ancora!",
+          "Consiglio eco-friendly: bella giornata di sole fuori, possiamo spegnere le luci interne e risparmiare corrente!"
+        ] | random }}
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Zero Sprechi: Luci accese oltre 1h di giorno"
+  mode: single
