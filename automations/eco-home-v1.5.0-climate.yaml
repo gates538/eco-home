@@ -197,9 +197,9 @@
     value_template: "{{ is_state('climate.condizionatore_sala', 'cool') or is_state('climate.condizionatore_camera', 'cool') }}"
   - condition: template
     value_template: >-
-      {% set temp_in = states('sensor.temperatura_media') | float(99) %}
-      {% set temp_out = states('sensor.temperatura_media_esterna') | float(-99) %}
-      {{ temp_in != 99 and temp_out != -99 and temp_out < (temp_in - 1.5) }}
+      {% set s_in = states('sensor.temperatura_media') %}
+      {% set s_out = states('sensor.temperatura_media_esterna') %}
+      {{ s_in not in ['unknown', 'unavailable', 'None'] and s_out not in ['unknown', 'unavailable', 'None'] and (s_out | float(0) < (s_in | float(0) - 1.5)) }}
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
   actions:

@@ -268,7 +268,7 @@
         {% set lista = [] %}
         {% for d in dispositivi_critici %}
           {% if states(d) in ['unavailable', 'unknown'] %}
-            {% set lista = lista + [state_attr(d, 'friendly_name') | default(d)] %}
+            {% set lista = lista + [state_attr(d, 'friendly_name') | default(d, true)] %}
           {% endif %}
         {% endfor %}
         {{ lista | join(', ') }}
