@@ -1,68 +1,59 @@
-# Dipendenze di Eco Home v1.1.8
+# Dipendenze di Eco Home v1.5.0
 
 Eco Home usa esclusivamente funzioni standard di Home Assistant. Non richiede HACS o componenti personalizzati.
 
-Questo file elenca le dipendenze software e gli entity ID. Per sapere quali
-dispositivi fisici servono, quali coordinatori possono essere necessari e come
-verificarne la compatibilità, leggi [REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md).
+Questo file elenca le dipendenze software e gli entity ID dell'ecosistema completo v1.5.0.
 
-## Entità obbligatorie
+---
 
-Adatta questi entity ID alla tua installazione:
+## Entità Principali
 
 ```text
 person.stefano
 person.laura
 binary_sensor.porta_contact
 media_player.nest_hub_sala
-tts.google_ai_tts
+tts.google_translate_it_lt
 ```
 
-Le persone devono passare correttamente a `home`. Il portone deve passare a `on` quando viene aperto.
+Le persone devono passare correttamente a `home` e `not_home`. Il portone deve passare a `on` quando viene aperto.
 
-Il file pubblicato è configurato per due persone. Chi usa una sola persona deve
-adattare tutte le occorrenze indicate in
-[GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md), non soltanto l'elenco
-dei trigger.
+La sintesi vocale utilizza `tts.google_translate_it_lt` (con lingua `it` e tld `it`) sul Nest Hub Sala.
 
-La presenza di un'entità `media_player.*` non garantisce il TTS: il lettore deve
-superare una prova reale con `tts.speak`. Anche il provider `tts.*` può essere
-sostituito, purché l'azione funzioni con il lettore scelto.
+---
 
-## Entità opzionali
+## Entità Opzionali e Sensori di Casa
 
 ```text
 light.luceambiente
-media_player.tv_sala_ue85du7170uxzt
+light.faretti_cucina
+media_player.sala_tv_sala
+media_player.emby_homeassistant
+sensor.temperatura_media
+sensor.temperatura_media_esterna
+sensor.sala_anemometro_gust_strength
+sensor.terrazza_pulvirometro_precipitazione
+sensor.cucina_piano_cottura_stato_di_funzionamento
+sensor.cucina_piano_cottura_potenza
+sensor.cucina_forno_machine_state
 sensor.esterno_asciugatrice_machine_state
-sensor.esterno_asciugatrice_completion_time
-sensor.esterno_asciugatrice_energia_elettrica
-sun.sun
+vacuum.dreame_l40_pro (o vacuum.dobby)
+image.dispenser_crocchette_ultimo_pasto
+climate.condizionatore_sala
+climate.condizionatore_camera
 camera.sala_2
+sun.sun
 ```
 
-Se non utilizzi una funzione opzionale, disattiva o rimuovi i relativi blocchi seguendo [GUIDA_PERSONALIZZAZIONE.md](GUIDA_PERSONALIZZAZIONE.md).
+---
 
-`sun.sun` serve soltanto per accendere la luce quando è buio. Il sensore di
-energia dell'asciugatrice è predisposto ma non viene usato dalla logica della
-v1.1.8. Il sensore `machine_state` è invece necessario se si vuole il
-promemoria di fine ciclo.
-
-## Helper
-
-Per una nuova installazione copia
-`eco-home-v1.1.8-helpers.yaml` in `/config/packages/eco-home-v1.1.8-helpers.yaml`.
-
-Se preferisci crearli dalla UI, segui [GUIDA_HELPER_UI.md](GUIDA_HELPER_UI.md).
-
-Se aggiorni dalla 1.1.8 o da una versione precedente, segui prima [GUIDA_AGGIORNAMENTO.md](GUIDA_AGGIORNAMENTO.md).
-
-Il file completo definisce:
+## Helper Configurazione UI
 
 ```text
 input_boolean.eco_home_attivo
 input_boolean.eco_home_silenzioso
 input_boolean.eco_home_modalita_ferie
+input_boolean.eco_home_allarme_inserito
 input_boolean.eco_home_notifiche_foto
 input_boolean.eco_home_asciugatrice_da_annunciare
 input_datetime.eco_home_asciugatrice_fine
@@ -78,23 +69,10 @@ input_text.eco_home_ultimo_messaggio
 input_text.eco_home_ultima_persona
 ```
 
-Per abilitare i package, `configuration.yaml` contiene:
-
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
-```
-
-Non mantenere contemporaneamente helper `echo_home_*` e `eco_home_*`: la
-versione corrente utilizza esclusivamente il prefisso `eco_home_*`.
+---
 
 ## Controllo prima dell'uso
 
 1. Verifica gli entity ID in **Strumenti per sviluppatori → Stati**.
 2. Controlla che il portone sia `off` quando chiuso e `on` quando aperto.
-3. Prova l'azione `tts.speak` sul lettore scelto: il messaggio deve essere realmente udibile.
-4. Completa la lista di controllo in [REQUISITI_HARDWARE.md](REQUISITI_HARDWARE.md).
-5. Esegui **Controlla configurazione**.
-6. Ricarica package e automazioni oppure riavvia Home Assistant.
-7. Seleziona `Percorso audio` dalla card ed esegui il test.
-
+3. Esegui **Ricarica automazioni e script** in Home Assistant.

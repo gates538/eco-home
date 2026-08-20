@@ -97,8 +97,8 @@
         continue_on_error: true
       - action: '{{ default_notification_service }}'
         data:
-          title: "🚨 ALLARME INTRUSIONE 🚨"
-          message: "Il portone è stato aperto mentre la casa è vuota!"
+          title: "⚠️ Portone Aperto a Casa Vuota"
+          message: "Il portone d'ingresso è stato aperto. Disarmo automatico o conferma entro 30 secondi!"
           data:
             image: '{{ snapshot_access_url }}'
             attachment:
@@ -107,22 +107,36 @@
               hide-thumbnail: false
             actions:
               - action: "DISARM_ALARM_{{ context.id }}"
-                title: "È un falso allarme"
+                title: "Disarma (Sono io)"
         continue_on_error: true
-      - action: media_player.volume_set
-        target:
-          entity_id: '{{ speaker }}'
-        data:
-          volume_level: 1.0
-        continue_on_error: true
-      - action: tts.speak
-        target:
-          entity_id: '{{ tts_engine }}'
-        data:
-          media_player_entity_id: '{{ speaker }}'
-          message: "Attenzione. Intrusione rilevata. Le forze dell'ordine sono state avvisate. Allontanarsi immediatamente."
-          cache: false
-        continue_on_error: true
+      - delay: 00:00:30
+      - if:
+        - condition: state
+          entity_id: input_boolean.eco_home_allarme_inserito
+          state: 'on'
+        - condition: numeric_state
+          entity_id: zone.home
+          below: 1
+        then:
+        - action: '{{ default_notification_service }}'
+          data:
+            title: "🚨 ALLARME INTRUSIONE CONFERMATO 🚨"
+            message: "Nessun disarmo registrato dopo 30 secondi: allarme sonoro attivo in casa!"
+          continue_on_error: true
+        - action: media_player.volume_set
+          target:
+            entity_id: '{{ speaker }}'
+          data:
+            volume_level: 1.0
+          continue_on_error: true
+        - action: tts.speak
+          target:
+            entity_id: '{{ tts_engine }}'
+          data:
+            media_player_entity_id: '{{ speaker }}'
+            message: "Attenzione. Intrusione rilevata. Le forze dell'ordine sono state avvisate. Allontanarsi immediatamente."
+            cache: false
+          continue_on_error: true
 
   variables:
     speaker: media_player.nest_hub_sala

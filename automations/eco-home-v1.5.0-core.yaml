@@ -438,6 +438,10 @@
         data:
           value: '{{ announced_profile | trim }}'
         continue_on_error: true
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.eco_home_allarme_inserito
+        continue_on_error: true
       - action: input_text.set_value
         target:
           entity_id: input_text.eco_home_ultimo_messaggio

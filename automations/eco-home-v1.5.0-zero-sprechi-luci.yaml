@@ -15,7 +15,7 @@
     entity_id: input_boolean.eco_home_attivo
     state: 'on'
   - condition: template
-    value_template: "{{ is_state('person.stefano', 'not_home') and is_state('person.laura', 'not_home') and is_state('person.simone', 'not_home') and is_state('person.monica', 'not_home') }}"
+    value_template: "{{ states('person.stefano') not in ['home', 'casa'] and states('person.laura') not in ['home', 'casa'] and states('person.simone') not in ['home', 'casa'] and states('person.monica') not in ['home', 'casa'] }}"
   actions:
   - action: light.turn_off
     target:
