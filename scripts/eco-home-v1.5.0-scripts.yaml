@@ -1,0 +1,63 @@
+eco_home_speak:
+  alias: 'Eco Home - Master Speaker & Notificatore Resiliente'
+  description: 'Gestisce TTS vocale, volume, DND notturno, modalità silenziosa e fallback smartphone in caso di errore di rete'
+  mode: queued
+  max: 10
+  fields:
+    message:
+      description: 'Il messaggio da pronunciare o notificare'
+      example: 'Portone aperto da oltre tre minuti!'
+      required: true
+    title:
+      description: 'Titolo per la notifica smartphone o dashboard'
+      example: 'Meteo Alert'
+      default: 'Eco Home'
+    priority:
+      description: 'Priorità del messaggio: normal, high, critical'
+      example: 'normal'
+      default: 'normal'
+    volume:
+      description: 'Livello volume per il Nest Hub (0.0 - 1.0)'
+      example: 0.8
+      default: 0.8
+  sequence:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  - variables:
+      is_night: "{{ now().hour >= 23 or now().hour < 7 }}"
+      is_silent: "{{ is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+      allow_voice: "{{ (priority == 'critical') or (not is_silent and not is_night) }}"
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ allow_voice }}"
+      sequence:
+      - action: media_player.volume_set
+        target:
+          entity_id: media_player.nest_hub_sala
+        data:
+          volume_level: '{{ volume | default(0.8) }}'
+        continue_on_error: true
+      - action: tts.speak
+        target:
+          entity_id: tts.google_translate_it_lt
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
+          message: '{{ message }}'
+        continue_on_error: true
+    default:
+    - action: notify.notify
+      data:
+        title: '{{ title | default("Eco Home") }}'
+        message: '{{ message }}'
+      continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: '{{ (title ~ ": " ~ message) | truncate(255, true, "") }}'
+    continue_on_error: true
