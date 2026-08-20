@@ -1,7 +1,7 @@
-- id: 'eco_home_actions_120'
-  alias: Eco Home - Azioni Notifiche
+- id: 'eco_home_actions_150'
+  alias: 'Eco Home - Gestione Azioni Notifiche Interattive'
   mode: parallel
-  description: Eco Home v1.2.0 - Gestisce le risposte interattive (Clima, Luci, Allarme).
+  description: 'Eco Home v1.5.0 - Gestisce le risposte interattive (Clima, Luci, Allarme).'
   triggers:
   - trigger: event
     event_type: mobile_app_notification_action
@@ -93,3 +93,62 @@
     - climate.condizionatore_sala
     - climate.condizionatore_camera
     light_entity: light.luceambiente
+
+- id: 'eco_home_master_speaker_event_router'
+  alias: 'Eco Home - Master Speaker Event Router'
+  description: 'Router centrale per eventi eco_home_speak con gestione DND e fallback notifica'
+  mode: queued
+  max: 10
+  triggers:
+  - trigger: event
+    event_type: eco_home_speak
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_attivo
+    state: 'on'
+  actions:
+  - variables:
+      msg: "{{ trigger.event.data.message | default('') }}"
+      title_str: "{{ trigger.event.data.title | default('Eco Home') }}"
+      prio: "{{ trigger.event.data.priority | default('normal') }}"
+      vol: "{{ trigger.event.data.volume | default(0.8) }}"
+      is_night: "{{ now().hour >= 23 or now().hour < 7 }}"
+      is_silent: "{{ is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+      allow_voice: "{{ (prio == 'critical') or (not is_silent and not is_night) }}"
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ allow_voice and msg | trim != '' }}"
+      sequence:
+      - action: media_player.volume_set
+        target:
+          entity_id: media_player.nest_hub_sala
+        data:
+          volume_level: '{{ vol }}'
+        continue_on_error: true
+      - action: tts.speak
+        target:
+          entity_id: tts.google_translate_it_lt
+        data:
+          media_player_entity_id: media_player.nest_hub_sala
+          language: "it"
+          options:
+            tld: "it"
+          message: '{{ msg }}'
+        continue_on_error: true
+    default:
+    - if:
+      - condition: template
+        value_template: "{{ msg | trim != '' }}"
+      then:
+      - action: notify.notify
+        data:
+          title: '{{ title_str }}'
+          message: '{{ msg }}'
+        continue_on_error: true
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: '{{ (title_str ~ ": " ~ msg) | truncate(255, true, "") }}'
+    continue_on_error: true

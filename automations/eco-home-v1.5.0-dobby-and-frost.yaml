@@ -78,11 +78,15 @@
   - trigger: state
     entity_id: binary_sensor.porta_contact
     to: 'on'
+    id: portone_aperto
   - trigger: state
     entity_id:
     - person.stefano
     - person.laura
     to: 'home'
+    for:
+      seconds: 60
+    id: presenza_gps_confermata
   conditions:
   - condition: state
     entity_id: input_boolean.eco_home_attivo

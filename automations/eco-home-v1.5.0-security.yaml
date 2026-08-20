@@ -267,8 +267,17 @@
       offline_list: >-
         {% set lista = [] %}
         {% for d in dispositivi_critici %}
-          {% if states(d) in ['unavailable', 'unknown'] %}
-            {% set lista = lista + [state_attr(d, 'friendly_name') | default(d, true)] %}
+          {% set s = states(d) %}
+          {% if s in ['unavailable', 'unknown'] %}
+            {% set lista = lista + [state_attr(d, 'friendly_name') | default(d, true) ~ ' (Offline)'] %}
+          {% else %}
+            {% set state_obj = states[d] %}
+            {% if state_obj is defined and state_obj.last_updated is defined %}
+              {% set diff_sec = (as_timestamp(now()) - as_timestamp(state_obj.last_updated)) | int(0) %}
+              {% if diff_sec > 86400 and d == 'binary_sensor.porta_contact' %}
+                {% set lista = lista + [state_attr(d, 'friendly_name') | default(d, true) ~ ' (Inattivo >24h)'] %}
+              {% endif %}
+            {% endif %}
           {% endif %}
         {% endfor %}
         {{ lista | join(', ') }}
@@ -278,11 +287,11 @@
     then:
     - action: notify.notify
       data:
-        title: "⚠️ Eco Home Manutenzione Dispositivi"
-        message: "I seguenti dispositivi risultano offline o non raggiungibili: {{ offline_list }}. Verificare Wi-Fi o batterie!"
+        title: "⚠️ Eco Home Watchdog Manutenzione"
+        message: "Anomalie rilevate sui dispositivi critici: {{ offline_list }}. Verificare batterie o connessione Zigbee/Wi-Fi!"
     - action: input_text.set_value
       target:
         entity_id: input_text.eco_home_ultimo_messaggio
       data:
-        value: "Manutenzione: Segnalati dispositivi offline"
+        value: "Watchdog: Segnalate anomalie dispositivi"
   mode: single
