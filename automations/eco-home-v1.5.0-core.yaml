@@ -349,9 +349,8 @@
           arrived_stefano: "{{ stefano_arrived_recently and not laura_arrived_recently }}"
           arrived_laura: "{{ laura_arrived_recently and not stefano_arrived_recently }}"
           arrived_now_couple: "{{ stefano_arrived_recently and laura_arrived_recently }}"
-          welcome_name: "{% if arrived_now_couple %}\n  {{ couple_nicknames | random
-            }}\n{% elif arrived_stefano %}\n  {{ stefano_nicknames | random }}\n{% elif
-            arrived_laura %}\n  {{ laura_nicknames | random }}\n{% elif arrived_now_count
+          welcome_name: "{% if arrived_now_couple or arrived_stefano %}\n  {{ couple_nicknames | random
+            }}\n{% elif arrived_laura %}\n  {{ laura_nicknames | random }}\n{% elif arrived_now_count
             | int(0) > 1 %}\n  {{ couple_nicknames | random }}\n{% else %}\n  bentornati
             a casa\n{% endif %}"
           welcome_opening: '{{ saluto_orario }} {{ welcome_name | trim }}.'
@@ -383,12 +382,10 @@
               entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
       - variables:
           welcome_body: "{% if is_night %}\n  {{ night_phrase_starts | random }}:
-            {{ night_phrase_tails | random }}\n{% elif arrived_now_couple or arrived_now_count
+            {{ night_phrase_tails | random }}\n{% elif arrived_now_couple or arrived_stefano or arrived_now_count
             | int(0) > 1 %}\n  {{ couple_phrase_starts | random }}: {{ couple_phrase_tails
             | random }}\n{% elif arrived_laura %}\n  {{ laura_phrase_starts | random
-            }}: {{ laura_phrase_tails | random }}\n{% elif arrived_stefano %}\n  {{
-            stefano_phrase_starts | random }}: {{ stefano_phrase_tails
-            | random }}\n{% else %}\n  {{ generic_phrase_starts | random }}: {{ generic_phrase_tails
+            }}: {{ laura_phrase_tails | random }}\n{% else %}\n  {{ generic_phrase_starts | random }}: {{ generic_phrase_tails
             | random }}\n{% endif %}"
           weather_alert_text: "{% set alert = states(alert_entity) %} {% if alert
             not in ['unknown', 'unavailable', 'Nessuna allerta', 'nessuna allerta',
@@ -419,8 +416,7 @@
           messaggio_finale: '{{ welcome_opening | trim }} {{ welcome_body | trim }}
             {{ final_extra_text | trim }} {{ weather_alert_text | trim }} {{ temp_announcement_text | trim }} {{ dryer_arrival_text_final | trim }}'
           announced_profile: >-
-            {% if arrived_now_couple or arrived_now_count | int(0) > 1 %}Coppia
-            {% elif arrived_stefano %}Stefano
+            {% if arrived_now_couple or arrived_stefano or arrived_now_count | int(0) > 1 %}Coppia
             {% elif arrived_laura %}Laura
             {% else %}Generico{% endif %}
           nest_volume_before: '{{ state_attr(speaker, ''volume_level'') | float(-1) }}'
@@ -497,8 +493,8 @@
             sequence:
             - action: '{{ stefano_notification_service }}'
               data:
-                title: "Rientro - Eco Home"
-                message: "Rilevato rientro di Stefano."
+                title: "Rientro di Coppia - Eco Home"
+                message: "Bentornati a casa, Stefano e Laura!"
                 data:
                   image: '{{ snapshot_access_url }}'
                   attachment:
