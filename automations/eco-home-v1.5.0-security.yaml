@@ -134,6 +134,9 @@
             entity_id: '{{ tts_engine }}'
           data:
             media_player_entity_id: '{{ speaker }}'
+            language: "it"
+            options:
+              tld: "it"
             message: "Attenzione. Intrusione rilevata. Le forze dell'ordine sono state avvisate. Allontanarsi immediatamente."
             cache: false
           continue_on_error: true
