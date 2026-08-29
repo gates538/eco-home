@@ -31,7 +31,7 @@
       - climate.condizionatore_sala
       - climate.condizionatore_camera
     continue_on_error: true
-  - action: notify.notify
+  - action: notify.samsung_s25_edge_di_stefano
     data:
       title: "Risparmio Energetico"
       message: >-
@@ -40,6 +40,11 @@
           "Allarme dispersione termica! Climatizzatore spento: finestre aperte da oltre 3 minuti!",
           "Risparmio energetico: condizionatori spenti per finestre aperte!"
         ] | random }}
+    continue_on_error: true
+  - action: notify.samsung_s22_di_laura
+    data:
+      title: "Risparmio Energetico"
+      message: "Attenzione: condizionatori spenti per finestre aperte da oltre 3 minuti."
     continue_on_error: true
 
 - id: 'eco_home_notifica_clima_conferma'
@@ -75,7 +80,7 @@
       - condition: template
         value_template: "{{ trigger.id == 'troppo_caldo' }}"
       sequence:
-      - action: notify.notify
+      - action: notify.samsung_s25_edge_di_stefano
         data:
           title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
           message: "Fa caldo in casa! Vuoi che accenda i condizionatori o avete le finestre aperte per far arieggiare?"
@@ -85,11 +90,23 @@
               title: "❄️ Sì, Accendi Clima"
             - action: "NO_FINESTRE_APERTE"
               title: "🪟 No, Finestre Aperte"
+        continue_on_error: true
+      - action: notify.samsung_s22_di_laura
+        data:
+          title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
+          message: "Fa caldo in casa! Vuoi che accenda i condizionatori o avete le finestre aperte per far arieggiare?"
+          data:
+            actions:
+            - action: "ACCENDI_CONDIZIONATORI"
+              title: "❄️ Sì, Accendi Clima"
+            - action: "NO_FINESTRE_APERTE"
+              title: "🪟 No, Finestre Aperte"
+        continue_on_error: true
     - conditions:
       - condition: template
         value_template: "{{ trigger.id == 'troppo_freddo' }}"
       sequence:
-      - action: notify.notify
+      - action: notify.samsung_s25_edge_di_stefano
         data:
           title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
           message: "Fa freddino in casa! Vuoi accendere il termocamino a pellet o la pompa di calore per scaldare?"
@@ -99,6 +116,18 @@
               title: "🔥 Sì, Riscalda Casa"
             - action: "NO_FINESTRE_APERTE"
               title: "🪟 No, Finestre Aperte"
+        continue_on_error: true
+      - action: notify.samsung_s22_di_laura
+        data:
+          title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
+          message: "Fa freddino in casa! Vuoi accendere il termocamino a pellet o la pompa di calore per scaldare?"
+          data:
+            actions:
+            - action: "ACCENDI_RISCALDAMENTO"
+              title: "🔥 Sì, Riscalda Casa"
+            - action: "NO_FINESTRE_APERTE"
+              title: "🪟 No, Finestre Aperte"
+        continue_on_error: true
   mode: single
 
 - id: 'eco_home_risposta_notifica_clima'

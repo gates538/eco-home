@@ -105,7 +105,7 @@
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 14400 }}"
   actions:
-  - action: notify.notify
+  - action: notify.samsung_s25_edge_di_stefano
     data:
       title: "🐱 Comfort Termico Micie (Piccola e Luna)"
       message: "In casa ci sono {{ states('sensor.temperatura_media') }}°C: fa caldo per Piccola e Luna. Vuoi accendere il clima sala a 25°C in modalità eco?"
@@ -115,6 +115,18 @@
           title: "❄️ Accendi Clima Sala"
         - action: "FINESTRE_APERTE_MICIE"
           title: "🪟 No, Finestre già Aperte"
+    continue_on_error: true
+  - action: notify.samsung_s22_di_laura
+    data:
+      title: "🐱 Comfort Termico Micie (Piccola e Luna)"
+      message: "In casa ci sono {{ states('sensor.temperatura_media') }}°C: fa caldo per Piccola e Luna. Vuoi accendere il clima sala a 25°C in modalità eco?"
+      data:
+        actions:
+        - action: "ACCENDI_CLIMA_MICIE"
+          title: "❄️ Accendi Clima Sala"
+        - action: "FINESTRE_APERTE_MICIE"
+          title: "🪟 No, Finestre già Aperte"
+    continue_on_error: true
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
@@ -248,7 +260,7 @@
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 10800 }}"
   actions:
-  - action: notify.notify
+  - action: notify.samsung_s25_edge_di_stefano
     data:
       title: "⛈️ Allarme Temporale in Paese!"
       message: >-
@@ -260,6 +272,20 @@
         push:
           sound: default
           critical: 1
+    continue_on_error: true
+  - action: notify.samsung_s22_di_laura
+    data:
+      title: "⛈️ Allarme Temporale in Paese!"
+      message: >-
+        {% set pioggia = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 %}
+        {% set vento = states('sensor.sala_anemometro_gust_strength') | float(0) %}
+        Attenzione! Siete fuori casa e in terrazza {% if pioggia %}sta piovendo{% else %}ci sono raffiche a {{ vento }} km/h{% endif %}!
+        Se avete lasciato finestre aperte per le micie (Piccola e Luna), verificate se rientrare!
+      data:
+        push:
+          sound: default
+          critical: 1
+    continue_on_error: true
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio

@@ -50,7 +50,12 @@
         message: "{{ frigo_msg }}"
       continue_on_error: true
     else:
-    - action: notify.notify
+    - action: notify.samsung_s25_edge_di_stefano
+      data:
+        title: "❄️ Frigorifero Aperto"
+        message: "Lo sportello del frigorifero è aperto da oltre 60 secondi!"
+      continue_on_error: true
+    - action: notify.samsung_s22_di_laura
       data:
         title: "❄️ Frigorifero Aperto"
         message: "Lo sportello del frigorifero è aperto da oltre 60 secondi!"
@@ -112,7 +117,12 @@
         message: "{{ freezer_msg }}"
       continue_on_error: true
     else:
-    - action: notify.notify
+    - action: notify.samsung_s25_edge_di_stefano
+      data:
+        title: "🧊 Freezer Aperto"
+        message: "Lo sportello del congelatore è aperto da oltre 60 secondi!"
+      continue_on_error: true
+    - action: notify.samsung_s22_di_laura
       data:
         title: "🧊 Freezer Aperto"
         message: "Lo sportello del congelatore è aperto da oltre 60 secondi!"
