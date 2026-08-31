@@ -117,7 +117,7 @@
         value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or is_state('person.simone', 'home') or is_state('person.monica', 'home') or (states('zone.home') | int(0) > 0)) }}"
       sequence:
       - delay:
-          seconds: 3.5
+          seconds: 7.5
       - action: camera.snapshot
         target:
           entity_id: '{{ camera_entity }}'

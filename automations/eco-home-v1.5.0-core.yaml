@@ -449,7 +449,7 @@
           value_template: "{{ camera_notification_enabled\n   and was_house_empty\n   and states(camera_entity) not in ['unknown', 'unavailable'] }}"
         then:
         - delay:
-            seconds: 3.5
+            seconds: 7.5
         - action: camera.snapshot
           target:
             entity_id: '{{ camera_entity }}'
