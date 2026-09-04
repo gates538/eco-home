@@ -52,7 +52,7 @@
           windows_open: >-
             {% set open = expand(window_sensors) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
             {{ open | join(', ') if open | length > 0 else 'none' }}
-          dryer_is_on: '{{ states(dryer_state_sensor) not in [''off'', ''idle'', ''stop'', ''stopped'', ''complete'', ''completed'', ''finish'', ''finished'', ''end'', ''ended'', ''none'', ''standby'', ''unknown'', ''unavailable''] }}'
+          dryer_is_on: "{{ is_state('binary_sensor.asciugatrice_in_funzione', 'on') or states(dryer_state_sensor) in ['run', 'running', 'drying', 'cooling'] or (states('sensor.esterno_asciugatrice_potenza') | float(0) > 10) }}"
       - if:
         - condition: template
           value_template: '{{ light_is_on }}'
@@ -225,7 +225,7 @@
         {% set on_lights = expand(['light.luceambiente', 'light.faretti_cucina']) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
         {{ on_lights | join(', ') if on_lights | length > 0 else '' }}
       asciugatrice_attiva: >-
-        {{ states('sensor.esterno_asciugatrice_machine_state') not in ['off', 'idle', 'stop', 'stopped', 'complete', 'completed', 'finish', 'finished', 'end', 'ended', 'none', 'standby', 'unknown', 'unavailable'] }}
+        {{ is_state('binary_sensor.asciugatrice_in_funzione', 'on') or states('sensor.esterno_asciugatrice_machine_state') in ['run', 'running', 'drying', 'cooling'] or (states('sensor.esterno_asciugatrice_potenza') | float(0) > 10) }}
       anomalie: >-
         {% set lista = [] %}
         {% if portone_aperto %}

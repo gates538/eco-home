@@ -785,7 +785,7 @@
     tv_media_player: media_player.tv_sala_ue85du7170uxzt
     door_sensor: binary_sensor.porta_contact
     dryer_state_sensor: sensor.esterno_asciugatrice_machine_state
-    dryer_power_sensor: sensor.esterno_asciugatrice_energia_elettrica
+    dryer_power_sensor: sensor.esterno_asciugatrice_potenza
     dryer_completion_sensor: sensor.esterno_asciugatrice_completion_time
     camera_entity: camera.sala_2
     stefano_notification_service: notify.samsung_s25_edge_di_stefano
@@ -911,12 +911,11 @@
     dryer_state: '{{ states(dryer_state_sensor) | lower }}'
     dryer_completion_raw: '{{ states(dryer_completion_sensor) }}'
     dryer_is_finished_now: '{{ dryer_state in dryer_finished_states }}'
+    dryer_active_running: "{{\n  is_state('binary_sensor.asciugatrice_in_funzione', 'on')\n  or dryer_state in ['run', 'running', 'drying', 'cooling']\n  or (states(dryer_power_sensor) | float(0) > 10)\n}}"
     dryer_remaining_minutes: "{% set ts = as_timestamp(dryer_completion_raw, default=none)
       %} {% if ts is not none %}\n  {{ ((ts - as_timestamp(now())) / 60) | round(0,
       'ceil') | int(0) }}\n{% else %}\n  0\n{% endif %}"
-    dryer_running_and_has_remaining_time: "{{ not dryer_is_finished_now\n   and dryer_state
-      not in ['unknown', 'unavailable', 'none']\n   and dryer_remaining_minutes |
-      int(0) > 1\n   and dryer_remaining_minutes | int(0) < 360 }}"
+    dryer_running_and_has_remaining_time: "{{\n  dryer_active_running\n  and not dryer_is_finished_now\n  and dryer_state not in ['unknown', 'unavailable', 'none', 'ready', 'idle', 'off', 'stop', 'stopped', 'standby', 'complete', 'completed', 'finish', 'finished']\n  and dryer_remaining_minutes | int(0) > 1\n  and dryer_remaining_minutes | int(0) < 360\n}}"
     stefano_nicknames:
     - Ste
     - bello
