@@ -349,11 +349,6 @@
           arrived_stefano: "{{ stefano_arrived_recently and not laura_arrived_recently }}"
           arrived_laura: "{{ laura_arrived_recently and not stefano_arrived_recently }}"
           arrived_now_couple: "{{ stefano_arrived_recently and laura_arrived_recently }}"
-          welcome_name: "{% if arrived_now_couple or arrived_stefano %}\n  {{ couple_nicknames | random
-            }}\n{% elif arrived_laura %}\n  {{ laura_nicknames | random }}\n{% elif arrived_now_count
-            | int(0) > 1 %}\n  {{ couple_nicknames | random }}\n{% else %}\n  bentornati
-            a casa\n{% endif %}"
-          welcome_opening: '{{ saluto_orario }} {{ welcome_name | trim }}.'
       - variables:
           dryer_pending_minutes_ago: "{% set ts = as_timestamp(states('input_datetime.eco_home_asciugatrice_fine'),
             default=none) %} {% if ts is not none %}\n  {{ ((as_timestamp(now()) -
@@ -381,12 +376,30 @@
             target:
               entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
       - variables:
-          welcome_body: "{% if is_night %}\n  {{ night_phrase_starts | random }}:
-            {{ night_phrase_tails | random }}\n{% elif arrived_now_couple or arrived_stefano or arrived_now_count
-            | int(0) > 1 %}\n  {{ couple_phrase_starts | random }}: {{ couple_phrase_tails
-            | random }}\n{% elif arrived_laura %}\n  {{ laura_phrase_starts | random
-            }}: {{ laura_phrase_tails | random }}\n{% else %}\n  {{ generic_phrase_starts | random }}: {{ generic_phrase_tails
-            | random }}\n{% endif %}"
+          welcome_body: >-
+            {% if is_night %}
+              {{ night_phrases | random }}
+            {% elif arrived_now_couple or arrived_stefano or arrived_now_count | int(0) > 1 %}
+              {% if is_friday_evening %}
+                {{ couple_friday_phrases | random }}
+              {% elif hour_now | int(0) >= 12 and hour_now | int(0) < 15 %}
+                {{ couple_lunch_phrases | random }}
+              {% elif is_weekend %}
+                {{ couple_weekend_phrases | random }}
+              {% else %}
+                {{ couple_phrases | random }}
+              {% endif %}
+            {% elif arrived_laura %}
+              {% if is_friday_evening %}
+                {{ laura_friday_phrases | random }}
+              {% elif is_weekend %}
+                {{ laura_weekend_phrases | random }}
+              {% else %}
+                {{ laura_phrases | random }}
+              {% endif %}
+            {% else %}
+              {{ generic_phrases | random }}
+            {% endif %}
           weather_alert_text: "{% set alert = states(alert_entity) %} {% if alert
             not in ['unknown', 'unavailable', 'Nessuna allerta', 'nessuna allerta',
             'off', '0', ''] %}\n  Attenzione, è in vigore un'allerta meteo: {{ alert }}.\n{%
@@ -413,8 +426,12 @@
               color_temp_kelvin: '{{ light_kelvin }}'
               transition: 0
       - variables:
-          messaggio_finale: '{{ welcome_opening | trim }} {{ welcome_body | trim }}
-            {{ final_extra_text | trim }} {{ weather_alert_text | trim }} {{ temp_announcement_text | trim }} {{ dryer_arrival_text_final | trim }}'
+          messaggio_finale: >-
+            {{ welcome_body | trim }}
+            {% if final_extra_text | trim != '' %} {{ final_extra_text | trim }}{% endif %}
+            {% if weather_alert_text | trim != '' %} {{ weather_alert_text | trim }}{% endif %}
+            {% if temp_announcement_text | trim != '' %} {{ temp_announcement_text | trim }}{% endif %}
+            {% if dryer_arrival_text_final | trim != '' %} {{ dryer_arrival_text_final | trim }}{% endif %}
           announced_profile: >-
             {% if arrived_now_couple or arrived_stefano or arrived_now_count | int(0) > 1 %}Coppia
             {% elif arrived_laura %}Laura
@@ -944,104 +961,97 @@
     - belli
     - duo delle meraviglie
     - squadra di casa
-    laura_phrase_starts:
-    - Bentornata Laura,
-    - Eccola, la regina di casa è rientrata!
-    - Ingresso trionfale per Laura,
-    - Giornata lavorativa archiviata per Laura!
-    - Bentornata Lau,
-    - Finalmente a casa Laura,
-    - Missione ufficio completata per Laura,
-    - Laura a rapporto nella sua oasi di pace,
-    - Modalità relax attivata per Lau,
-    - La casa riprende vita: bentornata Laura!
-    - Buon venerdì sera Lau, settimana lavorativa archiviata!
-    - Punto Blu parcheggiata e weekend ufficialmente iniziato per Laura!
-    laura_phrase_tails:
-    - stasera niente pensieri: solo divano, coccole e relax!
-    - hai la casa tutta per te prima che rientri Stefano!
-    - le micie ti aspettavano sul lettone per il riposino serale.
-    - controlla se Luna è ancora nel lavandino del bagnetto o se è scesa!
-    - togliti le scarpe, il caos di fuori è ufficialmente bandito.
-    - la casa è accogliente e pronta a farti staccare la spina.
-    - stasera ti meriti solo coccole dalle gatte e zero stress!
-    - Piccola e Luna ti hanno già riservato il posto d'onore sul lettone!
-    - atmosfera perfetta: mettiti comoda e goditi la serata.
-    - chiudi la porta e lascia tutte le scartoffie fuori dal paese!
-    - la Punto Blu è a riposo, niente F24 o bilanci fino a lunedì!
-    - la settimana è finita: stasera solo divano, Emby e relax con le micie!
-    stefano_phrase_starts:
-    - Bentornato a casa Ste,
-    - Presenza del capitano Stefano confermata!
-    - Il boss della domotica ha fatto ritorno,
-    - Bentornato Stefano,
-    - Ehi Ste, rientro registrato con successo,
-    - Eccoti qua capitano,
-    - Rientro operativo per Stefano,
-    - Missione quotidiana finita per Ste,
-    - Ingresso autorizzato per il capo di casa,
-    - Centralina smart attiva: bentornato Stefano!
-    - Buon venerdì sera Stefano, weekend alle porte!
-    - Discovery parcheggiata: rientro confermato per Ste!
-    stefano_phrase_tails:
-    - se è pausa pranzo fai un pit-stop veloce, altrimenti divano immediato!
-    - le micie ti aspettavano per il controllo coccole serale!
-    - vai a vedere se Luna sta dormendo nel lavandino del bagnetto o sul lettone!
-    - la casa è al sicuro e i server della domotica sono stabili.
-    - togliti le scarpe e lascia il lavoro fuori dalla porta.
-    - spero tu sia pronto a farti fare le fusa da Piccola e Luna!
-    - rilassati e prenditi il meritato riposo prima di ripartire.
-    - il divano della sala ti ha tenuto il posto caldo tutto il giorno!
-    - ricordati che lo stress si lascia sullo zerbino di casa!
-    - missione compiuta per oggi: ora solo comfort casalingo!
-    - la Discovery è al sicuro in garage e il weekend si avvicina!
-    - venerdì sera a casa: stasera film su Emby e relax con Laura e le gatte!
-    couple_phrase_starts:
-    - Bentornati ragazzi,
-    - Rientro di coppia confermato,
-    - I padroni di casa sono tornati al nido!
-    - La squadra del cuore è di nuovo al completo,
-    - Che bello vedervi rientrare insieme,
-    - Attenzione, duo dinamico a casa!
-    - Doppio rientro registrato con successo,
-    - Eccovi qua, bentornati a casa insieme!
-    - Buon venerdì sera Stefano e Laura, la squadra è a casa per il weekend!
-    - Punto Blu e Discovery a riposo: rientro di coppia del venerdì!
-    couple_phrase_tails:
-    - ora potete decidere insieme chi non ha voglia di cucinare stasera!
-    - Piccola e Luna vi aspettavano sul lettone per fare festa!
-    - controllate se Luna è ancora nel lavandino o se è venuta a salutarvi!
-    - il divano della sala vi aspetta per il relax sincronizzato.
-    - chiudete fuori il mondo e godetevi la serata insieme!
-    - stasera niente pulizie e niente pensieri: solo divano e relax.
-    - la casa torna viva e accogliente quando siete insieme!
-    - vediamo chi di voi due cederà per primo al fascino del divano!
-    - serata di coppia ufficialmente aperta: rilassatevi!
-    - la settimana di lavoro è finita, stasera film su Emby, divano e fusa delle micie!
-    - modalità weekend ufficialmente attivata per entrambi: godetevi la serata!
-    night_phrase_starts:
-    - Rientro notturno rilevato,
-    - Bentornati nell'ombra,
-    - Ingresso silenzioso confermato,
-    - Che ore sono queste per rientrare?
-    - Modalità ninja attivata,
-    - Finalmente a casa, anche se è tardissimo,
-    night_phrase_tails:
-    - parlo a bassa voce per non svegliare tutto il paese.
-    - spero abbiate sonno, perché la casa sta già dormendo.
-    - andate dritti a letto senza passare dal frigorifero!
-    - cercherò di fare meno rumore possibile.
-    - non svegliate le gatte, o ve ne pentirete.
-    - è ora di ricaricare le batterie, buonanotte!
-    generic_phrase_starts:
-    - Bentornati a casa,
-    - Rientro generico confermato,
-    - Ingresso rilevato dai sensori,
-    - La casa vi saluta,
-    - Finalmente qualcuno è tornato,
-    generic_phrase_tails:
-    - mettetevi comodi e respirate profondamente.
-    - la vostra oasi di pace vi aspetta.
-    - lasciate lo stress fuori dalla porta.
-    - è il momento di iniziare la vera parte bella della giornata.
-    - vi auguro una serata fantastica.
+    couple_phrases:
+    - "Bentornati ragazzi! Toglietevi le scarpe e lasciate tutti i pensieri fuori dalla porta."
+    - "Ciao amori! Che bello vedervi rientrare insieme, la casa era troppo silenziosa senza di voi."
+    - "Bentornata alla coppia più bella del paese! Serata ufficialmente aperta, mettetevi comodi."
+    - "Rientro di coppia al completo! Luna e Piccola vi aspettavano sul lettone per il controllo coccole."
+    - "Bentornati a casa piccioncini! Andate a vedere se Luna sta dormendo nel lavandino del bagno o se vi è venuta incontro."
+    - "Bentornati! Casa accogliente, clima perfetto e divano prenotato per entrambi."
+    - "Ciao belli! Giornata archiviata, stasera solo relax sincronizzato sul divano."
+    - "Bentornata alla squadra del cuore! Vediamo chi di voi due cederà per primo al richiamo del divano."
+    - "Bentornati ragazzi! Portone chiuso e caos di fuori dimenticato: stasera chi cucina e chi si rilassa?"
+    - "Ciao ragazzi, bentornati! Le micie stavano giusto chiedendosi a che ora sareste tornati per la pappa e le coccole."
+    - "Eccovi a casa! Finalmente relax, staccate la spina e godetevi la vostra serata."
+    - "Bentornati a casa insieme! Le gatte hanno già fatto l'ispezione della sala, tutto è pronto per voi."
+    - "Ciao Stefano e Laura, bentornati! Niente stress stasera, solo divano, coccole e buona compagnia."
+    - "Bentornata coppia fantastica! Le micie sono già in posizione strategica per ricevere le coccole serali."
+    - "Bentornati a casa! Spegnete i pensieri lavorativi, la vostra oasi di pace è pronta."
+    - "Ciao ragazzi! Piccola e Luna vi hanno tenuto il posto caldo sul letto per tutto il pomeriggio."
+    - "Bentornati! Aria di casa, tranquillità e relax: cosa c'è di meglio per finire la giornata?"
+    - "Che bella sorpresa vedervi rientrare insieme! Mettetevi comodi e respirate l'atmosfera di casa."
+    - "Bentornata alla nostra squadra di casa! Tutto è sotto controllo e le micie vi salutano."
+    - "Ciao amori, bentornati! Toglietevi i cappotti e godetevi il calore di casa."
+    - "Missione quotidiana completata per entrambi! Stasera modalità riposo assoluto."
+    - "Bentornati ragazzi! Chiudete la porta al mondo esterno e godetevi la vostra serata insieme."
+    - "La casa riprende vita: bentornati Stefano e Laura!"
+    - "Ciao ragazzi! Le micie vi aspettano al varco per le fusa di benvenuto."
+    - "Bentornata alla coppia del cuore! Tutto è calmo, rilassatevi e prendetevi il vostro tempo."
+    - "Casa dolce casa: bentornati ragazzi, mettetevi comodi!"
+    - "Bentornati amori! Serata tutta per voi, zero fretta e massimo comfort."
+    - "Che bello riavervi a casa insieme! Divano pronto, luci perfette e relax assicurato."
+    couple_friday_phrases:
+    - "Buon venerdì sera ragazzi! Settimana lavorativa archiviata a chiave, stasera solo film su Emby, divano e fusa delle micie!"
+    - "Punto Blu e Discovery a riposo: il weekend della coppia più bella è ufficialmente iniziato!"
+    - "Venerdì sera a casa! Weekend alle porte, zero sveglie per domani e relax totale per entrambi!"
+    - "Fine della settimana lavorativa! Dimenticate fatture e computer fino a lunedì, godetevi il venerdì sera!"
+    - "Buon venerdì sera Stefano e Laura! Stasera pizza, divano e zero pensieri!"
+    - "Settimana conclusa con successo! Benvenuti nel vostro weekend di meritato riposo."
+    couple_lunch_phrases:
+    - "Buon pranzo e bentornati a casa ragazzi! Pausa meritata, ricaricate le batterie con calma!"
+    - "Bentornati per il pranzo! Godetevi il pit-stop a casa prima di riprendere la giornata!"
+    - "Ciao ragazzi, bentornati per la pausa pranzo! Mangiate con calma e godetevi un attimo di respiro!"
+    - "Pausa pranzo a casa! Staccate dieci minuti e ricaricate le energie!"
+    couple_weekend_phrases:
+    - "Buon weekend a casa ragazzi! Zero corse e relax totale con Piccola e Luna!"
+    - "Bentornati dal giretto del weekend! Mettetevi comodi e godetevi il tempo insieme!"
+    - "Weekend in corso: niente orari, niente fretta, solo relax di coppia!"
+    - "Bentornati a casa! Il fine settimana continua nel massimo comfort."
+    laura_phrases:
+    - "Bentornata a casa Laura! Togliti le scarpe, il caos dell'ufficio è ufficialmente bandito."
+    - "Ciao Lau! Le micie ti aspettavano per il riposino e la casa è tutta per te prima che arrivi Stefano."
+    - "Bentornata regina di casa! Punto Blu parcheggiata e serata relax ufficialmente iniziata."
+    - "Ciao dolcezza! Piccola e Luna ti hanno riservato il posto d'onore sul lettone!"
+    - "Bentornata Lau! Vai a controllare se Luna è ancora acciambellata nel lavandino del bagno!"
+    - "Ciao Laura! Giornata intensa conclusa: stasera meriti solo divano, coccole e zero pensieri."
+    - "Bentornata a casa Lau! Chiudi la porta e lascia tutte le scartoffie e i bilanci fuori dal paese!"
+    - "Ciao splendore, bentornata! Mettiti comoda e goditi la tranquillità di casa."
+    - "Bentornata principessa! Casa accogliente e pronta a farti staccare la spina."
+    - "Ciao Lau! Le gatte ti stavano cercando per fare il pieno di coccole pomeridiane."
+    - "Bentornata Laura! Prendi un bel respiro: il dovere è finito, ora solo piacere e riposo."
+    - "Ciao meravigliosa Lau! Togliti la borsa e mettiti comoda, te lo sei strameritato."
+    - "Bentornata Laura! La casa è calda e profumata, pronta a coccolarti."
+    laura_friday_phrases:
+    - "Buon venerdì sera Lau! Settimana di lavoro archiviata, niente F24 o numeri fino a lunedì!"
+    - "Punto Blu parcheggiata e weekend ufficialmente aperto per Laura! Stasera solo relax!"
+    - "Venerdì sera finalmente arrivato! Ciao Lau, goditi l'inizio del weekend con le micie e Stefano!"
+    laura_weekend_phrases:
+    - "Buon weekend a casa Laura! Goditi ogni momento di relax e coccole con Luna e Piccola!"
+    - "Bentornata a casa Lau! Niente lavoro nel weekend, solo benessere e tranquillità!"
+    stefano_phrases:
+    - "Bentornato capitano Ste! Discovery parcheggiata e server della domotica perfettamente operativi!"
+    - "Ciao Ste! Presenza del boss registrata, togliti le scarpe e rilassati prima che arrivi Laura!"
+    - "Bentornato a casa Ste! Le micie ti aspettavano per il controllo coccole di routine."
+    - "Ciao grande uomo! Vai a vedere se Luna sta dormendo nel lavandino o sul lettone!"
+    - "Bentornato capitano! Il divano della sala ti ha tenuto il posto caldo tutto il giorno."
+    - "Ciao Stefano! Missione quotidiana completata, ora solo comfort casalingo e tranquillità."
+    - "Bentornato Ste! Ricordati che lo stress si lascia rigorosamente sullo zerbino di casa!"
+    - "Ciao Ste, bentornato! Centralina smart attiva e casa pronta al tuo comando."
+    - "Bentornato Stefano! Prenditi un momento di pausa prima di rimetterti in moto."
+    - "Ciao Ste! La Discovery è a riposo e la domotica è stabile al cento per cento."
+    - "Bentornato a casa! Mettiti comodo e goditi la pace del nostro paese."
+    night_phrases:
+    - "Bentornati a quest'ora! Faccio piano per non svegliare tutto il paese e le micie."
+    - "Ingresso notturno da veri ninja! Andate dritti a letto senza fare troppo rumore."
+    - "Bentornati nell'ombra! Spero abbiate sonno perché la casa sta già dormendo da un pezzo."
+    - "Rientro a notte fonda registrato! Attenti a non inciampare sulle gatte nel corridoio, buonanotte!"
+    - "Faccio la voce bassa per non disturbarvi: mettetevi a letto e sogni d'oro!"
+    - "Che ore piccole! Chiudete a chiave, spegnete le luci e fiondatevi sotto le coperte."
+    - "Rientro silenzioso confermato. Riposatevi e ricaricate le batterie per domani, buonanotte!"
+    - "Bentornati nottambuli! La casa è al buio e vi aspetta per una bella dormita."
+    generic_phrases:
+    - "Bentornati a casa! Mettetevi comodi e respirate l'atmosfera di pace."
+    - "Ciao! Rientro registrato con successo, lasciate lo stress fuori dalla porta."
+    - "Bentornati! Casa calda, sicura e pronta ad accogliervi."
+    - "Benvenuti a casa! È il momento di iniziare la parte più bella della giornata."
+    - "Bentornati! Prendetevi tutto il relax che vi serve."
