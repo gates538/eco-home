@@ -202,16 +202,79 @@
     continue_on_error: true
   mode: single
 
-- id: 'eco_home_asciugatrice_promemoria_svuotamento'
-  alias: 'Eco Home - Promemoria Asciugatrice da Svuotare (Samsung Dryer)'
-  description: 'Promemoria vocale sarcastico 30 minuti dopo la fine del ciclo asciugatrice'
+- id: 'eco_home_asciugatrice_ciclo_terminato'
+  alias: 'Eco Home - Registrazione Fine Ciclo Asciugatrice'
+  description: 'Registra la fine del ciclo asciugatrice e attiva il promemoria panni da ritirare'
   triggers:
   - trigger: state
     entity_id: sensor.esterno_asciugatrice_machine_state
+    from:
+    - run
+    - running
+    - drying
+    - cooling
     to:
     - 'off'
     - idle
     - stop
+    - complete
+    - completed
+    - finish
+    - finished
+  - trigger: state
+    entity_id: binary_sensor.asciugatrice_in_funzione
+    from: 'on'
+    to: 'off'
+  conditions:
+  - condition: template
+    value_template: "{{ is_state('input_boolean.eco_home_attivo', 'on') or is_state('input_boolean.echo_home_attivo', 'on') or states('input_boolean.eco_home_attivo') in ['unknown', 'unavailable'] }}"
+  actions:
+  - action: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+  - action: input_datetime.set_datetime
+    target:
+      entity_id: input_datetime.eco_home_asciugatrice_fine
+    data:
+      datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Asciugatrice: Ciclo terminato, panni in attesa di ritiro"
+    continue_on_error: true
+  mode: single
+
+- id: 'eco_home_asciugatrice_svuotata_terrazza'
+  alias: 'Eco Home - Rilevamento Svuotamento Asciugatrice da Porta Terrazza'
+  description: 'Annulla automaticamente il promemoria quando si apre la porta della terrazza per ritirare i panni'
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.portaterrazzo_contact
+    to: 'on'
+  conditions:
+  - condition: state
+    entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+    state: 'on'
+  actions:
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.eco_home_ultimo_messaggio
+    data:
+      value: "Asciugatrice: Panni ritirati (porta terrazza aperta)"
+    continue_on_error: true
+  mode: single
+
+- id: 'eco_home_asciugatrice_promemoria_svuotamento'
+  alias: 'Eco Home - Promemoria Asciugatrice da Svuotare (Samsung Dryer)'
+  description: 'Promemoria vocale 30 minuti dopo la fine del ciclo asciugatrice solo se i panni non sono ancora stati ritirati'
+  triggers:
+  - trigger: state
+    entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+    to: 'on'
     for:
       minutes: 30
   conditions:
@@ -221,6 +284,11 @@
     value_template: "{{ is_state('input_boolean.echo_home_attivo', 'on') or is_state('input_boolean.eco_home_attivo', 'on') or states('input_boolean.echo_home_attivo') in ['unknown', 'unavailable'] }}"
   - condition: template
     value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
+  - condition: state
+    entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+    state: 'on'
+  - condition: template
+    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
   actions:
   - action: tts.speak
     target:
@@ -237,11 +305,14 @@
           "Bucato asciutto e pronto! È ora di svuotare l'asciugatrice!",
           "I panni nell'asciugatrice vi aspettano al calduccio: andate a svuotarla!"
         ] | random }}
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
     data:
-      value: "Promemoria Asciugatrice: Panni da svuotare"
+      value: "Promemoria Asciugatrice: Panni da svuotare annunciato"
     continue_on_error: true
   mode: single
 
