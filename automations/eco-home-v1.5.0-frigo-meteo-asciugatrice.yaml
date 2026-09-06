@@ -88,14 +88,14 @@
     value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
   actions:
   - variables:
-    is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
-    freezer_msg: >-
-      {{ [
-        "Attenzione! Freezer aperto da un minuto: salvate i gelati!",
-        "Allarme congelatore aperto! Chiudete prima che si sciolga il Polo Nord!",
-        "Chiudere il freezer! I surgelati stanno chiedendo asilo!",
-        "Emergenza freezer aperto! Chiudete subito lo sportello!"
-      ] | random }}
+      is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+      freezer_msg: >-
+        {{ [
+          "Attenzione! Freezer aperto da un minuto: salvate i gelati!",
+          "Allarme congelatore aperto! Chiudete prima che si sciolga il Polo Nord!",
+          "Chiudere il freezer! I surgelati stanno chiedendo asilo!",
+          "Emergenza freezer aperto! Chiudete subito lo sportello!"
+        ] | random }}
   - if:
     - condition: template
       value_template: "{{ is_daytime }}"
