@@ -105,7 +105,7 @@
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 14400 }}"
   actions:
-  - action: notify.samsung_s25_edge_di_stefano
+  - action: notify.mobile_app_samsung_s25_edge_di_stefano
     data:
       title: "🐱 Comfort Termico Micie (Piccola e Luna)"
       message: "In casa ci sono {{ states('sensor.temperatura_media') }}°C: fa caldo per Piccola e Luna. Vuoi accendere il clima sala a 25°C in modalità eco?"
@@ -116,7 +116,7 @@
         - action: "FINESTRE_APERTE_MICIE"
           title: "🪟 No, Finestre già Aperte"
     continue_on_error: true
-  - action: notify.samsung_s22_di_laura
+  - action: notify.mobile_app_samsung_s22_di_laura
     data:
       title: "🐱 Comfort Termico Micie (Piccola e Luna)"
       message: "In casa ci sono {{ states('sensor.temperatura_media') }}°C: fa caldo per Piccola e Luna. Vuoi accendere il clima sala a 25°C in modalità eco?"
@@ -260,7 +260,7 @@
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 10800 }}"
   actions:
-  - action: notify.samsung_s25_edge_di_stefano
+  - action: notify.mobile_app_samsung_s25_edge_di_stefano
     data:
       title: "⛈️ Allarme Temporale in Paese!"
       message: >-
@@ -273,7 +273,7 @@
           sound: default
           critical: 1
     continue_on_error: true
-  - action: notify.samsung_s22_di_laura
+  - action: notify.mobile_app_samsung_s22_di_laura
     data:
       title: "⛈️ Allarme Temporale in Paese!"
       message: >-

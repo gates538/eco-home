@@ -805,8 +805,8 @@
     dryer_power_sensor: sensor.esterno_asciugatrice_potenza
     dryer_completion_sensor: sensor.esterno_asciugatrice_completion_time
     camera_entity: camera.sala_2
-    stefano_notification_service: notify.samsung_s25_edge_di_stefano
-    laura_notification_service: notify.samsung_s22_di_laura
+    stefano_notification_service: notify.mobile_app_samsung_s25_edge_di_stefano
+    laura_notification_service: notify.mobile_app_samsung_s22_di_laura
     snapshot_file_path: /config/www/cam_snapshots/sala_2.jpg
     snapshot_access_url: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
     indoor_temp_sensors:

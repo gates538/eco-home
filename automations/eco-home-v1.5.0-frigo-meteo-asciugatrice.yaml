@@ -50,12 +50,12 @@
         message: "{{ frigo_msg }}"
       continue_on_error: true
     else:
-    - action: notify.samsung_s25_edge_di_stefano
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
       data:
         title: "❄️ Frigorifero Aperto"
         message: "Lo sportello del frigorifero è aperto da oltre 60 secondi!"
       continue_on_error: true
-    - action: notify.samsung_s22_di_laura
+    - action: notify.mobile_app_samsung_s22_di_laura
       data:
         title: "❄️ Frigorifero Aperto"
         message: "Lo sportello del frigorifero è aperto da oltre 60 secondi!"
@@ -88,14 +88,14 @@
     value_template: "{{ not is_state('input_boolean.echo_home_silenzioso', 'on') and not is_state('input_boolean.eco_home_silenzioso', 'on') }}"
   actions:
   - variables:
-      is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
-      freezer_msg: >-
-        {{ [
-          "Attenzione! Freezer aperto da un minuto: salvate i gelati!",
-          "Allarme congelatore aperto! Chiudete prima che si sciolga il Polo Nord!",
-          "Chiudere il freezer! I surgelati stanno chiedendo asilo!",
-          "Emergenza freezer aperto! Chiudete subito lo sportello!"
-        ] | random }}
+    is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+    freezer_msg: >-
+      {{ [
+        "Attenzione! Freezer aperto da un minuto: salvate i gelati!",
+        "Allarme congelatore aperto! Chiudete prima che si sciolga il Polo Nord!",
+        "Chiudere il freezer! I surgelati stanno chiedendo asilo!",
+        "Emergenza freezer aperto! Chiudete subito lo sportello!"
+      ] | random }}
   - if:
     - condition: template
       value_template: "{{ is_daytime }}"
@@ -117,12 +117,12 @@
         message: "{{ freezer_msg }}"
       continue_on_error: true
     else:
-    - action: notify.samsung_s25_edge_di_stefano
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
       data:
         title: "🧊 Freezer Aperto"
         message: "Lo sportello del congelatore è aperto da oltre 60 secondi!"
       continue_on_error: true
-    - action: notify.samsung_s22_di_laura
+    - action: notify.mobile_app_samsung_s22_di_laura
       data:
         title: "🧊 Freezer Aperto"
         message: "Lo sportello del congelatore è aperto da oltre 60 secondi!"

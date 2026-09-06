@@ -31,7 +31,7 @@
       - climate.condizionatore_sala
       - climate.condizionatore_camera
     continue_on_error: true
-  - action: notify.samsung_s25_edge_di_stefano
+  - action: notify.mobile_app_samsung_s25_edge_di_stefano
     data:
       title: "Risparmio Energetico"
       message: >-
@@ -41,7 +41,7 @@
           "Risparmio energetico: condizionatori spenti per finestre aperte!"
         ] | random }}
     continue_on_error: true
-  - action: notify.samsung_s22_di_laura
+  - action: notify.mobile_app_samsung_s22_di_laura
     data:
       title: "Risparmio Energetico"
       message: "Attenzione: condizionatori spenti per finestre aperte da oltre 3 minuti."
@@ -80,7 +80,7 @@
       - condition: template
         value_template: "{{ trigger.id == 'troppo_caldo' }}"
       sequence:
-      - action: notify.samsung_s25_edge_di_stefano
+      - action: notify.mobile_app_samsung_s25_edge_di_stefano
         data:
           title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
           message: "Fa caldo in casa! Vuoi che accenda i condizionatori o avete le finestre aperte per far arieggiare?"
@@ -91,7 +91,7 @@
             - action: "NO_FINESTRE_APERTE"
               title: "🪟 No, Finestre Aperte"
         continue_on_error: true
-      - action: notify.samsung_s22_di_laura
+      - action: notify.mobile_app_samsung_s22_di_laura
         data:
           title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
           message: "Fa caldo in casa! Vuoi che accenda i condizionatori o avete le finestre aperte per far arieggiare?"
@@ -106,7 +106,7 @@
       - condition: template
         value_template: "{{ trigger.id == 'troppo_freddo' }}"
       sequence:
-      - action: notify.samsung_s25_edge_di_stefano
+      - action: notify.mobile_app_samsung_s25_edge_di_stefano
         data:
           title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
           message: "Fa freddino in casa! Vuoi accendere il termocamino a pellet o la pompa di calore per scaldare?"
@@ -117,7 +117,7 @@
             - action: "NO_FINESTRE_APERTE"
               title: "🪟 No, Finestre Aperte"
         continue_on_error: true
-      - action: notify.samsung_s22_di_laura
+      - action: notify.mobile_app_samsung_s22_di_laura
         data:
           title: "🌡️ Temperatura in casa: {{ states('sensor.temperatura_media') }}°C"
           message: "Fa freddino in casa! Vuoi accendere il termocamino a pellet o la pompa di calore per scaldare?"

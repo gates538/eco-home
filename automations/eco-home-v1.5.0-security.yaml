@@ -194,9 +194,9 @@
     light_entity: light.luceambiente
     dryer_state_sensor: sensor.esterno_asciugatrice_machine_state
     camera_entity: camera.sala_2
-    stefano_notification_service: notify.samsung_s25_edge_di_stefano
-    laura_notification_service: notify.samsung_s22_di_laura
-    default_notification_service: notify.samsung_s25_edge_di_stefano
+    stefano_notification_service: notify.mobile_app_samsung_s25_edge_di_stefano
+    laura_notification_service: notify.mobile_app_samsung_s22_di_laura
+    default_notification_service: notify.mobile_app_samsung_s25_edge_di_stefano
     snapshot_file_path: /config/www/cam_snapshots/sala_2.jpg
     snapshot_access_url: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
     window_sensors:
@@ -245,12 +245,12 @@
     - condition: template
       value_template: "{{ anomalie | trim != '' }}"
     then:
-    - action: notify.samsung_s25_edge_di_stefano
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
       data:
         title: "🌙 Check Notturno Eco Home"
         message: "Attenzione: prima di dormire risultano ancora aperti o accesi:\n• {{ anomalie }}"
       continue_on_error: true
-    - action: notify.samsung_s22_di_laura
+    - action: notify.mobile_app_samsung_s22_di_laura
       data:
         title: "🌙 Check Notturno Eco Home"
         message: "Attenzione: prima di dormire risultano ancora aperti o accesi:\n• {{ anomalie }}"
@@ -305,12 +305,12 @@
           tld: "it"
         message: "{{ portone_msg }}"
     else:
-    - action: notify.samsung_s25_edge_di_stefano
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
       data:
         title: "🚪 Portone Aperto"
         message: "Il portone principale è aperto da oltre 3 minuti!"
       continue_on_error: true
-    - action: notify.samsung_s22_di_laura
+    - action: notify.mobile_app_samsung_s22_di_laura
       data:
         title: "🚪 Portone Aperto"
         message: "Il portone principale è aperto da oltre 3 minuti!"
@@ -320,6 +320,7 @@
       entity_id: input_text.eco_home_ultimo_messaggio
     data:
       value: "Allarme Portone Aperto oltre 3 minuti"
+    continue_on_error: true
   mode: single
 
 - id: 'eco_home_guardiano_dispositivi_offline'
@@ -356,12 +357,12 @@
     - condition: template
       value_template: "{{ offline_list | trim != '' }}"
     then:
-    - action: notify.samsung_s25_edge_di_stefano
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
       data:
         title: "⚠️ Guardiano Dispositivi Eco Home"
         message: "Attenzione, i seguenti dispositivi risultano offline o non rispondono da oltre 24 ore: {{ offline_list }}."
       continue_on_error: true
-    - action: notify.samsung_s22_di_laura
+    - action: notify.mobile_app_samsung_s22_di_laura
       data:
         title: "⚠️ Guardiano Dispositivi Eco Home"
         message: "Attenzione, i seguenti dispositivi risultano offline o non rispondono da oltre 24 ore: {{ offline_list }}."
