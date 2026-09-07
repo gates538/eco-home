@@ -87,6 +87,7 @@
           entity_id:
           - input_datetime.input_datetime_echo_home_ultimo_arrivo
           - input_datetime.eco_home_ultimo_arrivo
+          - input_datetime.eco_home_ultimo_arrivo_2
         data:
           datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
         continue_on_error: true
@@ -727,6 +728,7 @@
               entity_id:
               - input_datetime.input_datetime_echo_home_ultimo_arrivo
               - input_datetime.eco_home_ultimo_arrivo
+              - input_datetime.eco_home_ultimo_arrivo_2
             data:
               datetime: '1970-01-01 00:00:00'
             continue_on_error: true
@@ -841,7 +843,7 @@
       {%- endif -%}
     nest_available: '{{ states(speaker) not in [''unknown'', ''unavailable''] }}'
     min_away_minutes: 2
-    arrival_person_door_window_seconds: 120
+    arrival_person_door_window_seconds: 600
     arrival_group_window_seconds: 900
     welcome_cooldown_seconds: 900
     dryer_announce_valid_hours: 12
@@ -877,7 +879,13 @@
       / 60) | int(0) }}\n{% else %}\n  999\n{% endif %}"
     door_opened_recently: "{{\n  states(door_sensor) not in ['unknown', 'unavailable']\n  and (as_timestamp(now())
       - as_timestamp(states[door_sensor].last_changed)) <= arrival_person_door_window_seconds\n}}"
-    last_arrival_ts: "{% set ts1 = as_timestamp(states('input_datetime.input_datetime_echo_home_ultimo_arrivo'), default=0) %} {% set ts2 = as_timestamp(states('input_datetime.eco_home_ultimo_arrivo'), default=0) %} {{ [ts1, ts2] | max }}"
+    last_arrival_ts: >-
+      {% set ts1 = as_timestamp(states('input_datetime.input_datetime_echo_home_ultimo_arrivo'), default=0) %}
+      {% set ts2 = as_timestamp(states('input_datetime.eco_home_ultimo_arrivo'), default=0) %}
+      {% set ts3 = as_timestamp(states('input_datetime.eco_home_ultimo_arrivo_2'), default=0) %}
+      {% set person_ts_list = states.person | selectattr('entity_id', 'in', tracked_people) | selectattr('state', 'eq', 'home') | map(attribute='last_changed') | map('as_timestamp') | list %}
+      {% set max_person_ts = person_ts_list | max | default(0) %}
+      {{ [ts1, ts2, ts3, max_person_ts] | max }}
     seconds_from_last_arrival: "{{ (as_timestamp(now()) - (last_arrival_ts | float(0))) | int(999999) }}"
     person_arrived_recently: "{{ seconds_from_last_arrival | int(999999) <= arrival_person_door_window_seconds }}"
     trigger_person_arrival_valid: "{{\n  trigger_type == 'person_arrived'\n  and trigger_entity_id
