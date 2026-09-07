@@ -1,110 +1,490 @@
-- id: '1782669617443'
-  alias: Notifica WhatsApp - Temperatura oltre 40°
-  description: Invia un messaggio WhatsApp quando la temperatura supera i 40°C
+# ==============================================================================
+# REGOLE DI NOTIFICA INTELLIGENTI — CASA MANCINI
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. ENERGIA & ANTI-BLACKOUT (CONTRATTO 6 KW)
+# ------------------------------------------------------------------------------
+- id: 'notifica_anti_blackout_potenza'
+  alias: "⚡ Notifica Smart - Allerta Anti-Blackout Sovraccarico 6 kW"
+  description: "Invia un allarme critico con tasto di spegnimento clima rapido se l'assorbimento supera 5800W per 45s"
   triggers:
-  - entity_id: sensor.temperatura_media_esterna
-    above: 40
-    trigger: numeric_state
+    - trigger: numeric_state
+      entity_id: sensor.potenza_totale_istantanea_casa
+      above: 5800
+      for:
+        seconds: 45
   actions:
-  - data:
-      message: Attenzione! La temperatura esterna ha superato i 40°C.
-    action: rest_command.whatsapp_group_notify
+    - action: script.notifica_smart
+      data:
+        titolo: "⚡ ALLERTA ASSORBIMENTO ELEVATO"
+        messaggio: "Consumo totale a {{ states('sensor.potenza_totale_istantanea_casa') }} W (> 5.8 kW) da oltre 45s! Rischio distacco contatore Enel (Contratto 6 kW)."
+        categoria: "energia"
+        priorita: "critica"
+        tag: "anti_blackout"
+        azioni:
+          - action: "SPEGNI_CLIMA"
+            title: "❄️ Spegni Condizionatori"
+          - action: "IGNORA"
+            title: "Ignora"
   mode: single
-- id: '1782669922081'
-  alias: Notifica WhatsApp - Temperatura sotto zero
-  description: Invia un messaggio WhatsApp quando la temperatura scende sotto i 0°
+
+# ------------------------------------------------------------------------------
+# 2. RACCOLTA DIFFERENZIATA RIFIUTI (ORE 20:30)
+# ------------------------------------------------------------------------------
+- id: 'notifica_rifiuti_serale'
+  alias: "🗑️ Notifica Smart - Promemoria Rifiuti Serale"
+  description: "Ogni sera alle 20:30 ricorda quale bidone della raccolta differenziata esporre per domani"
   triggers:
-  - entity_id: sensor.temperatura_media_esterna
-    below: 0
-    trigger: numeric_state
-  conditions: []
-  actions:
-  - data:
-      message: Attenzione! La temperatura esterna è sotto zero!
-    action: rest_command.whatsapp_group_notify
-  mode: single
-- id: '1782673217209'
-  alias: Notifica WhatsApp - Raffiche di vento superiori a 10 km/h
-  description: Invia un messaggio WhatsApp quando le raffiche di vento superano i
-    10 km/h
-  triggers:
-  - trigger: numeric_state
-    entity_id: sensor.sala_anemometro_gust_strength
-    above: 10
+    - trigger: time
+      at: "20:30:00"
   conditions:
-  - condition: template
-    value_template: "{{ this.attributes.last_triggered is none\n   or (now() - this.attributes.last_triggered).total_seconds()
-      > 3600 }}\n"
+    - condition: template
+      value_template: "{{ states('sensor.raccolta_rifiuti') not in ['unknown', 'unavailable', '', 'Nessun ritiro', 'none'] }}"
   actions:
-  - action: rest_command.whatsapp_group_notify
-    data:
-      message: Attenzione! Raffiche di vento superiori a 10 km/h, controllare le tende!
+    - action: script.notifica_smart
+      data:
+        titolo: "🗑️ Raccolta Differenziata"
+        messaggio: "Stasera è da esporre: {{ states('sensor.raccolta_rifiuti') }} (per il ritiro di domani mattina nel paese)."
+        categoria: "rifiuti"
+        priorita: "normale"
+        tag: "rifiuti_giorno"
   mode: single
-- id: '1782675351168'
-  alias: Notifica WhatsApp - Inizio pioggia
-  description: Invia un messaggio WhatsApp quando inizia a piovere
+
+# ------------------------------------------------------------------------------
+# 3. METEO & PROTEZIONE INFISSI (VENTO, PIOGGIA, GELO)
+# ------------------------------------------------------------------------------
+- id: 'notifica_meteo_vento_forte'
+  alias: "💨 Notifica Smart - Raffiche di Vento Forte"
+  description: "Invia allerta con tasto abbassa tapparelle se il vento supera i 20 km/h (max 1 ogni 2h)"
   triggers:
-  - entity_id: sensor.terrazza_pulvirometro_precipitazione
-    above: 0.01
-    trigger: numeric_state
+    - trigger: numeric_state
+      entity_id: sensor.sala_anemometro_gust_strength
+      above: 20
+  conditions:
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
   actions:
-  - data:
-      message: Attenzione! Sta iniziando a piovere!
-    action: rest_command.whatsapp_group_notify
+    - action: script.notifica_smart
+      data:
+        titolo: "💨 Vento Forte Rilevato"
+        messaggio: "Raffiche a {{ states('sensor.sala_anemometro_gust_strength') }} km/h registrate in terrazza. Verificare tende e balconi."
+        categoria: "meteo"
+        priorita: "alta"
+        tag: "meteo_vento"
+        azioni:
+          - action: "ABBASSA_TAPPARELLE"
+            title: "🪟 Abbassa Tapparelle"
+          - action: "IGNORA"
+            title: "Tutto a posto"
   mode: single
-- id: '1782743732058'
-  alias: Notifica WhatsApp - Temperatura interna oltre 30°
-  description: Invia un messaggio WhatsApp quando la temperatura interna supera i
-    30°C
+
+- id: 'notifica_meteo_inizio_pioggia'
+  alias: "🌧️ Notifica Smart - Inizio Pioggia"
+  description: "Invia avviso quando il pluviometro in terrazza rileva le prime gocce di pioggia (max 1 ogni 2h)"
   triggers:
-  - entity_id: sensor.temperatura_media
-    above: 30
-    trigger: numeric_state
-  conditions: []
+    - trigger: numeric_state
+      entity_id: sensor.terrazza_pulvirometro_precipitazione
+      above: 0.1
+  conditions:
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
   actions:
-  - data:
-      message: Attenzione! La temperatura media dentro casa ha superato i 30°C.
-    action: rest_command.whatsapp_group_notify
+    - action: script.notifica_smart
+      data:
+        titolo: "🌧️ Inizio Pioggia Rilevato"
+        messaggio: "Sta iniziando a piovere a Casa Mancini. Chiudi le finestre se aperte."
+        categoria: "meteo"
+        priorita: "alta"
+        tag: "meteo_pioggia"
+        azioni:
+          - action: "ABBASSA_TAPPARELLE"
+            title: "🪟 Abbassa Tapparelle"
   mode: single
-- id: '1782743848044'
-  alias: Notifica WhatsApp - Temperatura interna sotto 15°
-  description: Invia un messaggio WhatsApp quando la temperatura interna scende sotto
-    i 15°C
+
+- id: 'notifica_meteo_gelo_auto'
+  alias: "❄️ Notifica Smart - Allerta Gelo Notturno Auto"
+  description: "Avvisa alle 06:45 se la temperatura esterna è sotto i -1°C per riscaldamento auto/parabrezza"
   triggers:
-  - entity_id: sensor.temperatura_media
-    below: 15
-    trigger: numeric_state
-  conditions: []
+    - trigger: time
+      at: "06:45:00"
+  conditions:
+    - condition: numeric_state
+      entity_id: sensor.temperatura_media_esterna
+      below: 0
   actions:
-  - data:
-      message: Attenzione! La temperatura media dentro casa è sotto i 15°C.
-    action: rest_command.whatsapp_group_notify
+    - action: script.notifica_smart
+      data:
+        titolo: "❄️ Allerta Gelo Parabrezza"
+        messaggio: "Temperatura esterna a {{ states('sensor.temperatura_media_esterna') }}°C. Parabrezza delle auto (Discovery e Punto) probabilmente ghiacciati."
+        categoria: "meteo"
+        priorita: "normale"
+        tag: "meteo_gelo"
   mode: single
-- id: '1782744003356'
-  alias: Notifica WhatsApp - Temperatura percepita oltre 45°
-  description: Invia un messaggio WhatsApp quando la temperatura percepita supera
-    i 45°C
+
+# ------------------------------------------------------------------------------
+# 4. ELETTRODOMESTICI (ASCIUGATRICE SAMSUNG)
+# ------------------------------------------------------------------------------
+- id: 'notifica_asciugatrice_panni_pronti'
+  alias: "🧺 Notifica Smart - Promemoria Panni Asciugatrice"
+  description: "Invia notifica quando l'asciugatrice termina con pulsante per archiviare il promemoria"
   triggers:
-  - entity_id: sensor.temperatura_percepita
-    above: 45
-    trigger: numeric_state
-  conditions: []
+    - trigger: state
+      entity_id: binary_sensor.asciugatrice_panni_da_ritirare
+      to: 'on'
+      for:
+        minutes: 10
   actions:
-  - data:
-      message: Attenzione! La temperatura percepita ha superato i 45°C, riparatevi!
-    action: rest_command.whatsapp_group_notify
+    - action: script.notifica_smart
+      data:
+        titolo: "🧺 Asciugatrice Terminata"
+        messaggio: "Il ciclo di asciugatura è finito da 10 minuti. I panni sono pronti da ritirare."
+        categoria: "elettrodomestici"
+        priorita: "normale"
+        tag: "asciugatrice_pronta"
+        azioni:
+          - action: "SVUOTA_ASCIUGATRICE"
+            title: "✅ Panni Ritirati"
   mode: single
-- id: '1782745812256'
-  alias: Notifica WhatsApp - Temperatura sotto -3°
-  description: Invia un messaggio WhatsApp quando la temperatura scende sotto i -3°
+
+# ------------------------------------------------------------------------------
+# 5. SICUREZZA INFISSI & FINESTRA BAGNO
+# ------------------------------------------------------------------------------
+- id: 'notifica_finestra_bagno_aperta_fuori_casa'
+  alias: "🚪 Notifica Smart - Finestra Bagno Aperta Fuori Casa"
+  description: "Avvisa se la finestra del bagno è rimasta aperta all'attivazione dello scenario Fuori Casa o inserimento Allarme"
   triggers:
-  - entity_id: sensor.temperatura_media_esterna
-    below: -3
-    trigger: numeric_state
-  conditions: []
+    - trigger: state
+      entity_id: alarm_control_panel.centrale_allarme
+      to:
+        - armed_away
+        - armed_home
+        - armed_night
+    - trigger: state
+      entity_id: scene.fuori_casa
+  conditions:
+    - condition: state
+      entity_id: binary_sensor.finestrabagno_contact
+      state: 'on'
   actions:
-  - data:
-      message: Attenzione! La temperatura esterna è -3°! Troverai sicuramente la macchina
-        ghiacciata.
-    action: rest_command.whatsapp_group_notify
+    - action: script.notifica_smart
+      data:
+        titolo: "🚪 Finestra Bagno Aperta"
+        messaggio: "Attenzione: la Finestra del Bagno è rimasta APERTA mentre la casa è in modalità Fuori Casa / Allarme!"
+        categoria: "sicurezza"
+        priorita: "alta"
+        tag: "infisso_aperto_bagno"
   mode: single
+
+- id: 'notifica_pioggia_finestra_bagno'
+  alias: "🌧️ Notifica Smart - Pioggia con Finestra Bagno Aperta"
+  description: "Avvisa immediatamente se inizia a piovere e la finestra del bagno è aperta"
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.terrazza_pulvirometro_precipitazione
+      above: 0.1
+  conditions:
+    - condition: state
+      entity_id: binary_sensor.finestrabagno_contact
+      state: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "🌧️ Pioggia e Finestra Bagno Aperta!"
+        messaggio: "Sta piovendo a Casa Mancini e la Finestra del Bagno è APERTA! Chiudila per evitare infiltrazioni."
+        categoria: "meteo"
+        priorita: "alta"
+        tag: "pioggia_finestra_bagno"
+  mode: single
+
+# ------------------------------------------------------------------------------
+# 6. CURA ANIMALI & ACQUARIO
+# ------------------------------------------------------------------------------
+- id: 'notifica_acquario_temperatura_anomala'
+  alias: "🐠 Notifica Smart - Temperatura Acqua Acquario Anomala"
+  description: "Avvisa se la temperatura della sonda acquario esce dal range di sicurezza (23°C - 30°C)"
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sensoreacquario_probe_temperature
+      above: 30.0
+      for:
+        minutes: 5
+    - trigger: numeric_state
+      entity_id: sensor.sensoreacquario_probe_temperature
+      below: 23.0
+      for:
+        minutes: 5
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "🐠 Allerta Temperatura Acquario"
+        messaggio: "La temperatura dell'acqua dell'acquario è a {{ states('sensor.sensoreacquario_probe_temperature') }}°C (soglia ottimale 24-28°C). Verificare termoriscaldatore o ventole di raffreddamento!"
+        categoria: "pet"
+        priorita: "alta"
+        tag: "acquario_temp_anomala"
+  mode: single
+
+- id: 'notifica_acquario_tds_elevato'
+  alias: "🐠 Notifica Smart - Qualità Acqua Acquario (TDS Elevato)"
+  description: "Avvisa se il livello TDS supera 450 ppm per oltre 30 minuti"
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sensoreacquario_tds
+      above: 450
+      for:
+        minutes: 30
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "🐠 Manutenzione Acquario (TDS Alto)"
+        messaggio: "Il livello TDS nell'acquario ha raggiunto {{ states('sensor.sensoreacquario_tds') }} ppm. Valutare un cambio parziale d'acqua o la pulizia del filtro."
+        categoria: "pet"
+        priorita: "normale"
+        tag: "acquario_tds_alto"
+  mode: single
+
+# ------------------------------------------------------------------------------
+# 7. GATTE (LUNA & PICCOLA) — MOVIMENTI GATTAIOLA
+# ------------------------------------------------------------------------------
+- id: 'notifica_luna_passaggio_gattaiola'
+  alias: "🐾 Notifica Smart - Movimenti Luna (Gattaiola)"
+  description: "Invia notifica smartphone quando Luna esce o rientra in casa"
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.luna
+      from: 'on'
+      to: 'off'
+      id: 'uscita'
+    - trigger: state
+      entity_id: binary_sensor.luna
+      from: 'off'
+      to: 'on'
+      id: 'rientro'
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: 'uscita'
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: "🐾 Luna è uscita di casa"
+                messaggio: "Luna è appena passata dalla gattaiola verso l'esterno/giardino."
+                categoria: "pet"
+                priorita: "normale"
+                tag: "pet_luna_status"
+        - conditions:
+            - condition: trigger
+              id: 'rientro'
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: "🐾 Luna è rientrata a casa"
+                messaggio: "Luna è appena rientrata in casa al sicuro dalla gattaiola."
+                categoria: "pet"
+                priorita: "normale"
+                tag: "pet_luna_status"
+  mode: parallel
+  max: 5
+
+- id: 'notifica_piccola_passaggio_gattaiola'
+  alias: "🐾 Notifica Smart - Movimenti Piccola (Gattaiola)"
+  description: "Invia notifica smartphone quando Piccola esce o rientra in casa"
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.piccola
+      from: 'on'
+      to: 'off'
+      id: 'uscita'
+    - trigger: state
+      entity_id: binary_sensor.piccola
+      from: 'off'
+      to: 'on'
+      id: 'rientro'
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: 'uscita'
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: "🐾 Piccola è uscita di casa"
+                messaggio: "Piccola è appena passata dalla gattaiola verso l'esterno."
+                categoria: "pet"
+                priorita: "normale"
+                tag: "pet_piccola_status"
+        - conditions:
+            - condition: trigger
+              id: 'rientro'
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: "🐾 Piccola è rientrata a casa"
+                messaggio: "Piccola è appena rientrata in casa al sicuro."
+                categoria: "pet"
+                priorita: "normale"
+                tag: "pet_piccola_status"
+  mode: parallel
+  max: 5
+
+# ------------------------------------------------------------------------------
+# 8. ROBOT DOBBY (DREAME L40 PRO) — STATO PULIZIE
+# ------------------------------------------------------------------------------
+- id: 'notifica_dobby_avvio_pulizia'
+  alias: "🤖 Notifica Smart - Dobby Avvio Pulizia"
+  description: "Invia notifica quando Dobby inizia il ciclo di pulizia"
+  triggers:
+    - trigger: state
+      entity_id:
+        - vacuum.dreame_l40_pro
+        - vacuum.dobby
+      to: 'cleaning'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "🤖 Dobby ha iniziato a pulire"
+        messaggio: "Dobby è partito dalla stazione e sta lavando e aspirando i pavimenti di casa."
+        categoria: "elettrodomestici"
+        priorita: "normale"
+        tag: "dobby_status"
+  mode: single
+
+- id: 'notifica_dobby_fine_pulizia'
+  alias: "🤖 Notifica Smart - Dobby Pulizia Completata"
+  description: "Invia notifica quando Dobby completa la pulizia e torna alla base"
+  triggers:
+    - trigger: state
+      entity_id:
+        - vacuum.dreame_l40_pro
+        - vacuum.dobby
+      from:
+        - 'cleaning'
+        - 'returning'
+      to: 'docked'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "🤖 Dobby: Pulizia Terminata"
+        messaggio: "Dobby ha completato il ciclo ed è tornato alla base in ricarica. Pavimenti splendenti!"
+        categoria: "elettrodomestici"
+        priorita: "normale"
+        tag: "dobby_status"
+  mode: single
+
+- id: 'notifica_dobby_errore_blocco'
+  alias: "⚠️ Notifica Smart - Dobby Errore o Blocco"
+  description: "Invia allarme se Dobby si blocca o segnala un'anomalia"
+  triggers:
+    - trigger: state
+      entity_id:
+        - vacuum.dreame_l40_pro
+        - vacuum.dobby
+      to: 'error'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Dobby Richiede Assistenza"
+        messaggio: "Dobby si è bloccato o ha riscontrato un errore! Verificare spazzole, serbatoi o ostacoli."
+        categoria: "elettrodomestici"
+        priorita: "alta"
+        tag: "dobby_status"
+  mode: single
+
+# ------------------------------------------------------------------------------
+# 9. APPELLO NOTTURNO GATTE (LUNA & PICCOLA)
+# ------------------------------------------------------------------------------
+- id: 'notifica_appello_notturno_gatte'
+  alias: "🐾 Notifica Smart - Appello Notturno Gatte (22:30)"
+  description: "Avvisa alle 22:30 se Luna o Piccola risultano ancora all'esterno in giardino"
+  triggers:
+    - trigger: time
+      at: "22:30:00"
+  conditions:
+    - condition: template
+      value_template: >
+        {{ is_state('binary_sensor.luna', 'off') or is_state('binary_sensor.piccola', 'off') }}
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "🐾 Appello Notturno: Gatta all'Esterno!"
+        messaggio: >
+          {% set fuori = [] %}
+          {% if is_state('binary_sensor.luna', 'off') %}{% set fuori = fuori + ['Luna'] %}{% endif %}
+          {% if is_state('binary_sensor.piccola', 'off') %}{% set fuori = fuori + ['Piccola'] %}{% endif %}
+          Attenzione: alle ore 22:30 {{ fuori | join(' e ') }} risulta ancora all'esterno della casa! Verificare prima del riposo notturno.
+        categoria: "pet"
+        priorita: "alta"
+        tag: "appello_notturno_gatte"
+  mode: single
+
+# ------------------------------------------------------------------------------
+# 10. MANUTENZIONE ACCESSORI PETKIT (FONTANELLA & DISPENSER)
+# ------------------------------------------------------------------------------
+- id: 'notifica_fontanella_mancanza_acqua'
+  alias: "💧 Notifica Smart - Fontanella Petkit Senza Acqua"
+  description: "Avvisa quando il sensore rileva mancanza di acqua nella fontanella"
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.fontanella2_avviso_mancanza_acqua
+      to: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "💧 Fontanella Smart: Ricarica Acqua Necessaria"
+        messaggio: "Il livello dell'acqua nella fontanella Petkit è critico. Rifornire il serbatoio per le micie."
+        categoria: "pet"
+        priorita: "normale"
+        tag: "fontanella_livello_acqua"
+  mode: single
+
+# ------------------------------------------------------------------------------
+# 11. GARAGE & METEO AUTO (GHIACCIO MATTUTINO)
+# ------------------------------------------------------------------------------
+- id: 'notifica_allerta_ghiaccio_parabrezza_auto'
+  alias: "❄️ Notifica Smart - Possibile Ghiaccio Parabrezza (07:00)"
+  description: "Avvisa la mattina prima di partire se la temperatura notturna è scesa sotto 1°C"
+  triggers:
+    - trigger: time
+      at: "07:00:00"
+  conditions:
+    - condition: template
+      value_template: >
+        {{ states('sensor.terrazza_temperatura') | float(10) <= 1.0 }}
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "❄️ Attenzione Ghiaccio Parabrezza"
+        messaggio: "Temperatura notturna molto rigida ({{ states('sensor.terrazza_temperatura') }}°C). Possibile presenza di brina o ghiaccio sui parabrezza di Discovery e Punto prima di partire."
+        categoria: "meteo"
+        priorita: "normale"
+        canale: "stefano"
+        tag: "ghiaccio_auto_mattina"
+  mode: single
+
+# ------------------------------------------------------------------------------
+# 12. REPORT CONSUMI ENERGETICI GIORNALIERO (23:00)
+# ------------------------------------------------------------------------------
+- id: 'notifica_report_energetico_giornaliero'
+  alias: "📊 Notifica Smart - Report Energetico Giornaliero (23:00)"
+  description: "Invia alle 23:00 il riepilogo giornaliero dei kWh consumati e della spesa stimata"
+  triggers:
+    - trigger: time
+      at: "23:00:00"
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "📊 Report Energetico Casa Mancini"
+        messaggio: >
+          {% set kwh = states('sensor.consumo_energia_giornaliero_totale_stimato') | float(0) %}
+          {% set costo_unit = states('input_number.costo_kwh_energia') | float(0.25) %}
+          {% set spesa = (kwh * costo_unit) | round(2) %}
+          Oggi sono stati consumati {{ kwh }} kWh per una spesa stimata di circa {{ spesa }} € (potenza attuale: {{ states('sensor.potenza_totale_istantanea_casa') }} W).
+        categoria: "energia"
+        priorita: "bassa"
+        canale: "stefano"
+        tag: "report_energia_giornaliero"
+  mode: single
+
+
+
