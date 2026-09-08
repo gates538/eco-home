@@ -148,13 +148,13 @@
       - variables:
           test_message: >-
             {% if test_profile | trim == 'Stefano' %}
-              {{ saluto_orario }} {{ test_nickname | trim }}. {{ stefano_phrase_starts | random }}: {{ stefano_phrase_tails | random }}
+              {{ stefano_phrases | random }}
             {% elif test_profile | trim == 'Laura' %}
-              {{ saluto_orario }} {{ test_nickname | trim }}. {{ laura_phrase_starts | random }}: {{ laura_phrase_tails | random }}
+              {{ laura_phrases | random }}
             {% elif test_profile | trim == 'Coppia' %}
-              {{ saluto_orario }} {{ test_nickname | trim }}. {{ couple_phrase_starts | random }}: {{ couple_phrase_tails | random }}
+              {{ couple_phrases | random }}
             {% elif test_profile | trim == 'Notte' %}
-              Buonanotte {{ test_nickname | trim }}. {{ night_phrase_starts | random }}: {{ night_phrase_tails | random }}
+              Buonanotte {{ test_nickname | trim }}. {{ night_phrases | random }}
             {% elif test_profile | trim == 'Asciugatrice' %}
               Test promemoria asciugatrice. Il ciclo è terminato e il promemoria vocale funziona correttamente.
             {% elif eco_home_enabled %}
@@ -380,7 +380,7 @@
           welcome_body: >-
             {% if is_night %}
               {{ night_phrases | random }}
-            {% elif arrived_now_couple or arrived_stefano or arrived_now_count | int(0) > 1 %}
+            {% elif arrived_now_couple or arrived_now_count | int(0) > 1 %}
               {% if is_friday_evening %}
                 {{ couple_friday_phrases | random }}
               {% elif hour_now | int(0) >= 12 and hour_now | int(0) < 15 %}
@@ -390,9 +390,21 @@
               {% else %}
                 {{ couple_phrases | random }}
               {% endif %}
+            {% elif arrived_stefano %}
+              {% if is_friday_evening %}
+                {{ stefano_friday_phrases | random }}
+              {% elif hour_now | int(0) >= 12 and hour_now | int(0) < 15 %}
+                {{ stefano_lunch_phrases | random }}
+              {% elif is_weekend %}
+                {{ stefano_weekend_phrases | random }}
+              {% else %}
+                {{ stefano_phrases | random }}
+              {% endif %}
             {% elif arrived_laura %}
               {% if is_friday_evening %}
                 {{ laura_friday_phrases | random }}
+              {% elif hour_now | int(0) >= 12 and hour_now | int(0) < 15 %}
+                {{ laura_lunch_phrases | random }}
               {% elif is_weekend %}
                 {{ laura_weekend_phrases | random }}
               {% else %}
@@ -434,7 +446,8 @@
             {% if temp_announcement_text | trim != '' %} {{ temp_announcement_text | trim }}{% endif %}
             {% if dryer_arrival_text_final | trim != '' %} {{ dryer_arrival_text_final | trim }}{% endif %}
           announced_profile: >-
-            {% if arrived_now_couple or arrived_stefano or arrived_now_count | int(0) > 1 %}Coppia
+            {% if arrived_now_couple or arrived_now_count | int(0) > 1 %}Coppia
+            {% elif arrived_stefano %}Stefano
             {% elif arrived_laura %}Laura
             {% else %}Generico{% endif %}
           nest_volume_before: '{{ state_attr(speaker, ''volume_level'') | float(-1) }}'
@@ -479,7 +492,7 @@
         - choose:
           - conditions:
             - condition: template
-              value_template: '{{ arrived_now_couple or arrived_stefano }}'
+              value_template: '{{ arrived_now_couple or arrived_now_count | int(0) > 1 }}'
             sequence:
             - action: '{{ stefano_notification_service }}'
               data:
@@ -496,6 +509,21 @@
               data:
                 title: "Rientro di Coppia - Eco Home"
                 message: "Bentornati a casa, Stefano e Laura!"
+                data:
+                  image: '{{ snapshot_access_url }}'
+                  attachment:
+                    url: '{{ snapshot_access_url }}'
+                    content-type: jpeg
+                    hide-thumbnail: false
+              continue_on_error: true
+          - conditions:
+            - condition: template
+              value_template: '{{ arrived_stefano }}'
+            sequence:
+            - action: '{{ stefano_notification_service }}'
+              data:
+                title: "Rientro - Eco Home"
+                message: "Rilevato rientro di Stefano."
                 data:
                   image: '{{ snapshot_access_url }}'
                   attachment:
@@ -538,7 +566,7 @@
           - choose:
             - conditions:
               - condition: template
-                value_template: '{{ arrived_now_couple or arrived_stefano }}'
+                value_template: '{{ arrived_now_couple or arrived_now_count | int(0) > 1 }}'
               sequence:
               - action: '{{ stefano_notification_service }}'
                 data:
@@ -552,6 +580,21 @@
                         title: "No, grazie"
                 continue_on_error: true
               - action: '{{ laura_notification_service }}'
+                data:
+                  title: "Caldo in casa"
+                  message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere i condizionatori?"
+                  data:
+                    actions:
+                      - action: "TURN_ON_AC_{{ context.id }}"
+                        title: "Sì, raffredda"
+                      - action: "DISMISS_AC"
+                        title: "No, grazie"
+                continue_on_error: true
+            - conditions:
+              - condition: template
+                value_template: '{{ arrived_stefano }}'
+              sequence:
+              - action: '{{ stefano_notification_service }}'
                 data:
                   title: "Caldo in casa"
                   message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere i condizionatori?"
@@ -596,7 +639,7 @@
           - choose:
             - conditions:
               - condition: template
-                value_template: '{{ arrived_now_couple or arrived_stefano }}'
+                value_template: '{{ arrived_now_couple or arrived_now_count | int(0) > 1 }}'
               sequence:
               - action: '{{ stefano_notification_service }}'
                 data:
@@ -610,6 +653,22 @@
                         title: "No, grazie"
                 continue_on_error: true
               - action: '{{ laura_notification_service }}'
+                data:
+                  title: "Freddo in casa"
+                  message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere il riscaldamento?"
+                  data:
+                    actions:
+                      - action: "TURN_ON_HEAT_{{ context.id }}"
+                        title: "Sì, riscalda"
+                        continue_on_error: true
+                      - action: "DISMISS_AC"
+                        title: "No, grazie"
+                continue_on_error: true
+            - conditions:
+              - condition: template
+                value_template: '{{ arrived_stefano }}'
+              sequence:
+              - action: '{{ stefano_notification_service }}'
                 data:
                   title: "Freddo in casa"
                   message: "La temperatura interna è di {{ indoor_temp_avg | replace('.', ',') }}°C. Vuoi accendere il riscaldamento?"
@@ -1033,6 +1092,10 @@
     - "Buon venerdì sera Lau! Settimana di lavoro archiviata, niente F24 o numeri fino a lunedì!"
     - "Punto Blu parcheggiata e weekend ufficialmente aperto per Laura! Stasera solo relax!"
     - "Venerdì sera finalmente arrivato! Ciao Lau, goditi l'inizio del weekend con le micie e Stefano!"
+    laura_lunch_phrases:
+    - "Buon pranzo e bentornata a casa Laura! Pausa meritata, mangia con calma e rilassati un attimo!"
+    - "Ciao Lau, bentornata per il pranzo! Un bel momento di respiro prima del pomeriggio."
+    - "Pausa pranzo per la regina di casa! Stacca la spina e ricarica le batterie!"
     laura_weekend_phrases:
     - "Buon weekend a casa Laura! Goditi ogni momento di relax e coccole con Luna e Piccola!"
     - "Bentornata a casa Lau! Niente lavoro nel weekend, solo benessere e tranquillità!"
@@ -1048,6 +1111,19 @@
     - "Bentornato Stefano! Prenditi un momento di pausa prima di rimetterti in moto."
     - "Ciao Ste! La Discovery è a riposo e la domotica è stabile al cento per cento."
     - "Bentornato a casa! Mettiti comodo e goditi la pace del nostro paese."
+    stefano_friday_phrases:
+    - "Buon venerdì sera Stefano! Weekend alle porte, Discovery parcheggiata e lavoro archiviato a chiave!"
+    - "Venerdì sera a casa Ste! Settimana finita, stasera solo divano, Emby e fusa delle micie!"
+    - "Buon venerdì sera capitano! I server sono a posto, ora goditi l'inizio del fine settimana!"
+    stefano_lunch_phrases:
+    - "Buon pranzo e bentornato Ste! Pit-stop veloce a casa, ricarica le energie con calma!"
+    - "Bentornato a casa Ste per la pausa pranzo! Mangia tranquillo prima di ripartire."
+    - "Ciao Ste, bentornato! Pausa pranzo meritata: stacca dieci minuti e goditi la quiete di casa."
+    - "Pausa pranzo per il boss! Fai il pieno di energie, le micie ti fanno compagnia mentre mangi."
+    stefano_weekend_phrases:
+    - "Buon weekend a casa Ste! Zero corse e relax totale con Luna e Piccola!"
+    - "Bentornato dal giretto del weekend Ste! Mettiti comodo e goditi il meritato riposo."
+    - "Weekend in corso per il boss: Discovery a riposo e relax assoluto!"
     night_phrases:
     - "Bentornati a quest'ora! Faccio piano per non svegliare tutto il paese e le micie."
     - "Ingresso notturno da veri ninja! Andate dritti a letto senza fare troppo rumore."
