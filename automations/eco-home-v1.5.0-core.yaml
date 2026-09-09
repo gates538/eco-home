@@ -80,14 +80,17 @@
         continue_on_error: true
     - conditions:
       - condition: template
-        value_template: '{{ trigger_type == ''person_arrived'' }}'
+        value_template: "{{ trigger_type == 'person_arrived' and away_minutes_before_arrival | int(0) >= min_away_minutes }}"
       sequence:
       - action: input_datetime.set_datetime
         target:
-          entity_id:
-          - input_datetime.input_datetime_echo_home_ultimo_arrivo
-          - input_datetime.eco_home_ultimo_arrivo
-          - input_datetime.eco_home_ultimo_arrivo_2
+          entity_id: input_datetime.eco_home_ultimo_arrivo
+        data:
+          datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+        continue_on_error: true
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.eco_home_ultimo_arrivo_2
         data:
           datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
         continue_on_error: true
@@ -476,10 +479,13 @@
         continue_on_error: true
       - action: input_datetime.set_datetime
         target:
-          entity_id:
-          - input_datetime.input_datetime_echo_home_ultimo_arrivo
-          - input_datetime.eco_home_ultimo_arrivo
-          - input_datetime.eco_home_ultimo_arrivo_2
+          entity_id: input_datetime.eco_home_ultimo_arrivo
+        data:
+          datetime: '1970-01-01 00:00:00'
+        continue_on_error: true
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.eco_home_ultimo_arrivo_2
         data:
           datetime: '1970-01-01 00:00:00'
         continue_on_error: true
@@ -947,21 +953,27 @@
       and trigger.to_state is not none %}\n  {{ trigger.to_state.attributes.friendly_name
       | default(trigger.entity_id | replace('person.', '') | title) }}\n{% else %}\n
       \ Sconosciuto\n{% endif %}"
-    away_minutes_before_arrival: "{% if trigger_type == 'person_arrived'\n   and trigger
-      is defined\n   and trigger.from_state is defined\n   and trigger.from_state
-      is not none %}\n  {{ ((as_timestamp(now()) - as_timestamp(trigger.from_state.last_changed))
-      / 60) | int(0) }}\n{% else %}\n  999\n{% endif %}"
-    door_opened_recently: "{{\n  states(door_sensor) not in ['unknown', 'unavailable']\n  and (as_timestamp(now())
-      - as_timestamp(states[door_sensor].last_changed)) <= arrival_person_door_window_seconds\n}}"
+    away_minutes_before_arrival: >-
+      {% if trigger_type == 'person_arrived'
+         and trigger is defined
+         and trigger.from_state is defined
+         and trigger.from_state is not none
+         and trigger.from_state.last_changed is not none %}
+        {{ ((as_timestamp(now()) - as_timestamp(trigger.from_state.last_changed, default=now().timestamp())) / 60) | int(0) }}
+      {% else %}
+        999
+      {% endif %}
+    door_opened_recently: >-
+      {% set door_ts = as_timestamp(states('input_datetime.eco_home_ultima_apertura_portone'), default=0) %}
+      {% set sensor_ts = as_timestamp(states[door_sensor].last_changed, default=0) if states[door_sensor] is defined and states[door_sensor].last_changed is not none else 0 %}
+      {% set max_door_ts = [door_ts, sensor_ts] | max %}
+      {{ max_door_ts > 86400 and (as_timestamp(now()) - max_door_ts) <= arrival_person_door_window_seconds }}
     last_arrival_ts: >-
-      {% set ts1 = as_timestamp(states('input_datetime.input_datetime_echo_home_ultimo_arrivo'), default=0) %}
-      {% set ts2 = as_timestamp(states('input_datetime.eco_home_ultimo_arrivo'), default=0) %}
-      {% set ts3 = as_timestamp(states('input_datetime.eco_home_ultimo_arrivo_2'), default=0) %}
-      {% set person_ts_list = states.person | selectattr('entity_id', 'in', tracked_people) | selectattr('state', 'eq', 'home') | map(attribute='last_changed') | map('as_timestamp') | list %}
-      {% set max_person_ts = person_ts_list | max | default(0) %}
-      {{ [ts1, ts2, ts3, max_person_ts] | max }}
+      {% set ts1 = as_timestamp(states('input_datetime.eco_home_ultimo_arrivo'), default=0) %}
+      {% set ts2 = as_timestamp(states('input_datetime.eco_home_ultimo_arrivo_2'), default=0) %}
+      {{ [ts1, ts2] | max }}
     seconds_from_last_arrival: "{{ (as_timestamp(now()) - (last_arrival_ts | float(0))) | int(999999) }}"
-    person_arrived_recently: "{{ seconds_from_last_arrival | int(999999) <= arrival_person_door_window_seconds }}"
+    person_arrived_recently: "{{ last_arrival_ts | float(0) > 86400 and seconds_from_last_arrival | int(999999) <= arrival_person_door_window_seconds }}"
     trigger_person_arrival_valid: "{{\n  trigger_type == 'person_arrived'\n  and trigger_entity_id
       in tracked_people\n  and trigger_to_state == 'home'\n  and trigger_from_state
       not in ['home', 'unknown', 'unavailable']\n  and away_minutes_before_arrival | int(0) >= min_away_minutes\n
