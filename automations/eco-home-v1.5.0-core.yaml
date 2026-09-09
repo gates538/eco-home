@@ -304,8 +304,17 @@
             entity_id: sensor.esterno_asciugatrice_machine_state
     - conditions:
       - condition: template
-        value_template: "{{ eco_home_enabled\n   and trigger_type in ['door_opened', 'person_arrived']\n   and not eco_home_silent\n   and welcome_cooldown_ok\n
-          \  and arrival_confirmed_by_person_and_door }}"
+        value_template: >-
+          {% set last_ann_ts = as_timestamp(states('input_datetime.eco_home_ultimo_annuncio'), default=0) %}
+          {% set live_cooldown_ok = (as_timestamp(now()) - (last_ann_ts | float(0))) > 120 %}
+          {% set has_new_arrival = (last_arrival_ts | float(0)) > ((last_ann_ts | float(0)) + 2) %}
+          {{ eco_home_enabled
+             and trigger_type in ['door_opened', 'person_arrived']
+             and not eco_home_silent
+             and live_cooldown_ok
+             and has_new_arrival
+             and arrival_confirmed_by_person_and_door
+             and not is_state(speaker, 'playing') }}
       sequence:
       - variables:
           indoor_temp_avg: >-
@@ -459,6 +468,21 @@
                and not (state_attr(tv_media_player, 'is_volume_muted') | default(false,
             true)) }}"
           was_house_empty: '{{ people_at_home_count | int(0) == arrived_now_count | int(0) }}'
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.eco_home_ultimo_annuncio
+        data:
+          datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+        continue_on_error: true
+      - action: input_datetime.set_datetime
+        target:
+          entity_id:
+          - input_datetime.input_datetime_echo_home_ultimo_arrivo
+          - input_datetime.eco_home_ultimo_arrivo
+          - input_datetime.eco_home_ultimo_arrivo_2
+        data:
+          datetime: '1970-01-01 00:00:00'
+        continue_on_error: true
       - action: input_text.set_value
         target:
           entity_id: input_text.eco_home_ultimo_profilo
@@ -777,20 +801,6 @@
                 data:
                   volume_level: '{{ nest_volume_before }}'
                 continue_on_error: true
-          - action: input_datetime.set_datetime
-            target:
-              entity_id: input_datetime.eco_home_ultimo_annuncio
-            data:
-              datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
-          - action: input_datetime.set_datetime
-            target:
-              entity_id:
-              - input_datetime.input_datetime_echo_home_ultimo_arrivo
-              - input_datetime.eco_home_ultimo_arrivo
-              - input_datetime.eco_home_ultimo_arrivo_2
-            data:
-              datetime: '1970-01-01 00:00:00'
-            continue_on_error: true
           - action: input_text.set_value
             target:
               entity_id: input_text.eco_home_ultimo_esito
@@ -823,11 +833,16 @@
               entity_id: '{{ speaker }}'
     default:
     - variables:
+        last_ann_ts_diag: "{{ as_timestamp(states('input_datetime.eco_home_ultimo_annuncio'), default=0) }}"
+        live_cooldown_ok_diag: "{{ (as_timestamp(now()) - (last_ann_ts_diag | float(0))) > 120 }}"
+        has_new_arrival_diag: "{{ (last_arrival_ts | float(0)) > ((last_ann_ts_diag | float(0)) + 2) }}"
         diagnostic_reason: >-
           {% if not eco_home_enabled %}Eco Home disattivato
           {% elif eco_home_silent %}Modalità silenziosa attiva
+          {% elif is_state(speaker, 'playing') %}Annuncio bloccato: Nest Hub in riproduzione
+          {% elif not live_cooldown_ok_diag %}Annuncio bloccato dal cooldown
+          {% elif not has_new_arrival_diag %}Nessun nuovo rientro da annunciare
           {% elif trigger_type in ['door_opened', 'person_arrived'] and not arrival_confirmed_by_person_and_door %}In attesa della combinazione presenza e portone
-          {% elif not welcome_cooldown_ok %}Annuncio bloccato dal cooldown
           {% elif trigger_type == 'dryer_finished_while_away' and not nobody_home %}Asciugatrice terminata con qualcuno già in casa
           {% elif trigger_from_state in ['unknown', 'unavailable'] %}Stato iniziale non valido
           {% else %}Trigger ignorato dalle condizioni di sicurezza{% endif %}
@@ -904,7 +919,7 @@
     min_away_minutes: 2
     arrival_person_door_window_seconds: 600
     arrival_group_window_seconds: 900
-    welcome_cooldown_seconds: 900
+    welcome_cooldown_seconds: 120
     dryer_announce_valid_hours: 12
     tts_minimum_delay_seconds: 5
     tts_chars_per_second: 11
