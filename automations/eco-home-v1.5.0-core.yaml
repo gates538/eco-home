@@ -1,3 +1,10 @@
+# ==============================================================================
+# ECO HOME CORE ENGINE (BENVENUTO & PRESENZA SMART) — CASA MANCINI
+# ==============================================================================
+# Motore centrale per annunci di benvenuto modulari su Nest Hub, gestione
+# arrivi di Stefano e Laura, code vocali e climatizzazione d'ingresso.
+# ==============================================================================
+
 - id: '1783777716602'
   alias: Eco home
   description: Eco Home v1.5.0 - Benvenuto intelligente modulare su Nest Hub con
@@ -7,10 +14,6 @@
     entity_id:
     - person.stefano
     - person.laura
-    - person.simone
-    - person.monica
-    - person.mauro
-    - person.rita
     to: home
     not_from:
     - home
@@ -900,10 +903,6 @@
     tracked_people:
     - person.stefano
     - person.laura
-    - person.simone
-    - person.monica
-    - person.mauro
-    - person.rita
     weather_entity: weather.home
     alert_entity: sensor.allerta_meteo
     window_sensors:
@@ -922,7 +921,7 @@
       Percorso audio
       {%- endif -%}
     nest_available: '{{ states(speaker) not in [''unknown'', ''unavailable''] }}'
-    min_away_minutes: 2
+    min_away_minutes: 4
     arrival_person_door_window_seconds: 600
     arrival_group_window_seconds: 900
     welcome_cooldown_seconds: 120
@@ -974,14 +973,31 @@
       {{ [ts1, ts2] | max }}
     seconds_from_last_arrival: "{{ (as_timestamp(now()) - (last_arrival_ts | float(0))) | int(999999) }}"
     person_arrived_recently: "{{ last_arrival_ts | float(0) > 86400 and seconds_from_last_arrival | int(999999) <= arrival_person_door_window_seconds }}"
-    trigger_person_arrival_valid: "{{\n  trigger_type == 'person_arrived'\n  and trigger_entity_id
-      in tracked_people\n  and trigger_to_state == 'home'\n  and trigger_from_state
-      not in ['home', 'unknown', 'unavailable']\n  and away_minutes_before_arrival | int(0) >= min_away_minutes\n
-      \ and door_opened_recently\n}}"
-    trigger_door_open_valid: "{{\n  trigger_type == 'door_opened'\n  and trigger_to_state
-      == 'on'\n  and trigger_from_state not in ['unknown', 'unavailable']\n  and person_arrived_recently\n}}"
-    arrival_confirmed_by_person_and_door: '{{ trigger_door_open_valid or trigger_person_arrival_valid
-      }}'
+    stefano_arrived_recently: >-
+      {{ is_state('person.stefano', 'home')
+         and states['person.stefano'] is defined
+         and states['person.stefano'].last_changed is not none
+         and (as_timestamp(now()) - as_timestamp(states['person.stefano'].last_changed)) <= arrival_person_door_window_seconds }}
+    laura_arrived_recently: >-
+      {{ is_state('person.laura', 'home')
+         and states['person.laura'] is defined
+         and states['person.laura'].last_changed is not none
+         and (as_timestamp(now()) - as_timestamp(states['person.laura'].last_changed)) <= arrival_person_door_window_seconds }}
+    resident_arrived_recently: "{{ stefano_arrived_recently or laura_arrived_recently or eco_home_ospiti }}"
+    trigger_person_arrival_valid: >-
+      {{ trigger_type == 'person_arrived'
+         and trigger_entity_id in tracked_people
+         and trigger_to_state == 'home'
+         and trigger_from_state not in ['home', 'unknown', 'unavailable']
+         and away_minutes_before_arrival | int(0) >= min_away_minutes
+         and door_opened_recently }}
+    trigger_door_open_valid: >-
+      {{ trigger_type == 'door_opened'
+         and trigger_to_state == 'on'
+         and trigger_from_state not in ['unknown', 'unavailable']
+         and person_arrived_recently
+         and resident_arrived_recently }}
+    arrival_confirmed_by_person_and_door: '{{ trigger_door_open_valid or trigger_person_arrival_valid }}'
     hour_now: '{{ now().hour }}'
     today_md: '{{ now().strftime(''%m-%d'') }}'
     is_night: '{{ hour_now | int(0) >= 23 or hour_now | int(0) < 6 }}'
