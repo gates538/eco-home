@@ -21,6 +21,25 @@
     - unavailable
     id: person_arrived
   - trigger: state
+    entity_id:
+    - binary_sensor.samsung_s25_edge_di_stefano_presenza
+    - binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza
+    to: 'on'
+    not_from:
+    - 'on'
+    - unknown
+    - unavailable
+    id: person_arrived
+  - trigger: state
+    entity_id:
+    - sensor.samsung_s25_edge_di_stefano_wi_fi_connection
+    to: 'NETMancini'
+    not_from:
+    - 'NETMancini'
+    - unknown
+    - unavailable
+    id: person_arrived
+  - trigger: state
     entity_id: binary_sensor.porta_contact
     to: 'on'
     not_from:
@@ -109,6 +128,25 @@
         data:
           value: 'Rientro rilevato: {{ trigger_person_name | trim }}'
         continue_on_error: true
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: "{{ 's25' in trigger_entity_id or trigger_entity_id == 'person.stefano' }}"
+          sequence:
+          - action: device_tracker.see
+            data:
+              dev_id: samsung_s25_edge_di_stefano
+              location_name: home
+            continue_on_error: true
+        - conditions:
+          - condition: template
+            value_template: "{{ 's22' in trigger_entity_id or trigger_entity_id == 'person.laura' }}"
+          sequence:
+          - action: device_tracker.see
+            data:
+              dev_id: samsung_s22_di_laura
+              location_name: home
+            continue_on_error: true
     - conditions:
       - condition: template
         value_template: '{{ trigger_type == ''dryer_finished_while_away'' }}'
@@ -360,8 +398,17 @@
             + arrival_group_window_seconds) %}\n  {% set ns.names = ns.names + [p.attributes.friendly_name
             | default(p.entity_id | replace('person.', '') | title)] %}\n{% endfor
             %}\n{{ ns.names | unique | list | count }}"
-          stefano_arrived_recently: "{{\n  is_state('person.stefano', 'home')\n  and states['person.stefano'] is defined\n  and states['person.stefano'].last_changed is not none\n  and (as_timestamp(now()) - as_timestamp(states['person.stefano'].last_changed)) <= arrival_person_door_window_seconds\n}}"
-          laura_arrived_recently: "{{\n  is_state('person.laura', 'home')\n  and states['person.laura'] is defined\n  and states['person.laura'].last_changed is not none\n  and (as_timestamp(now()) - as_timestamp(states['person.laura'].last_changed)) <= arrival_person_door_window_seconds\n}}"
+          stefano_arrived_recently: >-
+            {% set ts_p = as_timestamp(states['person.stefano'].last_changed, default=0) if states['person.stefano'] is defined and is_state('person.stefano', 'home') else 0 %}
+            {% set ts_st = as_timestamp(states['binary_sensor.samsung_s25_edge_di_stefano_presenza'].last_changed, default=0) if states['binary_sensor.samsung_s25_edge_di_stefano_presenza'] is defined and is_state('binary_sensor.samsung_s25_edge_di_stefano_presenza', 'on') else 0 %}
+            {% set ts_wf = as_timestamp(states['sensor.samsung_s25_edge_di_stefano_wi_fi_connection'].last_changed, default=0) if states['sensor.samsung_s25_edge_di_stefano_wi_fi_connection'] is defined and is_state('sensor.samsung_s25_edge_di_stefano_wi_fi_connection', 'NETMancini') else 0 %}
+            {% set max_ts = [ts_p, ts_st, ts_wf] | max %}
+            {{ max_ts > 86400 and (as_timestamp(now()) - max_ts) <= arrival_person_door_window_seconds }}
+          laura_arrived_recently: >-
+            {% set ts_p = as_timestamp(states['person.laura'].last_changed, default=0) if states['person.laura'] is defined and is_state('person.laura', 'home') else 0 %}
+            {% set ts_st = as_timestamp(states['binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza'].last_changed, default=0) if states['binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza'] is defined and is_state('binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza', 'on') else 0 %}
+            {% set max_ts = [ts_p, ts_st] | max %}
+            {{ max_ts > 86400 and (as_timestamp(now()) - max_ts) <= arrival_person_door_window_seconds }}
           arrived_stefano: "{{ stefano_arrived_recently and not laura_arrived_recently }}"
           arrived_laura: "{{ laura_arrived_recently and not stefano_arrived_recently }}"
           arrived_now_couple: "{{ stefano_arrived_recently and laura_arrived_recently }}"
@@ -903,6 +950,9 @@
     tracked_people:
     - person.stefano
     - person.laura
+    - binary_sensor.samsung_s25_edge_di_stefano_presenza
+    - binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza
+    - sensor.samsung_s25_edge_di_stefano_wi_fi_connection
     weather_entity: weather.home
     alert_entity: sensor.allerta_meteo
     window_sensors:
@@ -948,10 +998,16 @@
       is defined and trigger.from_state is not none else ''unknown'' }}'
     trigger_to_state: '{{ trigger.to_state.state if trigger is defined and trigger.to_state
       is defined and trigger.to_state is not none else ''unknown'' }}'
-    trigger_person_name: "{% if trigger is defined and trigger.to_state is defined
-      and trigger.to_state is not none %}\n  {{ trigger.to_state.attributes.friendly_name
-      | default(trigger.entity_id | replace('person.', '') | title) }}\n{% else %}\n
-      \ Sconosciuto\n{% endif %}"
+    trigger_person_name: >-
+      {% if 's25' in trigger_entity_id or trigger_entity_id == 'person.stefano' %}
+        Stefano
+      {% elif 's22' in trigger_entity_id or trigger_entity_id == 'person.laura' %}
+        Laura
+      {% elif trigger is defined and trigger.to_state is defined and trigger.to_state is not none %}
+        {{ trigger.to_state.attributes.friendly_name | default(trigger.entity_id | replace('person.', '') | title) }}
+      {% else %}
+        Sconosciuto
+      {% endif %}
     away_minutes_before_arrival: >-
       {% if trigger_type == 'person_arrived'
          and trigger is defined
@@ -974,21 +1030,22 @@
     seconds_from_last_arrival: "{{ (as_timestamp(now()) - (last_arrival_ts | float(0))) | int(999999) }}"
     person_arrived_recently: "{{ last_arrival_ts | float(0) > 86400 and seconds_from_last_arrival | int(999999) <= arrival_person_door_window_seconds }}"
     stefano_arrived_recently: >-
-      {{ is_state('person.stefano', 'home')
-         and states['person.stefano'] is defined
-         and states['person.stefano'].last_changed is not none
-         and (as_timestamp(now()) - as_timestamp(states['person.stefano'].last_changed)) <= arrival_person_door_window_seconds }}
+      {% set ts_p = as_timestamp(states['person.stefano'].last_changed, default=0) if states['person.stefano'] is defined and is_state('person.stefano', 'home') else 0 %}
+      {% set ts_st = as_timestamp(states['binary_sensor.samsung_s25_edge_di_stefano_presenza'].last_changed, default=0) if states['binary_sensor.samsung_s25_edge_di_stefano_presenza'] is defined and is_state('binary_sensor.samsung_s25_edge_di_stefano_presenza', 'on') else 0 %}
+      {% set ts_wf = as_timestamp(states['sensor.samsung_s25_edge_di_stefano_wi_fi_connection'].last_changed, default=0) if states['sensor.samsung_s25_edge_di_stefano_wi_fi_connection'] is defined and is_state('sensor.samsung_s25_edge_di_stefano_wi_fi_connection', 'NETMancini') else 0 %}
+      {% set max_ts = [ts_p, ts_st, ts_wf] | max %}
+      {{ max_ts > 86400 and (as_timestamp(now()) - max_ts) <= arrival_person_door_window_seconds }}
     laura_arrived_recently: >-
-      {{ is_state('person.laura', 'home')
-         and states['person.laura'] is defined
-         and states['person.laura'].last_changed is not none
-         and (as_timestamp(now()) - as_timestamp(states['person.laura'].last_changed)) <= arrival_person_door_window_seconds }}
+      {% set ts_p = as_timestamp(states['person.laura'].last_changed, default=0) if states['person.laura'] is defined and is_state('person.laura', 'home') else 0 %}
+      {% set ts_st = as_timestamp(states['binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza'].last_changed, default=0) if states['binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza'] is defined and is_state('binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza', 'on') else 0 %}
+      {% set max_ts = [ts_p, ts_st] | max %}
+      {{ max_ts > 86400 and (as_timestamp(now()) - max_ts) <= arrival_person_door_window_seconds }}
     resident_arrived_recently: "{{ stefano_arrived_recently or laura_arrived_recently or eco_home_ospiti }}"
     trigger_person_arrival_valid: >-
       {{ trigger_type == 'person_arrived'
          and trigger_entity_id in tracked_people
-         and trigger_to_state == 'home'
-         and trigger_from_state not in ['home', 'unknown', 'unavailable']
+         and trigger_to_state in ['home', 'on', 'NETMancini']
+         and trigger_from_state not in ['home', 'on', 'NETMancini', 'unknown', 'unavailable']
          and away_minutes_before_arrival | int(0) >= min_away_minutes
          and door_opened_recently }}
     trigger_door_open_valid: >-
