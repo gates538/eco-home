@@ -1,3 +1,9 @@
+# ==============================================================================
+# GESTIONE ANIMALI (LUNA & PICCOLA) E AUTO — CASA MANCINI
+# ==============================================================================
+# Monitoraggio dispenser pasti, gattaiola SurePet, rientri animali e promemoria auto.
+# ==============================================================================
+
 - id: 'eco_home_pet_alert_crocchette'
   alias: 'Eco Home - Pet Alert (Crocchette Rilasciate)'
   description: 'Annuncio vocale ed eventuale notifica quando il dispenser rilascia il pasto per Piccola e Luna'
@@ -200,8 +206,8 @@
     value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
   - condition: template
     value_template: >-
-      {% set rain_active = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 or states('weather.home') in ['rainy', 'pouring', 'lightning', 'hail'] %}
-      {% set frost_active = states('sensor.temperatura_media_esterna') | float(10) <= 2 %}
+      {% set rain_active = is_state('binary_sensor.eco_home_pioggia_rilevata', 'on') %}
+      {% set frost_active = states('sensor.eco_home_temperatura_esterna_prioritaria') | float(10) <= 2.0 %}
       {{ rain_active or frost_active }}
   actions:
   - action: tts.speak
@@ -213,8 +219,9 @@
       options:
         tld: "it"
       message: >-
-        {% set rain_active = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 or states('weather.home') in ['rainy', 'pouring', 'lightning', 'hail'] %}
-        {% set frost_active = states('sensor.temperatura_media_esterna') | float(10) <= 2 %}
+        {% set rain_active = is_state('binary_sensor.eco_home_pioggia_rilevata', 'on') %}
+        {% set t_out = states('sensor.eco_home_temperatura_esterna_prioritaria') | float(10) | round(1) %}
+        {% set frost_active = t_out <= 2.0 %}
         {% if rain_active %}
           {{ [
             "Attenzione Stefano e Laura: piove in terrazza! Ricordatevi gli ombrelli prima di salire sulla Discovery!",
@@ -223,7 +230,7 @@
           ] | random }}
         {% elif frost_active %}
           {{ [
-            "Attenzione prima di uscire: fuori ci sono solo " ~ states('sensor.temperatura_media_esterna') ~ " gradi! Il parabrezza della Discovery potrebbe essere gelato!",
+            "Attenzione prima di uscire: fuori ci sono solo " ~ t_out ~ " gradi! Il parabrezza della Discovery potrebbe essere gelato!",
             "Meteo flash: mattinata con ghiaccio all'esterno, occhio ai vetri dell'auto!"
           ] | random }}
         {% endif %}
@@ -241,11 +248,24 @@
   - trigger: numeric_state
     entity_id: sensor.terrazza_pulvirometro_precipitazione
     above: 0.01
+  - trigger: state
+    entity_id: binary_sensor.eco_home_pioggia_rilevata
+    to: 'on'
   - trigger: numeric_state
     entity_id: sensor.sala_anemometro_gust_strength
     above: 20
+  - trigger: numeric_state
+    entity_id: sensor.eco_home_vento_prioritario
+    above: 20
   - trigger: state
-    entity_id: weather.home
+    entity_id: weather.meteoam_home
+    to:
+    - rainy
+    - pouring
+    - lightning
+    - hail
+  - trigger: state
+    entity_id: weather.casa
     to:
     - rainy
     - pouring
@@ -264,8 +284,9 @@
     data:
       title: "⛈️ Allarme Temporale in Paese!"
       message: >-
-        {% set pioggia = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 %}
-        {% set vento = states('sensor.sala_anemometro_gust_strength') | float(0) %}
+        {% set pioggia = is_state('binary_sensor.eco_home_pioggia_rilevata', 'on') %}
+        {% set vento_gust = states('sensor.sala_anemometro_gust_strength') %}
+        {% set vento = vento_gust if vento_gust not in ['unavailable', 'unknown'] else states('sensor.eco_home_vento_prioritario') | float(0) %}
         Attenzione! Siete fuori casa e in terrazza {% if pioggia %}sta piovendo{% else %}ci sono raffiche a {{ vento }} km/h{% endif %}!
         Se avete lasciato finestre aperte per le micie (Piccola e Luna), verificate se rientrare!
       data:
@@ -277,8 +298,9 @@
     data:
       title: "⛈️ Allarme Temporale in Paese!"
       message: >-
-        {% set pioggia = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 %}
-        {% set vento = states('sensor.sala_anemometro_gust_strength') | float(0) %}
+        {% set pioggia = is_state('binary_sensor.eco_home_pioggia_rilevata', 'on') %}
+        {% set vento_gust = states('sensor.sala_anemometro_gust_strength') %}
+        {% set vento = vento_gust if vento_gust not in ['unavailable', 'unknown'] else states('sensor.eco_home_vento_prioritario') | float(0) %}
         Attenzione! Siete fuori casa e in terrazza {% if pioggia %}sta piovendo{% else %}ci sono raffiche a {{ vento }} km/h{% endif %}!
         Se avete lasciato finestre aperte per le micie (Piccola e Luna), verificate se rientrare!
       data:

@@ -1,3 +1,9 @@
+# ==============================================================================
+# FRIGORIFERO SMART & METEO REPORT — CASA MANCINI
+# ==============================================================================
+# Allerta porta frigo aperta, monitoraggio filtro aria Shelfy e report meteo.
+# ==============================================================================
+
 - id: 'eco_home_frigo_porta_aperta'
   alias: 'Eco Home - Allerta Porta Frigorifero Aperta (Sensore Ufficiale)'
   description: 'Annuncio vocale sarcastico o notifica silenziosa se la porta del frigorifero rimane aperta per più di 60 secondi'
@@ -144,8 +150,16 @@
     above: 15
     id: vento_forte
   - trigger: numeric_state
+    entity_id: sensor.eco_home_vento_prioritario
+    above: 15
+    id: vento_forte
+  - trigger: numeric_state
     entity_id: sensor.terrazza_pulvirometro_precipitazione
     above: 0.01
+    id: inizio_pioggia
+  - trigger: state
+    entity_id: binary_sensor.eco_home_pioggia_rilevata
+    to: 'on'
     id: inizio_pioggia
   conditions:
   - condition: template
@@ -324,10 +338,23 @@
     entity_id: sensor.sala_anemometro_gust_strength
     above: 25
   - trigger: numeric_state
+    entity_id: sensor.eco_home_vento_prioritario
+    above: 25
+  - trigger: numeric_state
     entity_id: sensor.terrazza_pulvirometro_precipitazione
     above: 0.01
   - trigger: state
-    entity_id: weather.home
+    entity_id: binary_sensor.eco_home_pioggia_rilevata
+    to: 'on'
+  - trigger: state
+    entity_id: weather.meteoam_home
+    to:
+    - rainy
+    - pouring
+    - lightning
+    - hail
+  - trigger: state
+    entity_id: weather.casa
     to:
     - rainy
     - pouring

@@ -1,0 +1,64 @@
+# ==============================================================================
+# SINCRONIZZAZIONE PRESENZA SMART — CASA MANCINI
+# ==============================================================================
+# Mantiene sincronizzati in tempo reale i tracker di presenza di Stefano e Laura
+# combinando SmartThings Geofence (Knox One UI) e connessione Wi-Fi NETMancini.
+# Elimina la dipendenza dallo scanner router Synology SRM.
+# ==============================================================================
+
+- id: 'eco_home_presenza_sync'
+  alias: 'Presenza Smart - Sincronizzazione Tracker Stefano e Laura'
+  description: 'Sincronizza device_tracker.stefano_presenza e device_tracker.laura_presenza combinando SmartThings Geofence e Wi-Fi NETMancini'
+  mode: restart
+  triggers:
+    - trigger: state
+      entity_id:
+        - binary_sensor.samsung_s25_edge_di_stefano_presenza
+        - sensor.samsung_s25_edge_di_stefano_wi_fi_connection
+        - binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza
+        - sensor.samsung_s22_di_laura_wi_fi_connection
+        - device_tracker.samsung_s22_di_laura_2
+    - trigger: homeassistant
+      event: start
+    - trigger: time_pattern
+      minutes: '/2'
+  conditions: []
+  actions:
+    # --------------------------------------------------------------------------
+    # 1. Sincronizzazione Stefano
+    # --------------------------------------------------------------------------
+    - variables:
+        stefano_st_home: "{{ is_state('binary_sensor.samsung_s25_edge_di_stefano_presenza', 'on') }}"
+        stefano_wifi_home: "{{ is_state('sensor.samsung_s25_edge_di_stefano_wi_fi_connection', 'NETMancini') }}"
+        stefano_is_home: "{{ stefano_st_home or stefano_wifi_home }}"
+        stefano_target_loc: "{{ 'home' if stefano_is_home else 'not_home' }}"
+    - if:
+        - condition: template
+          value_template: "{{ states('device_tracker.stefano_presenza') != stefano_target_loc }}"
+      then:
+        - action: device_tracker.see
+          data:
+            dev_id: stefano_presenza
+            host_name: 'Stefano Presenza Smart'
+            location_name: '{{ stefano_target_loc }}'
+            source_type: router
+
+    # --------------------------------------------------------------------------
+    # 2. Sincronizzazione Laura
+    # --------------------------------------------------------------------------
+    - variables:
+        laura_st_home: "{{ is_state('binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza', 'on') }}"
+        laura_wifi_home: "{{ is_state('sensor.samsung_s22_di_laura_wi_fi_connection', 'NETMancini') }}"
+        laura_gps_home: "{{ is_state('device_tracker.samsung_s22_di_laura_2', 'home') }}"
+        laura_is_home: "{{ laura_st_home or laura_wifi_home or laura_gps_home }}"
+        laura_target_loc: "{{ 'home' if laura_is_home else 'not_home' }}"
+    - if:
+        - condition: template
+          value_template: "{{ states('device_tracker.laura_presenza') != laura_target_loc }}"
+      then:
+        - action: device_tracker.see
+          data:
+            dev_id: laura_presenza
+            host_name: 'Laura Presenza Smart'
+            location_name: '{{ laura_target_loc }}'
+            source_type: router
