@@ -36,6 +36,17 @@
     id: stefano_arrived
   - trigger: state
     entity_id:
+    - device_tracker.samsung_s25_edge_di_stefano_2
+    - device_tracker.stefano_presenza
+    - device_tracker.samsung_s25_edge_di_stefano
+    to: home
+    not_from:
+    - home
+    - unknown
+    - unavailable
+    id: stefano_arrived
+  - trigger: state
+    entity_id:
     - person.laura
     to: home
     not_from:
@@ -51,16 +62,9 @@
     id: laura_arrived
   - trigger: state
     entity_id:
-    - sensor.samsung_s22_di_laura_wi_fi_connection
-    to: NETMancini
-    not_from:
-    - unknown
-    - unavailable
-    - NETMancini
-    id: laura_arrived
-  - trigger: state
-    entity_id:
     - device_tracker.samsung_s22_di_laura_2
+    - device_tracker.laura_presenza
+    - device_tracker.samsung_s22_di_laura
     to: home
     not_from:
     - home
@@ -1003,10 +1007,6 @@
     tracked_people:
     - person.stefano
     - person.laura
-    - person.simone_mancini
-    - person.monica
-    - person.mauro
-    - person.rita
     weather_entity: weather.casa
     alert_entity: sensor.allerta_meteo
     window_sensors:
