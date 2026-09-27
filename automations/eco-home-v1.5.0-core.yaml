@@ -505,7 +505,7 @@
             {% endif %}
           weather_alert_text: "{% set alert = states(alert_entity) %} {% if alert
             not in ['unknown', 'unavailable', 'Nessuna allerta', 'nessuna allerta',
-            'off', '0', ''] %}\n  Attenzione, è in vigore un'allerta meteo: {{ alert }}.\n{%
+            'off', '0', '1', ''] %}\n  Attenzione, è in vigore un'allerta meteo: {{ alert }}.\n{%
             elif states(weather_entity) in ['rainy', 'pouring', 'lightning', 'hail'] %}\n
             \ Oggi è prevista pioggia o maltempo, tieni l'ombrello a portata di mano.\n{%
             else %}\n  {{ '' }}\n{% endif %}"
@@ -1008,10 +1008,10 @@
     - person.stefano
     - person.laura
     weather_entity: weather.casa
-    alert_entity: sensor.allerta_meteo
+    alert_entity: sensor.dipartimento_protezione_civile_alert
     window_sensors:
-    - binary_sensor.finestra_sala
-    - binary_sensor.finestra_camera
+    - binary_sensor.finestrasala_contact
+    - binary_sensor.finestracamera_contact
     eco_home_enabled: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') }}'
     eco_home_silent: '{{ is_state(''input_boolean.eco_home_silenzioso'', ''on'') }}'
     eco_home_ospiti: '{{ is_state(''input_boolean.eco_home_ospiti'', ''on'') }}'

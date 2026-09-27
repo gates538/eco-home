@@ -12,3 +12,5 @@ restart_log.txt
 # OS files
 .DS_Store
 Thumbs.db
+
+scratch/
