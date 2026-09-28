@@ -1,186 +1,324 @@
-- id: 'eco_home_security_120'
-  alias: Eco Home Security & Guardiano
-  description: Modulo per controlli all'uscita (Guardiano) e sistema anti-intrusione
-  mode: parallel
-  max: 10
+# ==============================================================================
+# ECO HOME SECURITY & ANTIFURTO INTELLIGENTE — CASA MANCINI
+# ==============================================================================
+# Sistema integrato di sicurezza:
+# 1. Auto-Armamento a 5 minuti dall'uscita di entrambi i residenti
+# 2. Auto-Disarmo all'ingresso nel raggio d'azione di casa (Geofence)
+# 3. Allarme intrusione portone con snapshot telecamera, pre-allarme e sirena
+# 4. Monitoraggio perimetrale finestre (apertura e chiusura con foto e orari)
+# 5. Monitoraggio anomalie luci accese a casa vuota
+# 6. Monitoraggio movimento tapparelle a casa vuota
+# 7. Sincronizzazione bidirezionale con alarm_control_panel.allarme_casa_mancini
+# 8. Check buonanotte, allarme portone aperto a lungo micie e guardiano dispositivi
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. AUTO-ARMAMENTO A 5 MINUTI DALL'USCITA DI ENTRAMBI
+# ------------------------------------------------------------------------------
+- id: 'eco_home_security_auto_arm'
+  alias: "Eco Home Security - Auto-Armamento (5 Minuti Fuori Casa)"
+  description: "Inserisce automaticamente l'allarme dopo 5 minuti che sia Stefano che Laura sono entrambi fuori casa, effettuando il check di sicurezza infissi e luci."
+  mode: single
   triggers:
-  - trigger: numeric_state
-    entity_id: zone.home
-    below: 1
-    id: everyone_left
-  - trigger: state
-    entity_id: binary_sensor.porta_contact
-    to: 'on'
-    id: door_opened_intrusion
-  - trigger: state
-    entity_id:
-    - person.stefano
-    - person.laura
-    - person.simone
-    - person.monica
-    to: home
-    id: someone_arrived_disarm
-  - trigger: numeric_state
-    entity_id: zone.home
-    above: 0
-    id: zone_home_disarm
-  conditions: []
+    - trigger: state
+      entity_id:
+        - person.stefano
+        - person.laura
+      to: not_home
+      for: "00:05:00"
+      id: persons_away_5min
+    - trigger: numeric_state
+      entity_id: zone.home
+      below: 1
+      for: "00:05:00"
+      id: zone_zero_5min
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: person.stefano
+      state: not_home
+    - condition: state
+      entity_id: person.laura
+      state: not_home
+    - condition: numeric_state
+      entity_id: zone.home
+      below: 1
+    - condition: state
+      entity_id: input_boolean.eco_home_allarme_inserito
+      state: 'off'
   actions:
-  - choose:
-    - conditions:
-      - condition: trigger
-        id:
-        - someone_arrived_disarm
-        - zone_home_disarm
-      sequence:
-      - action: input_boolean.turn_off
-        target:
-          entity_id: input_boolean.eco_home_allarme_inserito
-        continue_on_error: true
-
-    - conditions:
-      - condition: trigger
-        id: everyone_left
-      sequence:
-      - action: input_boolean.turn_on
-        target:
-          entity_id: input_boolean.eco_home_allarme_inserito
-        continue_on_error: true
-      - delay: 00:01:00
-      - variables:
-          light_is_on: '{{ is_state(light_entity, ''on'') }}'
-          windows_open: >-
-            {% set open = expand(window_sensors) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
-            {{ open | join(', ') if open | length > 0 else 'none' }}
-          dryer_is_on: "{{ is_state('binary_sensor.asciugatrice_in_funzione', 'on') or states(dryer_state_sensor) in ['run', 'running', 'drying', 'cooling'] or (states('sensor.esterno_asciugatrice_potenza') | float(0) > 10) }}"
-      - if:
-        - condition: template
-          value_template: '{{ light_is_on }}'
-        then:
-        - action: '{{ stefano_notification_service }}'
-          data:
-            title: "Guardiano Eco Home"
-            message: >-
-              {{ [
-                "Tutti sono usciti ma la luce " ~ state_attr(light_entity, 'friendly_name') ~ " è rimasta accesa. Vuoi spegnerla?",
-                "Avviso Guardiano: luce " ~ state_attr(light_entity, 'friendly_name') ~ " ancora accesa a casa vuota. La spengo?",
-                "Qualcuno ha dimenticato accesa la luce " ~ state_attr(light_entity, 'friendly_name') ~ "! Premi per spegnerla subito."
-              ] | random }}
-            data:
-              actions:
-                - action: "TURN_OFF_LIGHT_{{ context.id }}"
-                  title: "Sì, spegni"
-                - action: "DISMISS_SEC"
-                  title: "Ignora"
-          continue_on_error: true
-        - action: '{{ laura_notification_service }}'
-          data:
-            title: "Guardiano Eco Home"
-            message: "Tutti sono usciti ma la luce {{ state_attr(light_entity, 'friendly_name') }} è rimasta accesa."
-          continue_on_error: true
-      - if:
-        - condition: template
-          value_template: '{{ windows_open != ''none'' }}'
-        then:
-        - action: '{{ stefano_notification_service }}'
-          data:
-            title: "Guardiano Eco Home"
-            message: "Attenzione: avete lasciato aperto: {{ windows_open }} mentre siete fuori casa!"
-          continue_on_error: true
-        - action: '{{ laura_notification_service }}'
-          data:
-            title: "Guardiano Eco Home"
-            message: "Attenzione: avete lasciato aperto: {{ windows_open }} mentre siete fuori casa!"
-          continue_on_error: true
-      - if:
-        - condition: template
-          value_template: '{{ dryer_is_on }}'
-        then:
-        - action: '{{ stefano_notification_service }}'
-          data:
-            title: "Guardiano Eco Home"
-            message: "L'asciugatrice è ancora in funzione mentre siete fuori casa."
-          continue_on_error: true
-        - action: '{{ laura_notification_service }}'
-          data:
-            title: "Guardiano Eco Home"
-            message: "L'asciugatrice è ancora in funzione mentre siete fuori casa."
-          continue_on_error: true
-
-    - conditions:
-      - condition: trigger
-        id: door_opened_intrusion
-      - condition: state
+    # 1. Attivazione stato allarme
+    - action: input_boolean.turn_on
+      target:
         entity_id: input_boolean.eco_home_allarme_inserito
-        state: 'on'
-      - condition: template
-        value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or is_state('person.simone', 'home') or is_state('person.monica', 'home') or (states('zone.home') | int(0) > 0)) }}"
-      sequence:
-      - delay:
-          seconds: 7.5
-      - action: camera.snapshot
-        target:
-          entity_id: '{{ camera_entity }}'
-        data:
-          filename: '{{ snapshot_file_path }}'
-        continue_on_error: true
-      - action: '{{ stefano_notification_service }}'
-        data:
-          title: "⚠️ Portone Aperto a Casa Vuota"
-          message: "Il portone d'ingresso è stato aperto. Disarmo automatico o conferma entro 30 secondi!"
+    - action: alarm_control_panel.alarm_arm_away
+      target:
+        entity_id: alarm_control_panel.allarme_casa_mancini
+      continue_on_error: true
+
+    # 2. Check sicurezza infissi, luci e asciugatrice
+    - variables:
+        windows_open: >-
+          {% set open = expand([
+            'binary_sensor.finestrasala_contact',
+            'binary_sensor.finestracamera_contact',
+            'binary_sensor.finestracameretta_contact',
+            'binary_sensor.finestrabagno_contact',
+            'binary_sensor.finestrabagnetto_contact',
+            'binary_sensor.finestracucina_contact',
+            'binary_sensor.portaterrazzo_contact',
+            'binary_sensor.portainvetrogiorno_notte_contact'
+          ]) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
+          {{ open | join(', ') if open | length > 0 else 'none' }}
+        lights_on: >-
+          {% set on_l = expand([
+            'light.luceambiente',
+            'light.sala',
+            'light.cucina',
+            'light.faretti_cucina',
+            'light.camera',
+            'light.cameretta',
+            'light.corridoio',
+            'light.bagno',
+            'light.bagnetto'
+          ]) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
+          {{ on_l | join(', ') if on_l | length > 0 else 'none' }}
+        dryer_on: "{{ is_state('binary_sensor.asciugatrice_in_funzione', 'on') or states('sensor.esterno_asciugatrice_machine_state') in ['run', 'running', 'drying', 'cooling'] or (states('sensor.esterno_asciugatrice_potenza') | float(0) > 10) }}"
+        timestamp_str: "{{ now().strftime('%H:%M:%S') }}"
+
+    # 3. Notifica con esito del check
+    - choose:
+        # Se ci sono anomalie aperte o accese
+        - conditions:
+            - condition: template
+              value_template: "{{ windows_open != 'none' or lights_on != 'none' or dryer_on }}"
+          sequence:
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                title: "🛡️ Allarme Inserito — Attenzione Casa!"
+                message: >-
+                  Allarme Casa Mancini inserito automaticamente alle {{ timestamp_str }} (fuori da 5 min).
+                  Attenzione prima di allontanarvi:
+                  {% if windows_open != 'none' %}• Infissi aperti: {{ windows_open }}{% endif %}
+                  {% if lights_on != 'none' %}• Luci accese: {{ lights_on }}{% endif %}
+                  {% if dryer_on %}• Asciugatrice ancora in funzione{% endif %}
+                data:
+                  tag: "eco_home_security_arm"
+                  actions:
+                    - action: "TURN_OFF_LIGHT_{{ context.id }}"
+                      title: "Spegni luci"
+                    - action: "DISMISS_SEC"
+                      title: "OK"
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                title: "🛡️ Allarme Inserito — Attenzione Casa!"
+                message: >-
+                  Allarme Casa Mancini inserito automaticamente alle {{ timestamp_str }}.
+                  {% if windows_open != 'none' %}• Infissi aperti: {{ windows_open }}{% endif %}
+                  {% if lights_on != 'none' %}• Luci accese: {{ lights_on }}{% endif %}
+                data:
+                  tag: "eco_home_security_arm"
+              continue_on_error: true
+      default:
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
           data:
-            image: '{{ snapshot_access_url }}'
-            attachment:
-              url: '{{ snapshot_access_url }}'
-              content-type: jpeg
-              hide-thumbnail: false
-            actions:
-              - action: "DISARM_ALARM_{{ context.id }}"
-                title: "Disarma (Sono io)"
-        continue_on_error: true
-      - action: '{{ laura_notification_service }}'
-        data:
-          title: "⚠️ Portone Aperto a Casa Vuota"
-          message: "Il portone d'ingresso è stato aperto. Disarmo automatico o conferma entro 30 secondi!"
+            title: "🛡️ Allarme Casa Mancini Inserito"
+            message: "Siete entrambi fuori da 5 minuti (ore {{ timestamp_str }}). Allarme attivo, perimetro e interni protetti."
+            data:
+              tag: "eco_home_security_arm"
+          continue_on_error: true
+        - action: notify.mobile_app_samsung_s22_di_laura
           data:
-            image: '{{ snapshot_access_url }}'
-            attachment:
-              url: '{{ snapshot_access_url }}'
-              content-type: jpeg
-              hide-thumbnail: false
-            actions:
-              - action: "DISARM_ALARM_{{ context.id }}"
-                title: "Disarma (Sono io)"
-        continue_on_error: true
-      - delay: 00:00:30
-      - if:
+            title: "🛡️ Allarme Casa Mancini Inserito"
+            message: "Siete entrambi fuori da 5 minuti (ore {{ timestamp_str }}). Allarme attivo, perimetro e interni protetti."
+            data:
+              tag: "eco_home_security_arm"
+          continue_on_error: true
+
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_esito
+      data:
+        value: "Allarme armato automaticamente (fuori da 5 min)"
+      continue_on_error: true
+
+# ------------------------------------------------------------------------------
+# 2. AUTO-DISARMO ALL'INGRESSO NEL RAGGIO D'AZIONE (GEOFENCE)
+# ------------------------------------------------------------------------------
+- id: 'eco_home_security_auto_disarm'
+  alias: "Eco Home Security - Auto-Disarmo Geofence (Rientro a Casa)"
+  description: "Disarma tempestivamente l'antifurto non appena Stefano o Laura entrano nel raggio d'azione di casa, in modo da trovarlo disattivato prima di aprire la porta."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id:
+        - person.stefano
+        - person.laura
+      to: home
+      id: person_entered_home
+    - trigger: numeric_state
+      entity_id: zone.home
+      above: 0
+      id: zone_home_above_zero
+    - trigger: state
+      entity_id:
+        - device_tracker.stefano_presenza
+        - device_tracker.laura_presenza
+        - device_tracker.samsung_s25_edge_di_stefano_2
+        - device_tracker.samsung_s22_di_laura_2
+      to: home
+      id: trackers_home
+    - trigger: state
+      entity_id:
+        - binary_sensor.samsung_s25_edge_di_stefano_presenza
+        - binary_sensor.dispositivi_mobili_samsung_s22_di_laura_presenza
+      to: 'on'
+      id: smartthings_geofence
+    - trigger: state
+      entity_id: sensor.samsung_s25_edge_di_stefano_wi_fi_connection
+      to: NETMancini
+      id: wifi_connected
+  conditions:
+    - condition: or
+      conditions:
         - condition: state
           entity_id: input_boolean.eco_home_allarme_inserito
           state: 'on'
         - condition: template
-          value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or is_state('person.simone', 'home') or is_state('person.monica', 'home') or (states('zone.home') | int(0) > 0)) }}"
-        then:
-        - action: '{{ stefano_notification_service }}'
+          value_template: "{{ states('alarm_control_panel.allarme_casa_mancini') not in ['disarmed', 'unknown', 'unavailable'] }}"
+  actions:
+    # 1. Disarmo immediato
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.eco_home_allarme_inserito
+    - action: alarm_control_panel.alarm_disarm
+      target:
+        entity_id: alarm_control_panel.allarme_casa_mancini
+      continue_on_error: true
+
+    # 2. Fermata di sicurezza di eventuali allarmi sonori o sirene attive
+    - action: siren.turn_off
+      target:
+        entity_id: siren.terrazzo_3_sirena
+      continue_on_error: true
+    - action: media_player.media_stop
+      target:
+        entity_id: media_player.nest_hub_sala
+      continue_on_error: true
+
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_esito
+      data:
+        value: "Allarme disarmato automaticamente all'ingresso nel raggio di casa"
+      continue_on_error: true
+
+# ------------------------------------------------------------------------------
+# 3. ALLARME INTRUSIONE PORTONE (SNAPSHOT, NOTIFICA RICCA & DISSUASIONE)
+# ------------------------------------------------------------------------------
+- id: 'eco_home_security_door_intrusion'
+  alias: "Eco Home Security - Allarme Portone Ingresso (Snapshot & Dissuasione)"
+  description: "Apertura del portone d'ingresso ad allarme inserito: scatto fotografico immediato da Cam Sala 2, notifica con foto e orario al secondo, timer 30s con disarmo rapido e sirena ad alto volume se confermato."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.porta_contact
+      to: 'on'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_allarme_inserito
+      state: 'on'
+    - condition: template
+      value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or (states('zone.home') | int(0) > 0)) }}"
+  actions:
+    - variables:
+        timestamp_str: "{{ now().strftime('%H:%M:%S') }}"
+        date_str: "{{ now().strftime('%d/%m/%Y') }}"
+        snapshot_file: /config/www/cam_snapshots/sala_2.jpg
+        snapshot_url: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
+
+    # 1. Attesa breve (3s) per permettere l'ingresso nel campo visivo e snapshot
+    - delay: 00:00:03
+    - action: camera.snapshot
+      target:
+        entity_id: camera.sala_2
+      data:
+        filename: "{{ snapshot_file }}"
+      continue_on_error: true
+
+    # 2. Notifica push istantanea con foto e pulsante Disarma
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: "⚠️ Portone Aperto a Casa Vuota"
+        message: "Portone aperto alle ore {{ timestamp_str }} del {{ date_str }}. Disarmo automatico o tocca per confermare entro 30s!"
+        data:
+          tag: "eco_home_intrusion_alert"
+          priority: high
+          importance: high
+          image: "{{ snapshot_url }}"
+          actions:
+            - action: "DISARM_ALARM_{{ context.id }}"
+              title: "Disarma (Sono io)"
+      continue_on_error: true
+
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: "⚠️ Portone Aperto a Casa Vuota"
+        message: "Portone aperto alle ore {{ timestamp_str }} del {{ date_str }}. Disarmo automatico o tocca per confermare entro 30s!"
+        data:
+          tag: "eco_home_intrusion_alert"
+          priority: high
+          importance: high
+          image: "{{ snapshot_url }}"
+          actions:
+            - action: "DISARM_ALARM_{{ context.id }}"
+              title: "Disarma (Sono io)"
+      continue_on_error: true
+
+    # 3. Finestra di pre-allarme di 30 secondi
+    - delay: 00:00:27
+    - if:
+        - condition: state
+          entity_id: input_boolean.eco_home_allarme_inserito
+          state: 'on'
+        - condition: template
+          value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or (states('zone.home') | int(0) > 0)) }}"
+      then:
+        # Allarme Confermato: Sirena e Dissuasione
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
           data:
             title: "🚨 ALLARME INTRUSIONE CONFERMATO 🚨"
-            message: "Nessun disarmo registrato dopo 30 secondi: allarme sonoro attivo in casa!"
+            message: "Portone violato alle {{ timestamp_str }}: nessun disarmo dopo 30s! Sirena attiva in casa!"
+            data:
+              tag: "eco_home_intrusion_critical"
+              priority: high
+              importance: high
           continue_on_error: true
-        - action: '{{ laura_notification_service }}'
+        - action: notify.mobile_app_samsung_s22_di_laura
           data:
             title: "🚨 ALLARME INTRUSIONE CONFERMATO 🚨"
-            message: "Nessun disarmo registrato dopo 30 secondi: allarme sonoro attivo in casa!"
+            message: "Portone violato alle {{ timestamp_str }}: nessun disarmo dopo 30s! Sirena attiva in casa!"
+            data:
+              tag: "eco_home_intrusion_critical"
+              priority: high
+              importance: high
           continue_on_error: true
+
+        # Sirena su Nest Hub a volume 100%
         - action: media_player.volume_set
           target:
-            entity_id: '{{ speaker }}'
+            entity_id: media_player.nest_hub_sala
           data:
             volume_level: 1.0
           continue_on_error: true
         - action: tts.speak
           target:
-            entity_id: '{{ tts_engine }}'
+            entity_id: tts.google_translate_it_lt
           data:
-            media_player_entity_id: '{{ speaker }}'
+            media_player_entity_id: media_player.nest_hub_sala
             language: "it"
             options:
               tld: "it"
@@ -188,188 +326,550 @@
             cache: false
           continue_on_error: true
 
-  variables:
-    speaker: media_player.nest_hub_sala
-    tts_engine: tts.google_translate_it_lt
-    light_entity: light.luceambiente
-    dryer_state_sensor: sensor.esterno_asciugatrice_machine_state
-    camera_entity: camera.sala_2
-    stefano_notification_service: notify.mobile_app_samsung_s25_edge_di_stefano
-    laura_notification_service: notify.mobile_app_samsung_s22_di_laura
-    default_notification_service: notify.mobile_app_samsung_s25_edge_di_stefano
-    snapshot_file_path: /config/www/cam_snapshots/sala_2.jpg
-    snapshot_access_url: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
-    window_sensors:
-    - binary_sensor.finestra_sala
-    - binary_sensor.finestra_camera
+        # Attivazione sirena esterna terrazza
+        - action: siren.turn_on
+          target:
+            entity_id: siren.terrazzo_3_sirena
+          continue_on_error: true
 
+# ------------------------------------------------------------------------------
+# 4. MONITORAGGIO PERIMETRALE FINESTRE & TERRAZZI (APERTURA & CHIUSURA)
+# ------------------------------------------------------------------------------
+- id: 'eco_home_security_windows_monitor'
+  alias: "Eco Home Security - Monitoraggio Infissi Perimetrali (Foto & Orari)"
+  description: "Rileva in tempo reale l'apertura o la chiusura di qualsiasi finestra o porta terrazzo a casa vuota o allarme inserito, scattando una foto live e notificando con orario al secondo."
+  mode: parallel
+  max: 10
+  triggers:
+    - trigger: state
+      entity_id:
+        - binary_sensor.finestrasala_contact
+        - binary_sensor.finestracamera_contact
+        - binary_sensor.finestracameretta_contact
+        - binary_sensor.finestrabagno_contact
+        - binary_sensor.finestrabagnetto_contact
+        - binary_sensor.finestracucina_contact
+        - binary_sensor.portaterrazzo_contact
+        - binary_sensor.portainvetrogiorno_notte_contact
+      not_from:
+        - unknown
+        - unavailable
+      not_to:
+        - unknown
+        - unavailable
+  conditions:
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: input_boolean.eco_home_allarme_inserito
+          state: 'on'
+        - condition: template
+          value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or (states('zone.home') | int(0) > 0)) }}"
+  actions:
+    - variables:
+        infisso_nome: "{{ trigger.to_state.name | default(trigger.entity_id) }}"
+        is_open: "{{ trigger.to_state.state == 'on' }}"
+        timestamp_str: "{{ now().strftime('%H:%M:%S') }}"
+        target_cam: >-
+          {% if 'camera' in trigger.entity_id and 'cameretta' not in trigger.entity_id %}
+            camera.camera
+          {% elif 'cameretta' in trigger.entity_id %}
+            camera.cameretta
+          {% elif 'terrazzo' in trigger.entity_id %}
+            camera.terrazzo_3_2
+          {% else %}
+            camera.sala_2
+          {% endif %}
+        cam_slug: >-
+          {% if 'camera' in trigger.entity_id and 'cameretta' not in trigger.entity_id %}
+            camera
+          {% elif 'cameretta' in trigger.entity_id %}
+            cameretta
+          {% elif 'terrazzo' in trigger.entity_id %}
+            terrazzo_3_2
+          {% else %}
+            sala_2
+          {% endif %}
+        snapshot_file: "/config/www/cam_snapshots/{{ cam_slug }}.jpg"
+        snapshot_url: "/local/cam_snapshots/{{ cam_slug }}.jpg?t={{ now().timestamp() | int }}"
+
+    # 1. Snapshot da telecamera pertinente
+    - action: camera.snapshot
+      target:
+        entity_id: "{{ target_cam }}"
+      data:
+        filename: "{{ snapshot_file }}"
+      continue_on_error: true
+
+    # 2. Invio notifica differenziata Aperto / Chiuso
+    - choose:
+        # CASO APERTURA (ALLARME PERIMETRALE)
+        - conditions:
+            - condition: template
+              value_template: "{{ is_open }}"
+          sequence:
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                title: "🚨 Allarme Infisso — Apertura Rilevata!"
+                message: "Alle ore {{ timestamp_str }} è stata APERTA: {{ infisso_nome }}. Nessun residente risulta presente a casa!"
+                data:
+                  tag: "eco_home_window_alert"
+                  priority: high
+                  importance: high
+                  image: "{{ snapshot_url }}"
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                title: "🚨 Allarme Infisso — Apertura Rilevata!"
+                message: "Alle ore {{ timestamp_str }} è stata APERTA: {{ infisso_nome }}. Nessun residente risulta presente a casa!"
+                data:
+                  tag: "eco_home_window_alert"
+                  priority: high
+                  importance: high
+                  image: "{{ snapshot_url }}"
+              continue_on_error: true
+      default:
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
+          data:
+            title: "ℹ️ Infisso Richiuso"
+            message: "Alle ore {{ timestamp_str }} è stata CHIUSA: {{ infisso_nome }}."
+            data:
+              tag: "eco_home_window_alert"
+              image: "{{ snapshot_url }}"
+          continue_on_error: true
+        - action: notify.mobile_app_samsung_s22_di_laura
+          data:
+            title: "ℹ️ Infisso Richiuso"
+            message: "Alle ore {{ timestamp_str }} è stata CHIUSA: {{ infisso_nome }}."
+            data:
+              tag: "eco_home_window_alert"
+              image: "{{ snapshot_url }}"
+          continue_on_error: true
+
+# ------------------------------------------------------------------------------
+# 5. ALLERTA ANOMALIA ACCENSIONE LUCI A CASA VUOTA
+# ------------------------------------------------------------------------------
+- id: 'eco_home_security_lights_monitor'
+  alias: "Eco Home Security - Allerta Luci a Casa Vuota"
+  description: "Rileva l'accensione anomala di luci mentre l'allarme è inserito o casa vuota (esclusa la simulazione presenza serale), inviando notifica con foto e tasto spegni."
+  mode: parallel
+  max: 10
+  triggers:
+    - trigger: state
+      entity_id:
+        - light.luceambiente
+        - light.sala
+        - light.cucina
+        - light.faretti_cucina
+        - light.camera
+        - light.cameretta
+        - light.corridoio
+        - light.bagno
+        - light.bagnetto
+      to: 'on'
+      from: 'off'
+  conditions:
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: input_boolean.eco_home_allarme_inserito
+          state: 'on'
+        - condition: template
+          value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or (states('zone.home') | int(0) > 0)) }}"
+    # Filtro anti falsi positivi: ignora durante la simulazione presenza serale (19:30-23:15 per cucina o mensole)
+    - condition: template
+      value_template: >-
+        {% set is_sim_time = (now().hour == 19 and now().minute >= 30) or (now().hour in [20, 21, 22]) or (now().hour == 23 and now().minute <= 15) %}
+        {% set is_sim_light = trigger.entity_id in ['light.mensolecamino', 'light.cucina'] %}
+        {{ not (is_sim_time and is_sim_light) }}
+  actions:
+    - variables:
+        luce_nome: "{{ trigger.to_state.name | default(trigger.entity_id) }}"
+        timestamp_str: "{{ now().strftime('%H:%M:%S') }}"
+        snapshot_file: /config/www/cam_snapshots/sala_2.jpg
+        snapshot_url: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
+
+    - action: camera.snapshot
+      target:
+        entity_id: camera.sala_2
+      data:
+        filename: "{{ snapshot_file }}"
+      continue_on_error: true
+
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: "💡 Luce Accesa a Casa Vuota"
+        message: "Alle ore {{ timestamp_str }} è stata accesa la luce '{{ luce_nome }}'. Nessun residente risulta in casa!"
+        data:
+          tag: "eco_home_light_alert"
+          priority: high
+          importance: high
+          image: "{{ snapshot_url }}"
+          actions:
+            - action: "TURN_OFF_LIGHT_{{ context.id }}"
+              title: "Spegni subito"
+      continue_on_error: true
+
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: "💡 Luce Accesa a Casa Vuota"
+        message: "Alle ore {{ timestamp_str }} è stata accesa la luce '{{ luce_nome }}'. Nessun residente risulta in casa!"
+        data:
+          tag: "eco_home_light_alert"
+          priority: high
+          importance: high
+          image: "{{ snapshot_url }}"
+      continue_on_error: true
+
+# ------------------------------------------------------------------------------
+# 6. ALLERTA MOVIMENTO TAPPARELLE A CASA VUOTA
+# ------------------------------------------------------------------------------
+- id: 'eco_home_security_covers_monitor'
+  alias: "Eco Home Security - Allerta Movimento Tapparelle"
+  description: "Rileva qualsiasi apertura o chiusura di tapparelle a casa vuota o allarme inserito, scattando una foto e notificando con orario al secondo."
+  mode: parallel
+  max: 10
+  triggers:
+    - trigger: state
+      entity_id:
+        - cover.tapparella_sala_2
+        - cover.tapparella_cucina_2
+        - cover.tapparella_camera_2
+        - cover.tapparella_cameretta_2
+        - cover.tapparella_bagno_2
+        - cover.tapparella_bagnetto_2
+      not_from:
+        - unknown
+        - unavailable
+      not_to:
+        - unknown
+        - unavailable
+  conditions:
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: input_boolean.eco_home_allarme_inserito
+          state: 'on'
+        - condition: template
+          value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or (states('zone.home') | int(0) > 0)) }}"
+    - condition: template
+      value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
+  actions:
+    - variables:
+        tapparella_nome: "{{ trigger.to_state.name | default(trigger.entity_id) }}"
+        stato_nuovo: "{{ 'Aperta' if trigger.to_state.state in ['open', 'opening'] else 'Chiusa' }}"
+        timestamp_str: "{{ now().strftime('%H:%M:%S') }}"
+        snapshot_file: /config/www/cam_snapshots/sala_2.jpg
+        snapshot_url: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
+
+    - action: camera.snapshot
+      target:
+        entity_id: camera.sala_2
+      data:
+        filename: "{{ snapshot_file }}"
+      continue_on_error: true
+
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: "🪟 Movimento Tapparella a Casa Vuota"
+        message: "Alle ore {{ timestamp_str }} la {{ tapparella_nome }} è passata a: {{ stato_nuovo }}."
+        data:
+          tag: "eco_home_cover_alert"
+          priority: high
+          importance: high
+          image: "{{ snapshot_url }}"
+      continue_on_error: true
+
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: "🪟 Movimento Tapparella a Casa Vuota"
+        message: "Alle ore {{ timestamp_str }} la {{ tapparella_nome }} è passata a: {{ stato_nuovo }}."
+        data:
+          tag: "eco_home_cover_alert"
+          priority: high
+          importance: high
+          image: "{{ snapshot_url }}"
+      continue_on_error: true
+
+# ------------------------------------------------------------------------------
+# 7. SINCRONIZZAZIONE BIDIREZIONALE PANNELLO LOVELACE ALLARME
+# ------------------------------------------------------------------------------
+- id: 'eco_home_security_panel_sync'
+  alias: "Eco Home Security - Sincronizzazione Pannello Lovelace Allarme"
+  description: "Mantiene sincronizzato lo stato dell'alarm_control_panel con l'input_boolean sia da automazioni che da interfaccia grafica."
+  mode: restart
+  triggers:
+    - trigger: state
+      entity_id: alarm_control_panel.allarme_casa_mancini
+      to:
+        - arming
+        - armed_away
+        - armed_home
+        - armed_night
+      id: panel_armed
+    - trigger: state
+      entity_id: alarm_control_panel.allarme_casa_mancini
+      to: disarmed
+      id: panel_disarmed
+    - trigger: state
+      entity_id: input_boolean.eco_home_allarme_inserito
+      to: 'on'
+      id: bool_on
+    - trigger: state
+      entity_id: input_boolean.eco_home_allarme_inserito
+      to: 'off'
+      id: bool_off
+  actions:
+    - choose:
+        # Pannello armato da UI -> accendi boolean
+        - conditions:
+            - condition: trigger
+              id: panel_armed
+            - condition: state
+              entity_id: input_boolean.eco_home_allarme_inserito
+              state: 'off'
+          sequence:
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.eco_home_allarme_inserito
+
+        # Pannello disarmato da UI -> spegni boolean
+        - conditions:
+            - condition: trigger
+              id: panel_disarmed
+            - condition: state
+              entity_id: input_boolean.eco_home_allarme_inserito
+              state: 'on'
+          sequence:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.eco_home_allarme_inserito
+
+        # Boolean acceso -> arma pannello
+        - conditions:
+            - condition: trigger
+              id: bool_on
+            - condition: template
+              value_template: "{{ states('alarm_control_panel.allarme_casa_mancini') == 'disarmed' }}"
+          sequence:
+            - action: alarm_control_panel.alarm_arm_away
+              target:
+                entity_id: alarm_control_panel.allarme_casa_mancini
+              continue_on_error: true
+
+        # Boolean spento -> disarma pannello
+        - conditions:
+            - condition: trigger
+              id: bool_off
+            - condition: template
+              value_template: "{{ states('alarm_control_panel.allarme_casa_mancini') != 'disarmed' }}"
+          sequence:
+            - action: alarm_control_panel.alarm_disarm
+              target:
+                entity_id: alarm_control_panel.allarme_casa_mancini
+              continue_on_error: true
+
+# ------------------------------------------------------------------------------
+# 8. CHECK SILENZIOSO BUONANOTTE (ORE 00:00)
+# ------------------------------------------------------------------------------
 - id: 'eco_home_check_silenzioso_buonanotte'
   alias: 'Eco Home - Check Silenzioso Buonanotte (Ore 00:00)'
   description: 'Controllo a mezzanotte a suoni spenti: silenzio totale se tutto è chiuso/spento, notifica discreta se qualcosa è rimasto aperto'
-  triggers:
-  - trigger: time
-    at: '00:00:00'
-  conditions:
-  - condition: state
-    entity_id: input_boolean.eco_home_attivo
-    state: 'on'
-  - condition: template
-    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
-  actions:
-  - variables:
-      portone_aperto: "{{ is_state('binary_sensor.porta_contact', 'on') }}"
-      finestre_aperte: >-
-        {% set open = expand(['binary_sensor.finestra_sala', 'binary_sensor.finestra_camera']) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
-        {{ open | join(', ') if open | length > 0 else '' }}
-      luci_accese: >-
-        {% set on_lights = expand(['light.luceambiente', 'light.faretti_cucina']) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
-        {{ on_lights | join(', ') if on_lights | length > 0 else '' }}
-      asciugatrice_attiva: >-
-        {{ is_state('binary_sensor.asciugatrice_in_funzione', 'on') or states('sensor.esterno_asciugatrice_machine_state') in ['run', 'running', 'drying', 'cooling'] or (states('sensor.esterno_asciugatrice_potenza') | float(0) > 10) }}
-      anomalie: >-
-        {% set lista = [] %}
-        {% if portone_aperto %}
-          {% set lista = lista + ['Portone principale aperto'] %}
-        {% endif %}
-        {% if finestre_aperte != '' %}
-          {% set lista = lista + [finestre_aperte] %}
-        {% endif %}
-        {% if luci_accese != '' %}
-          {% set lista = lista + [luci_accese] %}
-        {% endif %}
-        {% if asciugatrice_attiva %}
-          {% set lista = lista + ['Asciugatrice ancora in funzione'] %}
-        {% endif %}
-        {{ lista | join(' • ') }}
-  - if:
-    - condition: template
-      value_template: "{{ anomalie | trim != '' }}"
-    then:
-    - action: notify.mobile_app_samsung_s25_edge_di_stefano
-      data:
-        title: "🌙 Check Notturno Eco Home"
-        message: "Attenzione: prima di dormire risultano ancora aperti o accesi:\n• {{ anomalie }}"
-      continue_on_error: true
-    - action: notify.mobile_app_samsung_s22_di_laura
-      data:
-        title: "🌙 Check Notturno Eco Home"
-        message: "Attenzione: prima di dormire risultano ancora aperti o accesi:\n• {{ anomalie }}"
-      continue_on_error: true
-    - action: input_text.set_value
-      target:
-        entity_id: input_text.eco_home_ultimo_messaggio
-      data:
-        value: "Check Buonanotte: Notificate anomalie aperte/accese"
   mode: single
+  triggers:
+    - trigger: time
+      at: '00:00:00'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+  actions:
+    - variables:
+        portone_aperto: "{{ is_state('binary_sensor.porta_contact', 'on') }}"
+        finestre_aperte: >-
+          {% set open = expand([
+            'binary_sensor.finestrasala_contact',
+            'binary_sensor.finestracamera_contact',
+            'binary_sensor.finestracameretta_contact',
+            'binary_sensor.finestrabagno_contact',
+            'binary_sensor.finestrabagnetto_contact',
+            'binary_sensor.finestracucina_contact',
+            'binary_sensor.portaterrazzo_contact',
+            'binary_sensor.portainvetrogiorno_notte_contact'
+          ]) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
+          {{ open | join(', ') if open | length > 0 else '' }}
+        luci_accese: >-
+          {% set on_lights = expand([
+            'light.luceambiente',
+            'light.sala',
+            'light.cucina',
+            'light.faretti_cucina',
+            'light.camera',
+            'light.cameretta',
+            'light.corridoio'
+          ]) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
+          {{ on_lights | join(', ') if on_lights | length > 0 else '' }}
+        asciugatrice_attiva: >-
+          {{ is_state('binary_sensor.asciugatrice_in_funzione', 'on') or states('sensor.esterno_asciugatrice_machine_state') in ['run', 'running', 'drying', 'cooling'] or (states('sensor.esterno_asciugatrice_potenza') | float(0) > 10) }}
+        anomalie: >-
+          {% set lista = [] %}
+          {% if portone_aperto %}
+            {% set lista = lista + ['Portone principale aperto'] %}
+          {% endif %}
+          {% if finestre_aperte != '' %}
+            {% set lista = lista + [finestre_aperte] %}
+          {% endif %}
+          {% if luci_accese != '' %}
+            {% set lista = lista + [luci_accese] %}
+          {% endif %}
+          {% if asciugatrice_attiva %}
+            {% set lista = lista + ['Asciugatrice ancora in funzione'] %}
+          {% endif %}
+          {{ lista | join(' • ') }}
+    - if:
+        - condition: template
+          value_template: "{{ anomalie | trim != '' }}"
+      then:
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
+          data:
+            title: "🌙 Check Notturno Eco Home"
+            message: "Attenzione: prima di dormire risultano ancora aperti o accesi:
+• {{ anomalie }}"
+          continue_on_error: true
+        - action: notify.mobile_app_samsung_s22_di_laura
+          data:
+            title: "🌙 Check Notturno Eco Home"
+            message: "Attenzione: prima di dormire risultano ancora aperti o accesi:
+• {{ anomalie }}"
+          continue_on_error: true
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.eco_home_ultimo_messaggio
+          data:
+            value: "Check Buonanotte: Notificate anomalie aperte/accese"
 
+# ------------------------------------------------------------------------------
+# 9. ALLARME PORTONE APERTO A LUNGO (> 3 MINUTI - SICUREZZA MICIE)
+# ------------------------------------------------------------------------------
 - id: 'eco_home_allarme_portone_aperto_lungo_micie'
   alias: 'Eco Home - Allarme Portone Aperto a Lungo (> 3 Minuti - Sicurezza Micie)'
   description: 'Avviso vocale tempestivo o notifica silenziosa se il portone resta aperto per più di 3 minuti continui'
-  triggers:
-  - trigger: state
-    entity_id: binary_sensor.porta_contact
-    to: 'on'
-    for:
-      minutes: 3
-  conditions:
-  - condition: state
-    entity_id: input_boolean.eco_home_attivo
-    state: 'on'
-  - condition: state
-    entity_id: input_boolean.eco_home_silenzioso
-    state: 'off'
-  - condition: template
-    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
-  - condition: template
-    value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 600 }}"
-  actions:
-  - variables:
-      is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
-      portone_msg: >-
-        {{ [
-          "Attenzione! Portone aperto da oltre tre minuti: controllate che sia ben chiuso per la sicurezza delle micie!",
-          "Allarme portone: la porta principale è aperta da tre minuti! Verificate la chiusura per la sicurezza di casa!",
-          "Attenzione Stefano e Laura: portone aperto da tre minuti, occhio alle micie e richiudete la porta!"
-        ] | random }}
-  - if:
-    - condition: template
-      value_template: "{{ is_daytime }}"
-    then:
-    - action: tts.speak
-      target:
-        entity_id: tts.google_translate_it_lt
-      data:
-        media_player_entity_id: media_player.nest_hub_sala
-        language: "it"
-        options:
-          tld: "it"
-        message: "{{ portone_msg }}"
-    else:
-    - action: notify.mobile_app_samsung_s25_edge_di_stefano
-      data:
-        title: "🚪 Portone Aperto"
-        message: "Il portone principale è aperto da oltre 3 minuti!"
-      continue_on_error: true
-    - action: notify.mobile_app_samsung_s22_di_laura
-      data:
-        title: "🚪 Portone Aperto"
-        message: "Il portone principale è aperto da oltre 3 minuti!"
-      continue_on_error: true
-  - action: input_text.set_value
-    target:
-      entity_id: input_text.eco_home_ultimo_messaggio
-    data:
-      value: "Allarme Portone Aperto oltre 3 minuti"
-    continue_on_error: true
   mode: single
-
-- id: 'eco_home_guardiano_dispositivi_offline'
-  alias: 'Eco Home - Guardiano Dispositivi Offline (Check Ore 11:00)'
-  description: 'Controllo silenzioso quotidiano alle 11:00 su nodi critici, sensori portone/finestre/batterie per avvisare di dispositivi offline o freeze'
   triggers:
-  - trigger: time
-    at: '11:00:00'
+    - trigger: state
+      entity_id: binary_sensor.porta_contact
+      to: 'on'
+      for:
+        minutes: 3
   conditions:
-  - condition: state
-    entity_id: input_boolean.eco_home_attivo
-    state: 'on'
-  actions:
-  - variables:
-      critical_devices:
-      - binary_sensor.porta_contact
-      - binary_sensor.finestra_sala
-      - binary_sensor.finestra_camera
-      - media_player.nest_hub_sala
-      offline_list: >-
-        {% set ns = namespace(items=[]) %}
-        {% for d in critical_devices %}
-          {% if states(d) in ['unavailable', 'unknown', 'None'] %}
-            {% set ns.items = ns.items + [state_attr(d, 'friendly_name') | default(d, true)] %}
-          {% elif states[d] is defined and states[d].last_updated is not none %}
-            {% set diff_sec = as_timestamp(now()) - as_timestamp(states[d].last_updated) %}
-            {% if diff_sec > 86400 and d == 'binary_sensor.porta_contact' %}
-              {% set ns.items = ns.items + [(state_attr(d, 'friendly_name') | default(d, true)) ~ ' (Nessun segnale da >24h)'] %}
-            {% endif %}
-          {% endif %}
-        {% endfor %}
-        {{ ns.items | join(', ') }}
-  - if:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
     - condition: template
-      value_template: "{{ offline_list | trim != '' }}"
-    then:
-    - action: notify.mobile_app_samsung_s25_edge_di_stefano
-      data:
-        title: "⚠️ Guardiano Dispositivi Eco Home"
-        message: "Attenzione, i seguenti dispositivi risultano offline o non rispondono da oltre 24 ore: {{ offline_list }}."
-      continue_on_error: true
-    - action: notify.mobile_app_samsung_s22_di_laura
-      data:
-        title: "⚠️ Guardiano Dispositivi Eco Home"
-        message: "Attenzione, i seguenti dispositivi risultano offline o non rispondono da oltre 24 ore: {{ offline_list }}."
-      continue_on_error: true
+      value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 600 }}"
+  actions:
+    - variables:
+        is_daytime: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+        portone_msg: >-
+          {{ [
+            "Attenzione! Portone aperto da oltre tre minuti: controllate che sia ben chiuso per la sicurezza delle micie!",
+            "Allarme portone: la porta principale è aperta da tre minuti! Verificate la chiusura per la sicurezza di casa!",
+            "Attenzione Stefano e Laura: portone aperto da tre minuti, occhio alle micie e richiudete la porta!"
+          ] | random }}
+    - if:
+        - condition: template
+          value_template: "{{ is_daytime }}"
+      then:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: "it"
+            options:
+              tld: "it"
+            message: "{{ portone_msg }}"
+      else:
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
+          data:
+            title: "🚪 Portone Aperto"
+            message: "Il portone principale è aperto da oltre 3 minuti!"
+          continue_on_error: true
+        - action: notify.mobile_app_samsung_s22_di_laura
+          data:
+            title: "🚪 Portone Aperto"
+            message: "Il portone principale è aperto da oltre 3 minuti!"
+          continue_on_error: true
     - action: input_text.set_value
       target:
         entity_id: input_text.eco_home_ultimo_messaggio
       data:
-        value: "Guardiano: Rilevati dispositivi offline ({{ offline_list | truncate(150) }})"
+        value: "Allarme Portone Aperto oltre 3 minuti"
+      continue_on_error: true
+
+# ------------------------------------------------------------------------------
+# 10. GUARDIANO DISPOSITIVI OFFLINE (CHECK ORE 11:00)
+# ------------------------------------------------------------------------------
+- id: 'eco_home_guardiano_dispositivi_offline'
+  alias: 'Eco Home - Guardiano Dispositivi Offline (Check Ore 11:00)'
+  description: 'Controllo silenzioso quotidiano alle 11:00 su nodi critici, sensori portone/finestre/batterie per avvisare di dispositivi offline o freeze'
   mode: single
+  triggers:
+    - trigger: time
+      at: '11:00:00'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+  actions:
+    - variables:
+        critical_devices:
+          - binary_sensor.porta_contact
+          - binary_sensor.finestrasala_contact
+          - binary_sensor.finestracamera_contact
+          - binary_sensor.finestracameretta_contact
+          - binary_sensor.finestrabagno_contact
+          - binary_sensor.finestrabagnetto_contact
+          - binary_sensor.finestracucina_contact
+          - binary_sensor.portaterrazzo_contact
+          - binary_sensor.portainvetrogiorno_notte_contact
+          - media_player.nest_hub_sala
+        offline_list: >-
+          {% set ns = namespace(items=[]) %}
+          {% for d in critical_devices %}
+            {% if states(d) in ['unavailable', 'unknown', 'None'] %}
+              {% set ns.items = ns.items + [state_attr(d, 'friendly_name') | default(d, true)] %}
+            {% elif states[d] is defined and states[d].last_updated is not none %}
+              {% set diff_sec = as_timestamp(now()) - as_timestamp(states[d].last_updated) %}
+              {% if diff_sec > 86400 and d == 'binary_sensor.porta_contact' %}
+                {% set ns.items = ns.items + [(state_attr(d, 'friendly_name') | default(d, true)) ~ ' (Nessun segnale da >24h)'] %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.items | join(', ') }}
+    - if:
+        - condition: template
+          value_template: "{{ offline_list | trim != '' }}"
+      then:
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
+          data:
+            title: "⚠️ Guardiano Dispositivi Eco Home"
+            message: "Attenzione, i seguenti dispositivi risultano offline o non rispondono da oltre 24 ore: {{ offline_list }}."
+          continue_on_error: true
+        - action: notify.mobile_app_samsung_s22_di_laura
+          data:
+            title: "⚠️ Guardiano Dispositivi Eco Home"
+            message: "Attenzione, i seguenti dispositivi risultano offline o non rispondono da oltre 24 ore: {{ offline_list }}."
+          continue_on_error: true
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.eco_home_ultimo_messaggio
+          data:
+            value: "Guardiano: Rilevati dispositivi offline ({{ offline_list | truncate(150) }})"
