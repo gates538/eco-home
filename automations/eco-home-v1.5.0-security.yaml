@@ -9,7 +9,8 @@
 # 5. Monitoraggio anomalie luci accese a casa vuota
 # 6. Monitoraggio movimento tapparelle a casa vuota
 # 7. Sincronizzazione bidirezionale con alarm_control_panel.allarme_casa_mancini
-# 8. Check buonanotte, allarme portone aperto a lungo micie e guardiano dispositivi
+# 8. Gestione Sospensione Temporanea Allarme (Modalità Ospiti / Cugino)
+# 9. Check buonanotte, allarme portone aperto a lungo micie e guardiano dispositivi
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -17,7 +18,7 @@
 # ------------------------------------------------------------------------------
 - id: 'eco_home_security_auto_arm'
   alias: "Eco Home Security - Auto-Armamento (5 Minuti Fuori Casa)"
-  description: "Inserisce automaticamente l'allarme dopo 5 minuti che sia Stefano che Laura sono entrambi fuori casa, effettuando il check di sicurezza infissi e luci."
+  description: "Inserisce automaticamente l'allarme dopo 5 minuti che sia Stefano che Laura sono entrambi fuori casa (se la sospensione ospiti non è attiva)."
   mode: single
   triggers:
     - trigger: state
@@ -36,6 +37,9 @@
     - condition: state
       entity_id: input_boolean.eco_home_attivo
       state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_sospensione_allarme
+      state: 'off'
     - condition: state
       entity_id: person.stefano
       state: not_home
@@ -90,7 +94,6 @@
 
     # 3. Notifica con esito del check
     - choose:
-        # Se ci sono anomalie aperte o accese
         - conditions:
             - condition: template
               value_template: "{{ windows_open != 'none' or lights_on != 'none' or dryer_on }}"
@@ -221,16 +224,13 @@
 # ------------------------------------------------------------------------------
 - id: 'eco_home_security_door_intrusion'
   alias: "Eco Home Security - Allarme Portone Ingresso (Snapshot & Dissuasione)"
-  description: "Apertura del portone d'ingresso ad allarme inserito: scatto fotografico immediato da Cam Sala 2, notifica con foto e orario al secondo, timer 30s con disarmo rapido e sirena ad alto volume se confermato."
+  description: "Apertura del portone ad allarme inserito. Se la sospensione ospiti è attiva invia notifica informativa; altrimenti scatta foto, preallarme 30s e sirena ad alto volume se confermato."
   mode: single
   triggers:
     - trigger: state
       entity_id: binary_sensor.porta_contact
       to: 'on'
   conditions:
-    - condition: state
-      entity_id: input_boolean.eco_home_allarme_inserito
-      state: 'on'
     - condition: template
       value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or (states('zone.home') | int(0) > 0)) }}"
   actions:
@@ -239,6 +239,8 @@
         date_str: "{{ now().strftime('%d/%m/%Y') }}"
         snapshot_file: /config/www/cam_snapshots/sala_2.jpg
         snapshot_url: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
+        sospeso: "{{ is_state('input_boolean.eco_home_sospensione_allarme', 'on') }}"
+        fine_sospensione: "{{ states('input_datetime.eco_home_sospensione_allarme_fine') }}"
 
     # 1. Attesa breve (3s) per permettere l'ingresso nel campo visivo e snapshot
     - delay: 00:00:03
@@ -249,88 +251,119 @@
         filename: "{{ snapshot_file }}"
       continue_on_error: true
 
-    # 2. Notifica push istantanea con foto e pulsante Disarma
-    - action: notify.mobile_app_samsung_s25_edge_di_stefano
-      data:
-        title: "⚠️ Portone Aperto a Casa Vuota"
-        message: "Portone aperto alle ore {{ timestamp_str }} del {{ date_str }}. Disarmo automatico o tocca per confermare entro 30s!"
-        data:
-          tag: "eco_home_intrusion_alert"
-          priority: high
-          importance: high
-          image: "{{ snapshot_url }}"
-          actions:
-            - action: "DISARM_ALARM_{{ context.id }}"
-              title: "Disarma (Sono io)"
-      continue_on_error: true
+    - choose:
+        # CASO A: SOSPENSIONE ATTIVA (MODALITÀ OSPITI / CUGINO)
+        - conditions:
+            - condition: template
+              value_template: "{{ sospeso }}"
+          sequence:
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                title: "🚪 Portone Aperto (Modalità Ospiti)"
+                message: "Portone aperto alle ore {{ timestamp_str }}. L'allarme è temporaneamente sospeso per ospiti fino alle {{ fine_sospensione }}."
+                data:
+                  tag: "eco_home_guest_entry"
+                  image: "{{ snapshot_url }}"
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                title: "🚪 Portone Aperto (Modalità Ospiti)"
+                message: "Portone aperto alle ore {{ timestamp_str }}. L'allarme è temporaneamente sospeso per ospiti fino alle {{ fine_sospensione }}."
+                data:
+                  tag: "eco_home_guest_entry"
+                  image: "{{ snapshot_url }}"
+              continue_on_error: true
 
-    - action: notify.mobile_app_samsung_s22_di_laura
-      data:
-        title: "⚠️ Portone Aperto a Casa Vuota"
-        message: "Portone aperto alle ore {{ timestamp_str }} del {{ date_str }}. Disarmo automatico o tocca per confermare entro 30s!"
-        data:
-          tag: "eco_home_intrusion_alert"
-          priority: high
-          importance: high
-          image: "{{ snapshot_url }}"
-          actions:
-            - action: "DISARM_ALARM_{{ context.id }}"
-              title: "Disarma (Sono io)"
-      continue_on_error: true
+        # CASO B: ALLARME INSERITO (VERA INTRUSIONE)
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.eco_home_allarme_inserito
+              state: 'on'
+          sequence:
+            # Notifica push con foto e pulsante Disarma
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                title: "⚠️ Portone Aperto a Casa Vuota"
+                message: "Portone aperto alle ore {{ timestamp_str }} del {{ date_str }}. Disarmo automatico o tocca per confermare entro 30s!"
+                data:
+                  tag: "eco_home_intrusion_alert"
+                  priority: high
+                  importance: high
+                  image: "{{ snapshot_url }}"
+                  actions:
+                    - action: "DISARM_ALARM_{{ context.id }}"
+                      title: "Disarma (Sono io)"
+              continue_on_error: true
 
-    # 3. Finestra di pre-allarme di 30 secondi
-    - delay: 00:00:27
-    - if:
-        - condition: state
-          entity_id: input_boolean.eco_home_allarme_inserito
-          state: 'on'
-        - condition: template
-          value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or (states('zone.home') | int(0) > 0)) }}"
-      then:
-        # Allarme Confermato: Sirena e Dissuasione
-        - action: notify.mobile_app_samsung_s25_edge_di_stefano
-          data:
-            title: "🚨 ALLARME INTRUSIONE CONFERMATO 🚨"
-            message: "Portone violato alle {{ timestamp_str }}: nessun disarmo dopo 30s! Sirena attiva in casa!"
-            data:
-              tag: "eco_home_intrusion_critical"
-              priority: high
-              importance: high
-          continue_on_error: true
-        - action: notify.mobile_app_samsung_s22_di_laura
-          data:
-            title: "🚨 ALLARME INTRUSIONE CONFERMATO 🚨"
-            message: "Portone violato alle {{ timestamp_str }}: nessun disarmo dopo 30s! Sirena attiva in casa!"
-            data:
-              tag: "eco_home_intrusion_critical"
-              priority: high
-              importance: high
-          continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                title: "⚠️ Portone Aperto a Casa Vuota"
+                message: "Portone aperto alle ore {{ timestamp_str }} del {{ date_str }}. Disarmo automatico o tocca per confermare entro 30s!"
+                data:
+                  tag: "eco_home_intrusion_alert"
+                  priority: high
+                  importance: high
+                  image: "{{ snapshot_url }}"
+                  actions:
+                    - action: "DISARM_ALARM_{{ context.id }}"
+                      title: "Disarma (Sono io)"
+              continue_on_error: true
 
-        # Sirena su Nest Hub a volume 100%
-        - action: media_player.volume_set
-          target:
-            entity_id: media_player.nest_hub_sala
-          data:
-            volume_level: 1.0
-          continue_on_error: true
-        - action: tts.speak
-          target:
-            entity_id: tts.google_translate_it_lt
-          data:
-            media_player_entity_id: media_player.nest_hub_sala
-            language: "it"
-            options:
-              tld: "it"
-            message: "Attenzione. Intrusione rilevata. Le forze dell'ordine sono state avvisate. Allontanarsi immediatamente."
-            cache: false
-          continue_on_error: true
+            # Finestra di pre-allarme di 30 secondi
+            - delay: 00:00:27
+            - if:
+                - condition: state
+                  entity_id: input_boolean.eco_home_allarme_inserito
+                  state: 'on'
+                - condition: state
+                  entity_id: input_boolean.eco_home_sospensione_allarme
+                  state: 'off'
+                - condition: template
+                  value_template: "{{ not (is_state('person.stefano', 'home') or is_state('person.laura', 'home') or (states('zone.home') | int(0) > 0)) }}"
+              then:
+                - action: notify.mobile_app_samsung_s25_edge_di_stefano
+                  data:
+                    title: "🚨 ALLARME INTRUSIONE CONFERMATO 🚨"
+                    message: "Portone violato alle {{ timestamp_str }}: nessun disarmo dopo 30s! Sirena attiva in casa!"
+                    data:
+                      tag: "eco_home_intrusion_critical"
+                      priority: high
+                      importance: high
+                  continue_on_error: true
+                - action: notify.mobile_app_samsung_s22_di_laura
+                  data:
+                    title: "🚨 ALLARME INTRUSIONE CONFERMATO 🚨"
+                    message: "Portone violato alle {{ timestamp_str }}: nessun disarmo dopo 30s! Sirena attiva in casa!"
+                    data:
+                      tag: "eco_home_intrusion_critical"
+                      priority: high
+                      importance: high
+                  continue_on_error: true
 
-        # Attivazione sirena esterna terrazza
-        - action: siren.turn_on
-          target:
-            entity_id: siren.terrazzo_3_sirena
-          continue_on_error: true
+                # Sirena su Nest Hub a volume 100%
+                - action: media_player.volume_set
+                  target:
+                    entity_id: media_player.nest_hub_sala
+                  data:
+                    volume_level: 1.0
+                  continue_on_error: true
+                - action: tts.speak
+                  target:
+                    entity_id: tts.google_translate_it_lt
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    language: "it"
+                    options:
+                      tld: "it"
+                    message: "Attenzione. Intrusione rilevata. Le forze dell'ordine sono state avvisate. Allontanarsi immediatamente."
+                    cache: false
+                  continue_on_error: true
+
+                # Attivazione sirena esterna terrazza
+                - action: siren.turn_on
+                  target:
+                    entity_id: siren.terrazzo_3_sirena
+                  continue_on_error: true
 
 # ------------------------------------------------------------------------------
 # 4. MONITORAGGIO PERIMETRALE FINESTRE & TERRAZZI (APERTURA & CHIUSURA)
@@ -370,6 +403,7 @@
         infisso_nome: "{{ trigger.to_state.name | default(trigger.entity_id) }}"
         is_open: "{{ trigger.to_state.state == 'on' }}"
         timestamp_str: "{{ now().strftime('%H:%M:%S') }}"
+        sospeso: "{{ is_state('input_boolean.eco_home_sospensione_allarme', 'on') }}"
         target_cam: >-
           {% if 'camera' in trigger.entity_id and 'cameretta' not in trigger.entity_id %}
             camera.camera
@@ -410,22 +444,28 @@
           sequence:
             - action: notify.mobile_app_samsung_s25_edge_di_stefano
               data:
-                title: "🚨 Allarme Infisso — Apertura Rilevata!"
-                message: "Alle ore {{ timestamp_str }} è stata APERTA: {{ infisso_nome }}. Nessun residente risulta presente a casa!"
+                title: >-
+                  {% if sospeso %}🚪 Infisso Aperto (Modalità Ospiti){% else %}🚨 Allarme Infisso — Apertura Rilevata!{% endif %}
+                message: >-
+                  Alle ore {{ timestamp_str }} è stata APERTA: {{ infisso_nome }}.
+                  {% if sospeso %}(Sospensione allarme ospiti attiva){% else %}Nessun residente risulta presente a casa!{% endif %}
                 data:
                   tag: "eco_home_window_alert"
-                  priority: high
-                  importance: high
+                  priority: "{% if sospeso %}normal{% else %}high{% endif %}"
+                  importance: "{% if sospeso %}normal{% else %}high{% endif %}"
                   image: "{{ snapshot_url }}"
               continue_on_error: true
             - action: notify.mobile_app_samsung_s22_di_laura
               data:
-                title: "🚨 Allarme Infisso — Apertura Rilevata!"
-                message: "Alle ore {{ timestamp_str }} è stata APERTA: {{ infisso_nome }}. Nessun residente risulta presente a casa!"
+                title: >-
+                  {% if sospeso %}🚪 Infisso Aperto (Modalità Ospiti){% else %}🚨 Allarme Infisso — Apertura Rilevata!{% endif %}
+                message: >-
+                  Alle ore {{ timestamp_str }} è stata APERTA: {{ infisso_nome }}.
+                  {% if sospeso %}(Sospensione allarme ospiti attiva){% else %}Nessun residente risulta presente a casa!{% endif %}
                 data:
                   tag: "eco_home_window_alert"
-                  priority: high
-                  importance: high
+                  priority: "{% if sospeso %}normal{% else %}high{% endif %}"
+                  importance: "{% if sospeso %}normal{% else %}high{% endif %}"
                   image: "{{ snapshot_url }}"
               continue_on_error: true
       default:
@@ -486,6 +526,7 @@
     - variables:
         luce_nome: "{{ trigger.to_state.name | default(trigger.entity_id) }}"
         timestamp_str: "{{ now().strftime('%H:%M:%S') }}"
+        sospeso: "{{ is_state('input_boolean.eco_home_sospensione_allarme', 'on') }}"
         snapshot_file: /config/www/cam_snapshots/sala_2.jpg
         snapshot_url: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
 
@@ -498,12 +539,15 @@
 
     - action: notify.mobile_app_samsung_s25_edge_di_stefano
       data:
-        title: "💡 Luce Accesa a Casa Vuota"
-        message: "Alle ore {{ timestamp_str }} è stata accesa la luce '{{ luce_nome }}'. Nessun residente risulta in casa!"
+        title: >-
+          {% if sospeso %}💡 Luce Accesa (Modalità Ospiti){% else %}💡 Luce Accesa a Casa Vuota{% endif %}
+        message: >-
+          Alle ore {{ timestamp_str }} è stata accesa la luce '{{ luce_nome }}'.
+          {% if sospeso %}(Sospensione allarme ospiti attiva){% else %}Nessun residente risulta in casa!{% endif %}
         data:
           tag: "eco_home_light_alert"
-          priority: high
-          importance: high
+          priority: "{% if sospeso %}normal{% else %}high{% endif %}"
+          importance: "{% if sospeso %}normal{% else %}high{% endif %}"
           image: "{{ snapshot_url }}"
           actions:
             - action: "TURN_OFF_LIGHT_{{ context.id }}"
@@ -512,12 +556,15 @@
 
     - action: notify.mobile_app_samsung_s22_di_laura
       data:
-        title: "💡 Luce Accesa a Casa Vuota"
-        message: "Alle ore {{ timestamp_str }} è stata accesa la luce '{{ luce_nome }}'. Nessun residente risulta in casa!"
+        title: >-
+          {% if sospeso %}💡 Luce Accesa (Modalità Ospiti){% else %}💡 Luce Accesa a Casa Vuota{% endif %}
+        message: >-
+          Alle ore {{ timestamp_str }} è stata accesa la luce '{{ luce_nome }}'.
+          {% if sospeso %}(Sospensione allarme ospiti attiva){% else %}Nessun residente risulta in casa!{% endif %}
         data:
           tag: "eco_home_light_alert"
-          priority: high
-          importance: high
+          priority: "{% if sospeso %}normal{% else %}high{% endif %}"
+          importance: "{% if sospeso %}normal{% else %}high{% endif %}"
           image: "{{ snapshot_url }}"
       continue_on_error: true
 
@@ -670,7 +717,196 @@
               continue_on_error: true
 
 # ------------------------------------------------------------------------------
-# 8. CHECK SILENZIOSO BUONANOTTE (ORE 00:00)
+# 8. GESTIONE SOSPENSIONE TEMPORANEA ALLARME (MODALITÀ OSPITI)
+# ------------------------------------------------------------------------------
+- id: 'eco_home_security_sospensione_durata_selezionata'
+  alias: "Eco Home Security - Attivazione Sospensione Allarme da Menu"
+  description: "Avvia il timer e imposta la data/ora di fine sospensione allarme quando viene selezionata una durata dal menu a discesa."
+  mode: restart
+  triggers:
+    - trigger: state
+      entity_id: input_select.eco_home_durata_sospensione_allarme
+  actions:
+    - variables:
+        scelta: "{{ states('input_select.eco_home_durata_sospensione_allarme') }}"
+    - choose:
+        # Disattivazione
+        - conditions:
+            - condition: template
+              value_template: "{{ scelta in ['Disattivata (Allarme Attivo)', 'off', 'none', ''] }}"
+          sequence:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.eco_home_sospensione_allarme
+            - action: timer.cancel
+              target:
+                entity_id: timer.eco_home_sospensione_allarme
+              continue_on_error: true
+
+        # Attivazione con durata
+      default:
+        - variables:
+            durata_sec: >-
+              {% if scelta == '1 Ora' %}3600
+              {% elif scelta == '2 Ore' %}7200
+              {% elif scelta == '4 Ore' %}14400
+              {% elif scelta == '8 Ore' %}28800
+              {% elif scelta == '24 Ore (Tutto il Giorno)' %}86400
+              {% elif scelta == 'Fino a Stasera (Ore 23:59)' %}
+                {% set midnight = today_at('23:59:59') %}
+                {{ [60, (as_timestamp(midnight) - as_timestamp(now())) | int] | max }}
+              {% else %}14400{% endif %}
+            fine_dt: >-
+              {% if scelta == 'Fino a Stasera (Ore 23:59)' %}
+                {{ today_at('23:59:59').strftime('%Y-%m-%d %H:%M:%S') }}
+              {% else %}
+                {{ (now() + timedelta(seconds=durata_sec | int)).strftime('%Y-%m-%d %H:%M:%S') }}
+              {% endif %}
+            fine_orario_msg: >-
+              {% if scelta == 'Fino a Stasera (Ore 23:59)' %}
+                stasera alle 23:59
+              {% else %}
+                alle ore {{ (now() + timedelta(seconds=durata_sec | int)).strftime('%H:%M') }}
+              {% endif %}
+
+        # 1. Attiva boolean sospensione
+        - action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.eco_home_sospensione_allarme
+
+        # 2. Disarma l'antifurto se attualmente armato
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.eco_home_allarme_inserito
+        - action: alarm_control_panel.alarm_disarm
+          target:
+            entity_id: alarm_control_panel.allarme_casa_mancini
+          continue_on_error: true
+
+        # 3. Salva data/ora fine sospensione
+        - action: input_datetime.set_datetime
+          target:
+            entity_id: input_datetime.eco_home_sospensione_allarme_fine
+          data:
+            datetime: "{{ fine_dt }}"
+
+        # 4. Avvia timer con la durata esatta
+        - action: timer.start
+          target:
+            entity_id: timer.eco_home_sospensione_allarme
+          data:
+            duration: "{{ durata_sec | int }}"
+
+        # 5. Notifica conferma a Stefano e Laura
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
+          data:
+            title: "⏸️ Allarme Sospeso per Ospiti"
+            message: "Antifurto Casa Mancini disattivato temporaneamente fino a {{ fine_orario_msg }}. L'allarme non suonerà se qualcuno entra in casa."
+            data:
+              tag: "eco_home_guest_mode"
+          continue_on_error: true
+        - action: notify.mobile_app_samsung_s22_di_laura
+          data:
+            title: "⏸️ Allarme Sospeso per Ospiti"
+            message: "Antifurto Casa Mancini disattivato temporaneamente fino a {{ fine_orario_msg }}."
+            data:
+              tag: "eco_home_guest_mode"
+          continue_on_error: true
+
+- id: 'eco_home_security_sospensione_toggle_boolean'
+  alias: "Eco Home Security - Toggle Sospensione Allarme (Interruttore)"
+  description: "Gestisce l'attivazione o la revoca manuale della sospensione tramite il toggle."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: input_boolean.eco_home_sospensione_allarme
+      to: 'off'
+      id: turned_off
+    - trigger: state
+      entity_id: input_boolean.eco_home_sospensione_allarme
+      to: 'on'
+      id: turned_on
+  actions:
+    - choose:
+        # Se spento manualmente: revoca sospensione
+        - conditions:
+            - condition: trigger
+              id: turned_off
+          sequence:
+            - action: timer.cancel
+              target:
+                entity_id: timer.eco_home_sospensione_allarme
+              continue_on_error: true
+            - action: input_select.select_option
+              target:
+                entity_id: input_select.eco_home_durata_sospensione_allarme
+              data:
+                option: "Disattivata (Allarme Attivo)"
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                title: "🛡️ Sospensione Allarme Terminata"
+                message: "La modalità ospiti è stata disattivata. L'antifurto tornerà ad armarsi regolarmente quando sarete fuori casa."
+                data:
+                  tag: "eco_home_guest_mode"
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                title: "🛡️ Sospensione Allarme Terminata"
+                message: "La modalità ospiti è stata disattivata."
+                data:
+                  tag: "eco_home_guest_mode"
+              continue_on_error: true
+
+        # Se acceso manualmente e il select era Disattivata -> imposta 4 ore di default
+        - conditions:
+            - condition: trigger
+              id: turned_on
+            - condition: state
+              entity_id: input_select.eco_home_durata_sospensione_allarme
+              state: "Disattivata (Allarme Attivo)"
+          sequence:
+            - action: input_select.select_option
+              target:
+                entity_id: input_select.eco_home_durata_sospensione_allarme
+              data:
+                option: "4 Ore"
+
+- id: 'eco_home_security_sospensione_fine_timer'
+  alias: "Eco Home Security - Scadenza Timer Sospensione Allarme"
+  description: "Allo scadere del timer di sospensione ripristina automaticamente l'allarme attivo."
+  mode: single
+  triggers:
+    - trigger: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.eco_home_sospensione_allarme
+  actions:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.eco_home_sospensione_allarme
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.eco_home_durata_sospensione_allarme
+      data:
+        option: "Disattivata (Allarme Attivo)"
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: "🛡️ Sospensione Allarme Conclusa"
+        message: "Il periodo di sospensione per ospiti è terminato. L'antifurto è di nuovo attivo e vigilerà sulla casa."
+        data:
+          tag: "eco_home_guest_mode"
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: "🛡️ Sospensione Allarme Conclusa"
+        message: "Il periodo di sospensione per ospiti è terminato. L'antifurto è di nuovo attivo."
+        data:
+          tag: "eco_home_guest_mode"
+      continue_on_error: true
+
+# ------------------------------------------------------------------------------
+# 9. CHECK SILENZIOSO BUONANOTTE (ORE 00:00)
 # ------------------------------------------------------------------------------
 - id: 'eco_home_check_silenzioso_buonanotte'
   alias: 'Eco Home - Check Silenzioso Buonanotte (Ore 00:00)'
@@ -751,7 +987,7 @@
             value: "Check Buonanotte: Notificate anomalie aperte/accese"
 
 # ------------------------------------------------------------------------------
-# 9. ALLARME PORTONE APERTO A LUNGO (> 3 MINUTI - SICUREZZA MICIE)
+# 10. ALLARME PORTONE APERTO A LUNGO (> 3 MINUTI - SICUREZZA MICIE)
 # ------------------------------------------------------------------------------
 - id: 'eco_home_allarme_portone_aperto_lungo_micie'
   alias: 'Eco Home - Allarme Portone Aperto a Lungo (> 3 Minuti - Sicurezza Micie)'
@@ -815,7 +1051,7 @@
       continue_on_error: true
 
 # ------------------------------------------------------------------------------
-# 10. GUARDIANO DISPOSITIVI OFFLINE (CHECK ORE 11:00)
+# 11. GUARDIANO DISPOSITIVI OFFLINE (CHECK ORE 11:00)
 # ------------------------------------------------------------------------------
 - id: 'eco_home_guardiano_dispositivi_offline'
   alias: 'Eco Home - Guardiano Dispositivi Offline (Check Ore 11:00)'
