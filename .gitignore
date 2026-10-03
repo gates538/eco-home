@@ -1,16 +1,17 @@
-# Private scripts and credentials
-scripts/reload_ha.ps1
-scripts/sshpass.vbs
-scripts/plink.exe
+# OS & System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Editor & Scratch files
+*.swp
+*.bak
+*.tmp
+*~
+scratch/
 
 # Local configs and storage
 .storage/
 *.log
 restart_log.txt
-*.tmp
-
-# OS files
-.DS_Store
-Thumbs.db
-
-scratch/
