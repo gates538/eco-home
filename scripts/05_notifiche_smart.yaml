@@ -1,0 +1,165 @@
+# ==============================================================================
+# MOTORE NOTIFICHE SMART & CANALI DI TEST — CASA MANCINI
+# ==============================================================================
+# Dispatching intelligente notifiche push prioritario e test canali WhatsApp/App.
+# Script inclusi in questo modulo: 4
+# ==============================================================================
+
+notifica_smart:
+  alias: 🔔 Notifica Smart Casa Mancini
+  description: Motore unificato per l'invio intelligente di notifiche su WhatsApp, Push App e Assistenti Vocali
+  mode: parallel
+  max: 20
+  fields:
+    titolo:
+      description: Titolo della notifica con eventuale emoji
+      example: ⚡ Allerta Blackout
+      required: true
+    messaggio:
+      description: Corpo del messaggio
+      example: Assorbimento oltre 6 kW! Spegnere i carichi pesanti.
+      required: true
+    canale:
+      description: 'Canale di destinazione: ''tutti'', ''whatsapp'', ''stefano'', ''laura'', ''tutti_telefoni'', ''vocale'''
+      default: tutti
+    priorita:
+      description: 'Livello di priorita'': ''critica'', ''alta'', ''normale'', ''bassa'''
+      default: normale
+    categoria:
+      description: 'Categoria: ''sicurezza'', ''energia'', ''elettrodomestici'', ''meteo'', ''rifiuti'', ''pet'', ''generale'''
+      default: generale
+    immagine:
+      description: URL o percorso immagine / snapshot telecamera
+      example: /api/camera_proxy/camera.cam_cancello_mainstreamprofile
+    azioni:
+      description: Pulsanti interattivi per smartphone (Actionable notifications)
+    tag:
+      description: Identificativo univoco notifica per raggruppamento o sostituzione
+      example: blackout_alert
+  sequence:
+    - variables:
+        target_channel: "{% if canale is defined and canale not in ['', none] %}\n  {{ canale }}\n{% else %}\n  {% set sel\
+          \ = states('input_select.notifiche_canale_predefinito') | default('Tutti') %}\n  {% if 'Solo WhatsApp' in sel %}whatsapp\n\
+          \  {% elif 'Solo Smartphone Stefano' in sel %}stefano\n  {% elif 'Solo Smartphone Laura' in sel %}laura\n  {% elif\
+          \ 'Tutti i Telefoni' in sel %}tutti_telefoni\n  {% else %}tutti{% endif %}\n{% endif %}"
+        cat: '{{ categoria | default(''generale'') }}'
+        prio: '{{ priorita | default(''normale'') }}'
+        is_critical: '{{ prio == ''critica'' }}'
+        master_enabled: '{{ is_state(''input_boolean.notifiche_abilitate_generale'', ''on'') or is_critical }}'
+        cat_enabled: "{% if is_critical %}true {% elif states('input_boolean.notifiche_' ~ cat) in ['on', 'off'] %}\n  {{\
+          \ is_state('input_boolean.notifiche_' ~ cat, 'on') }}\n{% else %}true{% endif %}"
+        should_send: '{{ master_enabled and cat_enabled }}'
+        msg_whatsapp: '*{{ titolo | trim }}* {{ messaggio | trim }} _Casa Mancini Smart_'
+    - condition: template
+      value_template: '{{ should_send }}'
+    - parallel:
+        - sequence:
+            - condition: template
+              value_template: '{{ target_channel in [''tutti'', ''whatsapp''] and (is_state(''input_boolean.notifiche_whatsapp_attive'',
+                ''on'') or is_critical) }}'
+            - action: rest_command.whatsapp_group_notify
+              data:
+                message: '{{ msg_whatsapp }}'
+              continue_on_error: true
+        - sequence:
+            - condition: template
+              value_template: "{{ target_channel in ['tutti', 'tutti_telefoni', 'stefano']\n   and (is_critical or (\n   \
+                \  is_state('input_boolean.notifiche_push_stefano', 'on')\n     and (is_state('input_boolean.notifiche_stefano_'\
+                \ ~ cat, 'on') if states('input_boolean.notifiche_stefano_' ~ cat) in ['on', 'off'] else true)\n   )) }}"
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                title: '{{ titolo }}'
+                message: '{{ messaggio }}'
+                data:
+                  tag: '{{ tag | default(''notifica_casa_'' ~ cat) }}'
+                  ttl: 0
+                  priority: '{% if is_critical or prio == ''alta'' %}high{% else %}normal{% endif %}'
+                  importance: '{% if is_critical or prio == ''alta'' %}high{% else %}normal{% endif %}'
+                  channel: '{% if is_critical %}Allarmi Critici{% elif prio == ''alta'' %}Importanti{% else %}Generale{% endif
+                    %}'
+                  image: '{{ immagine | default('''') }}'
+                  actions: '{{ azioni | default([]) }}'
+              continue_on_error: true
+        - sequence:
+            - condition: template
+              value_template: "{{ target_channel in ['tutti', 'tutti_telefoni', 'laura']\n   and (is_critical or (\n     is_state('input_boolean.notifiche_push_laura',\
+                \ 'on')\n     and (is_state('input_boolean.notifiche_laura_' ~ cat, 'on') if states('input_boolean.notifiche_laura_'\
+                \ ~ cat) in ['on', 'off'] else true)\n   )) }}"
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                title: '{{ titolo }}'
+                message: '{{ messaggio }}'
+                data:
+                  tag: '{{ tag | default(''notifica_casa_'' ~ cat) }}'
+                  ttl: 0
+                  priority: '{% if is_critical or prio == ''alta'' %}high{% else %}normal{% endif %}'
+                  importance: '{% if is_critical or prio == ''alta'' %}high{% else %}normal{% endif %}'
+                  channel: '{% if is_critical %}Allarmi Critici{% elif prio == ''alta'' %}Importanti{% else %}Generale{% endif
+                    %}'
+                  image: '{{ immagine | default('''') }}'
+                  actions: '{{ azioni | default([]) }}'
+              continue_on_error: true
+    - action: python_script.log_notifica
+      data:
+        timestamp: '{{ now().strftime(''%d/%m %H:%M'') }}'
+        categoria: '{{ cat | title }}'
+        titolo: '{{ titolo }}'
+        messaggio: '{{ messaggio }}'
+        canale: '{{ target_channel | title }}'
+        priorita: '{{ prio }}'
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: '{{ (titolo ~ '': '' ~ messaggio) | truncate(250, true, '''') }}'
+      continue_on_error: true
+    - action: logbook.log
+      data:
+        name: '{{ titolo }}'
+        message: '{{ messaggio }}'
+        entity_id: script.notifica_smart
+      continue_on_error: true
+test_notifica_whatsapp:
+  alias: 🟢 Test Notifica WhatsApp
+  icon: mdi:whatsapp
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: 🟢 Test Notifica WhatsApp
+        messaggio: Collaudo invio notifiche WhatsApp da Casa Mancini completato con successo!
+        canale: whatsapp
+        priorita: normale
+        categoria: generale
+        tag: test_whatsapp
+test_notifica_push_app:
+  alias: 📱 Test Notifica Push App (con Bottoni)
+  icon: mdi:cellphone-message
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: 📱 Test Push Companion App
+        messaggio: Questo è un test interattivo! Prova a toccare uno dei pulsanti qui sotto.
+        canale: tutti_telefoni
+        priorita: alta
+        categoria: generale
+        tag: test_push_interactive
+        azioni:
+          - action: SPEGNI_CLIMA
+            title: ❄️ Spegni Clima
+          - action: ABBASSA_TAPPARELLE
+            title: 🪟 Abbassa Tapparelle
+          - action: IGNORA
+            title: ✅ Test Superato
+test_notifica_acquario:
+  alias: 🐠 Test Notifica Acquario
+  icon: mdi:fish
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: 🐠 Test Notifica Acquario
+        messaggio: 'Collaudo filtri: questa notifica arriva a Stefano ed è esclusa per Laura se disattivata!'
+        canale: tutti_telefoni
+        priorita: normale
+        categoria: acquario
+        tag: test_acquario

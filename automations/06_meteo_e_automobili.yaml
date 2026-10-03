@@ -1,0 +1,670 @@
+# ==============================================================================
+# METEO AMBIENTALE NETATMO & MANUTENZIONE VEICOLI — CASA MANCINI
+# ==============================================================================
+# Pluviometro ed anemometro Netatmo, protezione infissi da pioggia/vento, allerte gelo, terremoti INGV e promemoria manutenzione auto Discovery e Punto.
+# Automazioni incluse in questo modulo: 19
+# ==============================================================================
+
+- id: eco_home_meteo_vento_pioggia_terrazza
+  alias: Eco Home - Allerta Vento Forte e Pioggia (Netatmo Terrazza)
+  description: Annuncio vocale sarcastico quando scattano pioggia o vento forte in terrazza di giorno
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sala_anemometro_gust_strength
+      above: 15
+      id: vento_forte
+    - trigger: numeric_state
+      entity_id: sensor.terrazza_pulvirometro_precipitazione
+      above: 0.01
+      id: inizio_pioggia
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: template
+      value_template: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') or is_state(''input_boolean.eco_home_attivo'',
+        ''on'') or states(''input_boolean.eco_home_attivo'') in [''unknown'', ''unavailable''] }}'
+    - condition: template
+      value_template: '{{ not is_state(''input_boolean.eco_home_silenzioso'', ''on'') and not is_state(''input_boolean.eco_home_silenzioso'',
+        ''on'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 3600 }}'
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.id == ''vento_forte'' }}'
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                language: it
+                options:
+                  tld: it
+                message: "{{ [\n  \"Attenzione! Vento sopra i quindici chilometri orari in terrazza: occhio a stendini e tende!\"\
+                  ,\n  \"Allarme raffiche in terrazza! Ritirate gli oggetti leggeri prima che volino in paese!\",\n  \"Vento\
+                  \ forte in terrazza! Controllate stendini e piante all'esterno!\"\n] | random }}"
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.id == ''inizio_pioggia'' }}'
+          sequence:
+            - variables:
+                finestre_aperte: '{% set ns = namespace(doors=[]) %} {% if is_state(''binary_sensor.finestrasala_contact'',
+                  ''on'') %}{% set ns.doors = ns.doors + [''Sala''] %}{% endif %} {% if is_state(''binary_sensor.finestracamera_contact'',
+                  ''on'') %}{% set ns.doors = ns.doors + [''Camera''] %}{% endif %} {% if is_state(''binary_sensor.finestracameretta_contact'',
+                  ''on'') %}{% set ns.doors = ns.doors + [''Cameretta''] %}{% endif %} {% if is_state(''binary_sensor.finestrabagno_contact'',
+                  ''on'') %}{% set ns.doors = ns.doors + [''Bagno''] %}{% endif %} {% if is_state(''binary_sensor.finestrabagnetto_contact'',
+                  ''on'') %}{% set ns.doors = ns.doors + [''Bagnetto''] %}{% endif %} {% if is_state(''binary_sensor.finestracucina_contact'',
+                  ''on'') %}{% set ns.doors = ns.doors + [''Cucina''] %}{% endif %} {% if is_state(''binary_sensor.portaterrazzo_contact'',
+                  ''on'') %}{% set ns.doors = ns.doors + [''Porta Terrazzo''] %}{% endif %} {{ ns.doors }}'
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                language: it
+                options:
+                  tld: it
+                message: "{% if finestre_aperte | length > 0 %}\n  Allarme pioggia in terrazza! Attenzione, ci sono finestre\
+                  \ aperte in: {{ finestre_aperte | join(', ') }}. Chiudetele subito per evitare infiltrazioni!\n{% else %}\n\
+                  \  Attenzione, pioggia rilevata dal pluviometro! Tutte le finestre sono chiuse, ritirate solo il bucato\
+                  \ steso se presente!\n{% endif %}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Meteo Alert: Vento/Pioggia in terrazza'
+      continue_on_error: true
+  mode: single
+- id: eco_home_salva_bucato_terrazza_vento_pioggia
+  alias: Eco Home - Salva-Bucato in Terrazza (Vento Forte & Pioggia con Asciugatrice Pronta)
+  description: Avviso vocale tempestivo se l asciugatrice ha finito e in terrazza scatta pioggia o vento forte prima che i
+    panni volino via
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sala_anemometro_gust_strength
+      above: 25
+    - trigger: numeric_state
+      entity_id: sensor.terrazza_pulvirometro_precipitazione
+      above: 0.01
+    - trigger: state
+      entity_id: weather.casa
+      to:
+        - rainy
+        - pouring
+        - lightning
+        - hail
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ is_state(''input_boolean.eco_home_asciugatrice_da_annunciare'', ''on'') or states(''sensor.esterno_asciugatrice_machine_state'')
+        in [''complete'', ''completed'', ''finish'', ''finished'', ''end'', ''ended''] }}'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 3600 }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Allarme bucato in terrazza! Asciugatrice terminata e vento forte: ritirate i panni prima che decollino!\"\
+          ,\n  \"Attenzione bucato! Prime gocce di pioggia in terrazza con asciugatrice terminata: salvate i vestiti!\",\n\
+          \  \"Allerta meteo terrazza: raffiche di vento con bucato fuori, andate a scaricare l'asciugatrice!\"\n] | random\
+          \ }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Asciugatrice Alert: Vento/Pioggia con bucato in terrazza'
+  mode: single
+- id: eco_home_allerta_raffiche_vento_porte_sbattute
+  alias: Eco Home - Allerta Raffiche Vento Forte & Porte Sbattute (> 30 km/h)
+  description: Avviso vocale su Nest Hub se l anemometro in terrazza rileva raffiche sopra 30 km/h per prevenire colpi d aria
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sala_anemometro_gust_strength
+      above: 30
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Attenzione: raffiche di vento sopra i trenta chilometri orari in terrazza! Occhio alle porte che\
+          \ sbattono!\",\n  \"Allerta vento in paese! Raffiche sostenute: controllate porte e finestre per evitare correnti\
+          \ d'aria!\",\n  \"Vento forte in terrazza! Verificate le aperture di casa per evitare colpi d'aria e spaventi alle\
+          \ micie!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Meteo Alert: Raffiche vento > 30 km/h in terrazza'
+  mode: single
+- id: eco_home_allerta_gelo_parabrezza_auto
+  alias: Eco Home - Allerta Gelo Parabrezza Serale (Netatmo Esterna)
+  description: Notifica WhatsApp alle 22:00 se la temperatura esterna scende sotto i 3°C per preparare la Discovery al mattino
+  triggers:
+    - trigger: time
+      at: '22:00:00'
+  conditions:
+    - condition: numeric_state
+      entity_id: sensor.temperatura_media_esterna
+      below: 3
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+  actions:
+    - action: rest_command.whatsapp_group_notify
+      data:
+        message: "{{ [\n  \"❄️ Attenzione! Temperatura esterna di \" ~ states('sensor.temperatura_media_esterna') ~ \"°C:\
+          \ domani possibile parabrezza gelato per la Discovery!\",\n  \"\U0001F976 Allerta Gelo! Fuori ci sono \" ~ states('sensor.temperatura_media_esterna')\
+          \ ~ \"°C: preparare il raschietto per l'auto!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Meteo Alert: Possibile gelo parabrezza auto'
+  mode: single
+- id: eco_home_promemoria_auto_domenica
+  alias: Eco Home - Promemoria Carburante Auto (Drivvo & Discovery)
+  description: Promemoria domenica sera per verificare rifornimento e consumi della Discovery
+  triggers:
+    - trigger: time
+      at: '20:30:00'
+  conditions:
+    - condition: time
+      weekday:
+        - sun
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Stefano, promemoria Discovery: verifica carburante e autonomia prima di domani mattina!\",\n \
+          \ \"Attenzione Stefano: check serbatoio per la Discovery prima della nuova settimana!\",\n  \"Promemoria domenica:\
+          \ controlla il livello carburante della Discovery!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Promemoria Auto: Verifica carburante Discovery'
+  mode: single
+- id: eco_home_meteo_flash_mattutino
+  alias: Eco Home - Meteo Flash Pre-Uscita Mattutina (Ore 07:40, Discovery)
+  description: Avviso vocale 10 minuti prima dell uscita lavorativa solo se piove in terrazza o c è gelo (esclude weekend,
+    festività e modalità ferie)
+  triggers:
+    - trigger: time
+      at: 07:40:00
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: template
+      value_template: '{{ now().weekday() < 5 }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ not is_state(''input_boolean.eco_home_modalita_ferie'', ''on'') }}'
+    - condition: template
+      value_template: "{% set m = now().month %} {% set d = now().day %} {% set is_holiday = (\n  (m == 1 and d in [1, 6])\
+        \ or\n  (m == 4 and d == 25) or\n  (m == 5 and d == 1) or\n  (m == 6 and d == 2) or\n  (m == 8 and d == 15) or\n \
+        \ (m == 11 and d == 1) or\n  (m == 12 and d in [8, 25, 26])\n) %} {{ not is_holiday }}"
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+    - condition: template
+      value_template: '{% set rain_active = states(''sensor.terrazza_pulvirometro_precipitazione'') | float(0) > 0.01 or states(''weather.casa'')
+        in [''rainy'', ''pouring'', ''lightning'', ''hail''] %} {% set frost_active = states(''sensor.temperatura_media_esterna'')
+        | float(10) <= 2 %} {{ rain_active or frost_active }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{% set rain_active = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 or states('weather.casa')\
+          \ in ['rainy', 'pouring', 'lightning', 'hail'] %} {% set frost_active = states('sensor.temperatura_media_esterna')\
+          \ | float(10) <= 2 %} {% if rain_active %}\n  {{ [\n    \"Attenzione Stefano e Laura: piove in terrazza! Ricordatevi\
+          \ gli ombrelli prima di salire sulla Discovery!\",\n    \"Meteo flash: pioggia in corso all'esterno! Non dimenticate\
+          \ gli ombrelli!\",\n    \"Avviso partenza: fuori piove, ombrelli a portata di mano!\"\n  ] | random }}\n{% elif\
+          \ frost_active %}\n  {{ [\n    \"Attenzione prima di uscire: fuori ci sono solo \" ~ states('sensor.temperatura_media_esterna')\
+          \ ~ \" gradi! Il parabrezza della Discovery potrebbe essere gelato!\",\n    \"Meteo flash: mattinata con ghiaccio\
+          \ all'esterno, occhio ai vetri dell'auto!\"\n  ] | random }}\n{% endif %}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Meteo Flash: Avviso pioggia/gelo pre-partenza Discovery'
+  mode: single
+- id: eco_home_controllo_batteria_smartphone_mattina
+  alias: Eco Home - Salva-Batteria Smartphone Pre-Partenza (Ore 07:30, Discovery & Punto Blu)
+  description: Avviso vocale prima di uscire alle 07:30 se lo smartphone di Stefano o Laura è sotto il 20%
+  triggers:
+    - trigger: time
+      at: 07:30:00
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: template
+      value_template: '{{ now().weekday() < 5 }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ not is_state(''input_boolean.eco_home_modalita_ferie'', ''on'') }}'
+    - condition: template
+      value_template: "{% set m = now().month %} {% set d = now().day %} {% set is_holiday = (\n  (m == 1 and d in [1, 6])\
+        \ or\n  (m == 4 and d == 25) or\n  (m == 5 and d == 1) or\n  (m == 6 and d == 2) or\n  (m == 8 and d == 15) or\n \
+        \ (m == 11 and d == 1) or\n  (m == 12 and d in [8, 25, 26])\n) %} {{ not is_holiday }}"
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+  actions:
+    - variables:
+        stefano_phones: '{% set s_list = states.sensor | selectattr(''entity_id'', ''search'', ''stefano.*(battery|batteria)|(battery|batteria).*stefano'')
+          | rejectattr(''entity_id'', ''search'', ''watch|orologio|tablet|ipad|tag|tile|fitbit'') | map(attribute=''state'')
+          | select(''is_number'') | map(''int'') | list %} {{ s_list | min | default(100) }}'
+        laura_phones: '{% set l_list = states.sensor | selectattr(''entity_id'', ''search'', ''laura.*(battery|batteria)|(battery|batteria).*laura'')
+          | rejectattr(''entity_id'', ''search'', ''watch|orologio|tablet|ipad|tag|tile|fitbit'') | map(attribute=''state'')
+          | select(''is_number'') | map(''int'') | list %} {{ l_list | min | default(100) }}'
+        stefano_low: '{{ stefano_phones < 20 and is_state(''person.stefano'', ''home'') }}'
+        laura_low: '{{ laura_phones < 20 and is_state(''person.laura'', ''home'') }}'
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ stefano_low and laura_low }}'
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                language: it
+                options:
+                  tld: it
+                message: "{{ [\n  \"Attenzione ragazzi: avete entrambi i telefoni quasi scarichi! Metteteli in carica prima\
+                  \ di salire sulla Discovery e sulla Punto Blu!\",\n  \"Promemoria batterie del mattino: telefoni sotto il\
+                  \ venti percento! Una ricarica rapida al volo prima della partenza!\"\n] | random }}"
+        - conditions:
+            - condition: template
+              value_template: '{{ stefano_low }}'
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                language: it
+                options:
+                  tld: it
+                message: "{{ [\n  \"Stefano, promemoria batteria: il telefono è quasi scarico! Mettilo in carica prima di\
+                  \ salire sulla Discovery!\",\n  \"Capitano Stefano, attenzione al telefono: batteria sotto il venti percento\
+                  \ prima di partire con la Discovery!\"\n] | random }}"
+        - conditions:
+            - condition: template
+              value_template: '{{ laura_low }}'
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                language: it
+                options:
+                  tld: it
+                message: "{{ [\n  \"Laura, promemoria batteria: il telefono è quasi scarico! Attaccalo alla ricarica prima\
+                  \ di salire sulla Punto Blu!\",\n  \"Attenzione Laura: batteria del telefono sotto il venti percento prima\
+                  \ di partire con la Punto Blu!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Batteria Alert: Controllo smartphone pre-uscita 07:30'
+  mode: single
+- id: manutenzione_tagliando_discovery
+  alias: Automobili - Promemoria Tagliando Discovery
+  description: Invia una notifica quando mancano meno di 1000 km al tagliando della Discovery
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.discovery_allerta_tagliando
+      from: 'off'
+      to: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🔧 Tagliando Land Rover Discovery
+        messaggio: 'Mancano meno di 1.000 km al tagliando per Land Rover Discovery Sport! (Km attuali: {{ states(''sensor.discovery_refuelling_odometer'')
+          }} km).'
+        categoria: generale
+        priorita: normale
+        tag: tagliando_discovery
+  mode: single
+- id: manutenzione_tagliando_punto
+  alias: Automobili - Promemoria Tagliando Punto
+  description: Invia una notifica quando mancano meno di 1000 km al tagliando della Punto
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.punto_allerta_tagliando
+      from: 'off'
+      to: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🔧 Tagliando Fiat Punto
+        messaggio: 'Mancano meno di 1.000 km al tagliando per Fiat Punto! (Km attuali: {{ states(''sensor.punto_odometer_value'')
+          }} km).'
+        categoria: generale
+        priorita: normale
+        tag: tagliando_punto
+  mode: single
+- id: manutenzione_gomme_discovery
+  alias: Automobili - Promemoria Inversione Gomme Discovery
+  description: Invia una notifica quando mancano meno di 500 km all'inversione gomme della Discovery
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.discovery_allerta_inversione_gomme
+      from: 'off'
+      to: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🛞 Inversione Gomme Discovery Sport
+        messaggio: 'È tempo di invertire le gomme sulla Discovery Sport (Intervallo 10.000 km raggiunto - Km attuali: {{ states(''sensor.discovery_refuelling_odometer'')
+          }} km).'
+        categoria: generale
+        priorita: normale
+        tag: gomme_discovery
+  mode: single
+- id: manutenzione_gomme_punto
+  alias: Automobili - Promemoria Inversione Gomme Punto
+  description: Invia una notifica quando mancano meno di 500 km all'inversione gomme della Punto
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.punto_allerta_inversione_gomme
+      from: 'off'
+      to: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🛞 Inversione Gomme Fiat Punto
+        messaggio: 'È tempo di invertire le gomme sulla Fiat Punto (Intervallo 10.000 km raggiunto - Km attuali: {{ states(''sensor.punto_odometer_value'')
+          }} km).'
+        categoria: generale
+        priorita: normale
+        tag: gomme_punto
+  mode: single
+- id: manutenzione_revisione_discovery
+  alias: Automobili - Promemoria Revisione Discovery
+  description: Invia una notifica quando mancano meno di 30 giorni alla revisione della Discovery
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.discovery_allerta_revisione
+      from: 'off'
+      to: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 📋 Revisione Discovery Sport
+        messaggio: 'La revisione ministeriale biennale per Discovery Sport scade tra meno di 30 giorni! (Scadenza: {{ states(''input_datetime.discovery_scadenza_revisione'')
+          }}).'
+        categoria: generale
+        priorita: normale
+        tag: revisione_discovery
+  mode: single
+- id: manutenzione_revisione_punto
+  alias: Automobili - Promemoria Revisione Punto
+  description: Invia una notifica quando mancano meno di 30 giorni alla revisione della Punto
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.punto_allerta_revisione
+      from: 'off'
+      to: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 📋 Revisione Fiat Punto
+        messaggio: 'La revisione ministeriale biennale per Fiat Punto scade tra meno di 30 giorni! (Scadenza: {{ states(''input_datetime.punto_scadenza_revisione'')
+          }}).'
+        categoria: generale
+        priorita: normale
+        tag: revisione_punto
+  mode: single
+- id: notifica_smart_terremoto_ingv
+  alias: 🌍 Notifica Smart - Allerta Terremoto INGV
+  description: Invia notifica push su smartphone per eventi sismici con Magnitudo >= 2.0 entro 50 km oppure Magnitudo >= 3.5
+    entro 100 km da Casa Mancini
+  triggers:
+    - trigger: state
+      entity_id: sensor.ingv_earthquakes_casa_status
+  conditions:
+    - condition: template
+      value_template: "{% set status = states('sensor.ingv_earthquakes_casa_status') | int(0) %} {% set quakes = states.geo_location\
+        \ | selectattr('attributes.source', 'defined') | selectattr('attributes.source', 'eq', 'ingv_centro_nazionale_terremoti')\
+        \ | list %} {% set ns = namespace(found=false) %} {% for q in quakes %}\n  {% set dist = q.state | float(999) %}\n\
+        \  {% set mag = q.attributes.magnitude | float(0) %}\n  {% if (dist <= 50 and mag >= 2.0) or (dist <= 100 and mag\
+        \ >= 3.5) %}\n    {% set ns.found = true %}\n  {% endif %}\n{% endfor %} {{ status > 0 and (trigger.to_state.state\
+        \ != trigger.from_state.state or trigger.from_state.state == '0') and ns.found }}\n"
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🌍 Allerta Terremoto INGV
+        messaggio: "{% set quakes = states.geo_location | selectattr('attributes.source', 'defined') | selectattr('attributes.source',\
+          \ 'eq', 'ingv_centro_nazionale_terremoti') | list %} {% set details = [] %} {% for q in quakes %}\n  {% set dist\
+          \ = q.state | float(999) %}\n  {% set mag = q.attributes.magnitude | float(0) %}\n  {% if (dist <= 50 and mag >=\
+          \ 2.0) or (dist <= 100 and mag >= 3.5) %}\n    {% set item = \"Scossa Magnitudo \" ~ mag ~ \" a circa \" ~ (dist\
+          \ | round(1)) ~ \" km da Casa Mancini (Zona: \" ~ q.attributes.region | default('N/D') ~ \", prof. \" ~ q.attributes.depth\
+          \ | default('N/D') ~ \" km).\" %}\n    {% set details = details + [item] %}\n  {% endif %}\n{% endfor %} {% if details\
+          \ | count > 0 %}\n  {{ details | join('\\n') }}\n{% else %}\n  Rilevata attività sismica nell'area monitorata da\
+          \ Casa Mancini.\n{% endif %}\n"
+        categoria: sicurezza
+        priorita: alta
+        canale: tutti_telefoni
+        tag: allerta_sisma_ingv
+  mode: queued
+  max: 5
+- id: notifica_smart_fulmini_ravvicinati_blitzortung
+  alias: ⚡ Notifica Smart - Allerta Fulmini entro 15 km
+  description: Invia notifica push su smartphone se Blitzortung rileva scariche elettriche entro 15 km da Casa Mancini con
+    tasto rapido Protezione Temporale
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.casa_lightning_distance
+      below: 15.1
+      id: fulmine_vicino
+    - trigger: state
+      entity_id: sensor.casa_lightning_counter
+      id: counter_scariche
+  conditions:
+    - condition: template
+      value_template: '{% set counter = states(''sensor.casa_lightning_counter'') | int(0) %} {% set dist = states(''sensor.casa_lightning_distance'')
+        %} {{ counter > 0 and dist not in [''unknown'', ''unavailable'', ''None'', ''''] and (dist | float(999)) <= 15.0 }}
+
+        '
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: '⚡ Allerta Temporale: Fulmini entro 15 km!'
+        messaggio: 'Rilevata attività elettrica a circa {{ states(''sensor.casa_lightning_distance'') }} km da Casa Mancini
+          (direzione {{ states(''sensor.casa_lightning_azimuth'') }}°, {{ states(''sensor.casa_lightning_counter'') }} scariche
+          nell''ultima ora).
+
+          '
+        categoria: meteo
+        priorita: alta
+        canale: tutti_telefoni
+        tag: allerta_fulmini_15km
+        azioni:
+          - action: ATTIVA_TEMPORALE
+            title: ⛈️ Protezione Temporale
+          - action: IGNORA
+            title: Ignora
+    - delay: 00:15:00
+  mode: single
+- id: notifica_meteo_vento_forte
+  alias: 💨 Notifica Smart - Raffiche di Vento Forte
+  description: Invia allerta con tasto abbassa tapparelle se il vento supera i 20 km/h (max 1 ogni 2h)
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sala_anemometro_gust_strength
+      above: 20
+  conditions:
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 💨 Vento Forte Rilevato
+        messaggio: Raffiche a {{ states('sensor.sala_anemometro_gust_strength') }} km/h registrate in terrazza. Verificare
+          tende e balconi.
+        categoria: meteo
+        priorita: alta
+        tag: meteo_vento
+        azioni:
+          - action: ABBASSA_TAPPARELLE
+            title: 🪟 Abbassa Tapparelle
+          - action: IGNORA
+            title: Tutto a posto
+  mode: single
+- id: notifica_meteo_inizio_pioggia
+  alias: 🌧️ Notifica Smart - Inizio Pioggia & Controllo Finestre
+  description: Invia avviso quando il pluviometro in terrazza rileva la pioggia, verificando se ci sono finestre aperte e
+    quali (max 1 ogni ora)
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.terrazza_pulvirometro_precipitazione
+      above: 0.1
+  conditions:
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 3600 }}'
+  actions:
+    - variables:
+        finestre_aperte: '{% set ns = namespace(doors=[]) %} {% if is_state(''binary_sensor.finestrasala_contact'', ''on'')
+          %}{% set ns.doors = ns.doors + [''Finestra Sala''] %}{% endif %} {% if is_state(''binary_sensor.finestracamera_contact'',
+          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Camera''] %}{% endif %} {% if is_state(''binary_sensor.finestracameretta_contact'',
+          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Cameretta''] %}{% endif %} {% if is_state(''binary_sensor.finestrabagno_contact'',
+          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Bagno''] %}{% endif %} {% if is_state(''binary_sensor.finestrabagnetto_contact'',
+          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Bagnetto''] %}{% endif %} {% if is_state(''binary_sensor.finestracucina_contact'',
+          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Cucina''] %}{% endif %} {% if is_state(''binary_sensor.portaterrazzo_contact'',
+          ''on'') %}{% set ns.doors = ns.doors + [''Porta Terrazzo''] %}{% endif %} {{ ns.doors }}'
+        ci_sono_finestre_aperte: '{{ finestre_aperte | length > 0 }}'
+    - if:
+        - condition: template
+          value_template: '{{ ci_sono_finestre_aperte }}'
+      then:
+        - action: script.notifica_smart
+          data:
+            titolo: 🌧️ Allerta Pioggia — Finestre Aperte!
+            messaggio: 'Sta piovendo a Casa Mancini! Attenzione: ci sono infissi APERTI: {{ finestre_aperte | join('', '')
+              }}. Chiudili subito per evitare infiltrazioni!'
+            categoria: meteo
+            priorita: alta
+            tag: meteo_pioggia
+            azioni:
+              - action: ABBASSA_TAPPARELLE
+                title: 🪟 Abbassa Tapparelle
+      else:
+        - action: script.notifica_smart
+          data:
+            titolo: 🌧️ Inizio Pioggia Rilevato
+            messaggio: Sta iniziando a piovere a Casa Mancini. Tutte le finestre sono chiuse e sigillate, nessun rischio.
+            categoria: meteo
+            priorita: normale
+            tag: meteo_pioggia
+            azioni:
+              - action: ABBASSA_TAPPARELLE
+                title: 🪟 Abbassa Tapparelle
+  mode: single
+- id: notifica_meteo_gelo_auto
+  alias: ❄️ Notifica Smart - Allerta Gelo Notturno Auto
+  description: Avvisa alle 06:45 se la temperatura esterna è sotto i -1°C per riscaldamento auto/parabrezza
+  triggers:
+    - trigger: time
+      at: 06:45:00
+  conditions:
+    - condition: numeric_state
+      entity_id: sensor.temperatura_media_esterna
+      below: 0
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: ❄️ Allerta Gelo Parabrezza
+        messaggio: Temperatura esterna a {{ states('sensor.temperatura_media_esterna') }}°C. Parabrezza delle auto (Discovery
+          e Punto) probabilmente ghiacciati.
+        categoria: meteo
+        priorita: normale
+        tag: meteo_gelo
+  mode: single
+- id: notifica_allerta_ghiaccio_parabrezza_auto
+  alias: ❄️ Notifica Smart - Possibile Ghiaccio Parabrezza (07:00)
+  description: Avvisa la mattina prima di partire se la temperatura notturna è scesa sotto 1°C
+  triggers:
+    - trigger: time
+      at: 07:00:00
+  conditions:
+    - condition: template
+      value_template: '{{ states(''sensor.temperatura_media_esterna'') | float(10) <= 1.0 }}
+
+        '
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: ❄️ Attenzione Ghiaccio Parabrezza
+        messaggio: Temperatura notturna molto rigida ({{ states('sensor.temperatura_media_esterna') }}°C). Possibile presenza
+          di brina o ghiaccio sui parabrezza di Discovery e Punto prima di partire.
+        categoria: meteo
+        priorita: normale
+        canale: stefano
+        tag: ghiaccio_auto_mattina
+  mode: single

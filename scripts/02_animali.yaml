@@ -1,0 +1,381 @@
+# ==============================================================================
+# GESTIONE ANIMALI: GATTE (LUNA & PICCOLA) E ACQUARIO — CASA MANCINI
+# ==============================================================================
+# Comandi presenza gatte in/out, erogazione pasti PetKit e gestione manuale luci/pasti/cambio acqua acquario.
+# Script inclusi in questo modulo: 14
+# ==============================================================================
+
+imposta_luna_in_casa:
+  alias: Imposta Luna In Casa
+  icon: mdi:home-heart
+  sequence:
+    - action: surepetcare.set_pet_location
+      data:
+        pet_name: Luna
+        location: Inside
+imposta_luna_fuori:
+  alias: Imposta Luna Fuori
+  icon: mdi:tree
+  sequence:
+    - action: surepetcare.set_pet_location
+      data:
+        pet_name: Luna
+        location: Outside
+imposta_piccola_in_casa:
+  alias: Imposta Piccola In Casa
+  icon: mdi:home-heart
+  sequence:
+    - action: surepetcare.set_pet_location
+      data:
+        pet_name: Piccola
+        location: Inside
+imposta_piccola_fuori:
+  alias: Imposta Piccola Fuori
+  icon: mdi:tree
+  sequence:
+    - action: surepetcare.set_pet_location
+      data:
+        pet_name: Piccola
+        location: Outside
+eroga_crocchette_manuale:
+  alias: Eroga Crocchette Manuale
+  icon: mdi:bowl-mix
+  sequence:
+    - if:
+        - condition: template
+          value_template: '{{ states(''input_number.dispenser_manuale_tramoggia_1'') | int(0) > 0 }}'
+      then:
+        - action: text.set_value
+          target:
+            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
+          data:
+            value: '{{ states(''input_number.dispenser_manuale_tramoggia_1'') | int(1) | string }}'
+    - if:
+        - condition: template
+          value_template: '{{ states(''input_number.dispenser_manuale_tramoggia_2'') | int(0) > 0 }}'
+      then:
+        - action: text.set_value
+          target:
+            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
+          data:
+            value: '{{ states(''input_number.dispenser_manuale_tramoggia_2'') | int(1) | string }}'
+    - action: button.press
+      target:
+        entity_id: button.dispenser_crocchette_play_sound
+      continue_on_error: true
+eroga_crocchette_slot_1:
+  alias: Eroga Pasto Mattina (Slot 1)
+  icon: mdi:weather-sunset-up
+  sequence:
+    - if:
+        - condition: template
+          value_template: '{{ states(''input_number.dispenser_slot_1_porzioni_t1'') | int(0) > 0 }}'
+      then:
+        - action: text.set_value
+          target:
+            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
+          data:
+            value: '{{ states(''input_number.dispenser_slot_1_porzioni_t1'') | int(1) | string }}'
+    - if:
+        - condition: template
+          value_template: '{{ states(''input_number.dispenser_slot_1_porzioni_t2'') | int(0) > 0 }}'
+      then:
+        - action: text.set_value
+          target:
+            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
+          data:
+            value: '{{ states(''input_number.dispenser_slot_1_porzioni_t2'') | int(1) | string }}'
+    - action: button.press
+      target:
+        entity_id: button.dispenser_crocchette_play_sound
+      continue_on_error: true
+eroga_crocchette_slot_2:
+  alias: Eroga Pasto Pranzo (Slot 2)
+  icon: mdi:weather-sunny
+  sequence:
+    - if:
+        - condition: template
+          value_template: '{{ states(''input_number.dispenser_slot_2_porzioni_t1'') | int(0) > 0 }}'
+      then:
+        - action: text.set_value
+          target:
+            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
+          data:
+            value: '{{ states(''input_number.dispenser_slot_2_porzioni_t1'') | int(1) | string }}'
+    - if:
+        - condition: template
+          value_template: '{{ states(''input_number.dispenser_slot_2_porzioni_t2'') | int(0) > 0 }}'
+      then:
+        - action: text.set_value
+          target:
+            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
+          data:
+            value: '{{ states(''input_number.dispenser_slot_2_porzioni_t2'') | int(1) | string }}'
+    - action: button.press
+      target:
+        entity_id: button.dispenser_crocchette_play_sound
+      continue_on_error: true
+eroga_crocchette_slot_3:
+  alias: Eroga Pasto Sera (Slot 3)
+  icon: mdi:weather-night
+  sequence:
+    - if:
+        - condition: template
+          value_template: '{{ states(''input_number.dispenser_slot_3_porzioni_t1'') | int(0) > 0 }}'
+      then:
+        - action: text.set_value
+          target:
+            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
+          data:
+            value: '{{ states(''input_number.dispenser_slot_3_porzioni_t1'') | int(1) | string }}'
+    - if:
+        - condition: template
+          value_template: '{{ states(''input_number.dispenser_slot_3_porzioni_t2'') | int(0) > 0 }}'
+      then:
+        - action: text.set_value
+          target:
+            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
+          data:
+            value: '{{ states(''input_number.dispenser_slot_3_porzioni_t2'') | int(1) | string }}'
+    - action: button.press
+      target:
+        entity_id: button.dispenser_crocchette_play_sound
+      continue_on_error: true
+acquario_ripristina_luce_automatica:
+  alias: 🐠 Acquario - Ripristina Luce Automatica
+  description: Interrompe l'override manuale e ripristina all'istante la fase del fotoperiodo biologico corretta per l'orario
+    attuale (buio dalle 23:30 alle 12:00).
+  icon: mdi:backup-restore
+  sequence:
+    - action: timer.cancel
+      target:
+        entity_id:
+          - timer.acquario_override_manuale
+          - timer.acquario_buio_24h
+    - action: input_boolean.turn_off
+      target:
+        entity_id:
+          - input_boolean.acquario_override_manuale
+          - input_boolean.acquario_buio_24h
+    - choose:
+        - conditions:
+            - condition: time
+              after: '12:00:00'
+              before: '13:30:00'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                brightness_pct: 25
+                rgbw_color:
+                  - 255
+                  - 110
+                  - 10
+                  - 15
+                transition: 5
+        - conditions:
+            - condition: time
+              after: '13:30:00'
+              before: '18:30:00'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                brightness_pct: 75
+                rgbw_color:
+                  - 240
+                  - 230
+                  - 255
+                  - 255
+                transition: 5
+        - conditions:
+            - condition: time
+              after: '18:30:00'
+              before: '20:00:00'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                brightness_pct: 45
+                rgbw_color:
+                  - 255
+                  - 150
+                  - 40
+                  - 60
+                transition: 5
+        - conditions:
+            - condition: time
+              after: '20:00:00'
+              before: '23:30:00'
+            - condition: template
+              value_template: '{{ states(''zone.home'') | int(0) > 0 and is_state(''input_boolean.acquario_relax_serale'',
+                ''on'') }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                brightness_pct: 18
+                rgbw_color:
+                  - 255
+                  - 75
+                  - 10
+                  - 0
+                transition: 5
+      default:
+        - action: light.turn_off
+          target:
+            entity_id: light.fzone_acquario
+    - delay: 00:00:01
+    - action: timer.cancel
+      target:
+        entity_id:
+          - timer.acquario_override_manuale
+          - timer.acquario_buio_24h
+    - action: input_boolean.turn_off
+      target:
+        entity_id:
+          - input_boolean.acquario_override_manuale
+          - input_boolean.acquario_buio_24h
+  mode: restart
+acquario_modalita_pasto:
+  alias: 🍽️ Acquario - Avvia Modalità Pasto (5 min)
+  description: Imposta una luce ottimale diffusa e nitida (70%) per 5 minuti per consentire ai neon e alle rasbore di alimentarsi
+    in superficie, poi ripristina la luce oraria automatica.
+  icon: mdi:shaker
+  sequence:
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.acquario_pasto_in_corso
+    - action: timer.start
+      target:
+        entity_id: timer.acquario_modalita_pasto
+      data:
+        duration: 00:05:00
+    - action: light.turn_on
+      target:
+        entity_id: light.fzone_acquario
+      data:
+        brightness_pct: 70
+        rgbw_color:
+          - 255
+          - 235
+          - 220
+          - 255
+        transition: 3
+  mode: restart
+acquario_registra_cambio_acqua:
+  alias: 💧 Acquario - Registra Cambio Acqua
+  description: Salva data e ora dell'ultimo cambio parziale d'acqua e notifica l'avvenuta manutenzione.
+  icon: mdi:water-sync
+  sequence:
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.acquario_ultimo_cambio_acqua
+      data:
+        datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+    - action: script.notifica_smart
+      data:
+        titolo: '💧 Acquario: Cambio Acqua Registrato'
+        messaggio: 'Registrato con successo il cambio parziale d''acqua. TDS attuale: {{ states(''sensor.sensoreacquario_tds'')
+          }} ppm, Temp: {{ states(''sensor.sensoreacquario_probe_temperature'') }} °C.'
+        categoria: pet
+        priorita: bassa
+        canale: stefano
+        tag: cambio_acqua_registrato
+  mode: restart
+acquario_eroga_cibo:
+  alias: 🐠 Acquario - Dai Cibo ai Pesci
+  description: Eroga una dose di cibo dalla mangiatoia smart VSON e imposta la luce dedicata per 5 minuti per l'alimentazione.
+  icon: mdi:shaker
+  sequence:
+    - action: button.press
+      target:
+        entity_id: button.mangiatoia_acquario_eroga_cibo
+    - action: script.acquario_modalita_pasto
+  mode: restart
+acquario_modalita_relax:
+  alias: 🛋️ Acquario - Modalità Salotto Relax
+  description: Attiva la tonalità soffusa ambrata (18%) a PAR nullo per ammirare l'acquario la sera senza alimentare alghe.
+  icon: mdi:weather-night
+  sequence:
+    - action: light.turn_on
+      target:
+        entity_id: light.fzone_acquario
+      data:
+        brightness_pct: 18
+        rgbw_color:
+          - 255
+          - 75
+          - 10
+          - 0
+        transition: 5
+  mode: restart
+acquario_toggle_buio_24h:
+  alias: 🌑 Acquario - Attiva/Disattiva Buio 24 Ore
+  description: Avvia o interrompe un ciclo di buio continuo di 24 ore (es. per trattamento antialghe o riposo), al termine
+    del quale viene ripristinato automaticamente il fotoperiodo biologico.
+  icon: mdi:weather-night
+  sequence:
+    - choose:
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.acquario_buio_24h
+              state: 'on'
+          sequence:
+            - action: timer.cancel
+              target:
+                entity_id: timer.acquario_buio_24h
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.acquario_buio_24h
+            - action: script.acquario_ripristina_luce_automatica
+            - action: script.notifica_smart
+              data:
+                titolo: '💡 Acquario: Buio 24h Interrotto'
+                messaggio: Il trattamento di buio 24h è stato interrotto manualmente. Ripristinato il normale ciclo fotoperiodo.
+                categoria: pet
+                priorita: bassa
+                canale: stefano
+                tag: acquario_buio_24h
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.acquario_buio_24h
+              state: 'off'
+          sequence:
+            - action: timer.cancel
+              target:
+                entity_id:
+                  - timer.acquario_override_manuale
+                  - timer.acquario_modalita_pasto
+            - action: input_boolean.turn_off
+              target:
+                entity_id:
+                  - input_boolean.acquario_override_manuale
+                  - input_boolean.acquario_pasto_in_corso
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.acquario_buio_24h
+            - action: timer.start
+              target:
+                entity_id: timer.acquario_buio_24h
+              data:
+                duration: '24:00:00'
+            - action: light.turn_off
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                transition: 5
+            - action: script.notifica_smart
+              data:
+                titolo: '🌑 Acquario: Trattamento Buio 24h Avviato'
+                messaggio: Plafoniera spenta per 24 ore continue. Il normale fotoperiodo biologico riprenderà automaticamente
+                  domani alle {{ (now() + timedelta(days=1)).strftime('%H:%M') }}.
+                categoria: pet
+                priorita: normale
+                canale: stefano
+                tag: acquario_buio_24h
+  mode: restart

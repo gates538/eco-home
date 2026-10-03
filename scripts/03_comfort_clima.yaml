@@ -1,0 +1,73 @@
+# ==============================================================================
+# COMFORT DOMESTICO, NOTTE E RISCALDAMENTO — CASA MANCINI
+# ==============================================================================
+# Routine buonanotte silenziosa e ricarica sacco pellet termocamino.
+# Script inclusi in questo modulo: 2
+# ==============================================================================
+
+buonanotte_silenziosa:
+  alias: 🌙 Buonanotte Silenziosa (Senza Annuncio)
+  description: 'Attiva tutte le azioni fisiche della routine Buonanotte (luci off, tapparelle, TV off, Nest Hub off, ossigenatore
+    off, tablet standby) senza alcun annuncio TTS. Usare quando uno dei due è già addormentato.
+
+    '
+  icon: mdi:sleep
+  mode: single
+  sequence:
+    - parallel:
+        - sequence:
+            - action: light.turn_off
+              target:
+                entity_id:
+                  - light.tutte_le_luci
+                  - light.fzone_acquario
+              continue_on_error: true
+            - action: switch.turn_off
+              target:
+                entity_id: switch.ossigenatoreacquario
+              continue_on_error: true
+        - sequence:
+            - action: script.chiusura_standard_tapparelle
+              continue_on_error: true
+        - sequence:
+            - condition: state
+              entity_id: media_player.sala_tv_sala
+              state: 'on'
+            - action: media_player.turn_off
+              target:
+                entity_id: media_player.sala_tv_sala
+              continue_on_error: true
+        - sequence:
+            - condition: state
+              entity_id: media_player.tv_cameretta
+              state: 'on'
+            - action: media_player.turn_off
+              target:
+                entity_id: media_player.tv_cameretta
+              continue_on_error: true
+        - sequence:
+            - action: media_player.turn_off
+              target:
+                entity_id:
+                  - media_player.nest_hub_camera
+                  - media_player.nest_hub_cameretta
+                  - media_player.nest_hub_sala
+              continue_on_error: true
+        - sequence:
+            - action: script.standby_tablet
+              continue_on_error: true
+ricarica_sacco_pellet:
+  alias: 🪵 Ricarica Sacco Pellet (15kg)
+  icon: mdi:sack
+  mode: restart
+  sequence:
+    - action: input_number.set_value
+      target:
+        entity_id: input_number.pellet_caricato_serbatoio
+      data:
+        value: 15
+    - action: persistent_notification.create
+      data:
+        title: 🪵 Ricarica Pellet Eseguita
+        message: Serbatoio pellet ripristinato al 100% (15 kg). Autonomia e consumi ricalcolati!
+        notification_id: pellet_ricarica_ok

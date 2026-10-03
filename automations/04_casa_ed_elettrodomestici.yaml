@@ -1,0 +1,892 @@
+# ==============================================================================
+# ELETTRODOMESTICI SMART: ROBOT DOBBY, ASCIUGATRICE, FRIGO E CUCINA — CASA MANCINI
+# ==============================================================================
+# Robot aspirapolvere Dobby (Dreame L40 Pro), asciugatrice Samsung, frigo/freezer SmartThings e controlli piano cottura cucina.
+# Automazioni incluse in questo modulo: 18
+# ==============================================================================
+
+- id: eco_home_dobby_pulizia_completata
+  alias: Eco Home - Annuncio Dobby Pulizia Completata
+  description: Annuncio vocale sul Nest Hub quando Dobby completa la pulizia e il lavaggio moci ed è tornato alla base
+  triggers:
+    - trigger: state
+      entity_id: vacuum.dobby
+      from:
+        - cleaning
+        - returning
+      to: docked
+  conditions:
+    - condition: template
+      value_template: "{{ is_state('sensor.dobby_task_status', 'completed') and\n   (states('sensor.dobby_cleaned_area') |\
+        \ int(0) >= 3 or\n    states('sensor.dobby_cleaning_time') | int(0) >= 3) }}"
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') or is_state(''person.simone_mancini'',
+        ''home'') or is_state(''person.monica'', ''home'') }}'
+    - condition: template
+      value_template: '{{ (as_timestamp(now()) - as_timestamp(state_attr(''automation.eco_home_annuncio_dobby_pulizia_completata'',
+        ''last_triggered'') | default(0))) > 300 }}'
+  actions:
+    - delay: 00:00:15
+    - wait_template: "{{ states('sensor.dobby_self_wash_base_status') not in ['washing', 'clean_add_water'] and\n   states('sensor.dobby_state')\
+        \ not in ['washing', 'clean_add_water', 'auto_emptying'] }}"
+      timeout: 00:06:00
+      continue_on_timeout: true
+    - condition: template
+      value_template: '{{ is_state(''vacuum.dobby'', ''docked'') }}'
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Dobby ha completato la pulizia e il lavaggio dei moci ed è tornato alla base! Casa splendente!\"\
+          ,\n  \"Pulizia completata! Dobby ha finito il suo dovere ed è tornato in carica!\",\n  \"Pavimenti splendenti e\
+          \ tirati a lucido: Dobby ha completato il giro!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Dobby: Pulizia completata e ritorno alla base'
+  mode: single
+- id: dobby_pulizia_automatica_casa_vuota
+  alias: 🤖 Dobby - Pulizia Automatica a Casa Vuota (Sempre)
+  description: Avvia automaticamente Dobby sempre in modalità automatica CleanGenius quando la casa resta vuota per almeno
+    10 minuti (08:30 - 21:00, tutti i giorni)
+  triggers:
+    - trigger: numeric_state
+      entity_id: zone.home
+      below: 1
+      for:
+        minutes: 10
+      id: casa_vuota_10m
+    - trigger: time
+      at: 09:00:00
+      id: controllo_mattutino
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.dobby_pulizia_automatica_fuori_casa
+      state: 'on'
+    - condition: time
+      after: 08:30:00
+      before: '21:00:00'
+    - condition: template
+      value_template: "{{ (states('zone.home') | int(0) == 0) and\n   not is_state('person.stefano', 'home') and\n   not is_state('person.laura',\
+        \ 'home') and\n   not is_state('person.simone_mancini', 'home') and\n   not is_state('person.monica', 'home') }}"
+    - condition: template
+      value_template: "{% set last = states('input_datetime.dobby_ultima_pulizia_fuori_casa') %} {{ last in ['unknown', 'unavailable',\
+        \ ''] or\n   last[:10] != now().strftime('%Y-%m-%d') or\n   (as_timestamp(now()) - as_timestamp(last, default=0))\
+        \ > 14400 }}"
+    - condition: template
+      value_template: "{{ states('vacuum.dobby') in ['docked', 'idle'] and\n   (states('sensor.dobby_battery_level') | int(100)\
+        \ >= 40) and\n   (states('sensor.dobby_error') in ['no_error', 'unknown', 'unavailable', '']) }}"
+  actions:
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.dobby_ultima_pulizia_fuori_casa
+      data:
+        datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+    - action: select.select_option
+      target:
+        entity_id: select.dobby_cleangenius
+      data:
+        option: routine_cleaning
+      continue_on_error: true
+    - action: vacuum.start
+      target:
+        entity_id: vacuum.dobby
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Dobby: Pulizia automatica avviata (casa vuota)'
+  mode: single
+- id: eco_home_dobby_rientro_su_presenza
+  alias: Eco Home - Dobby Rientro Immediato alla Base al Rientro Persone
+  description: Se Dobby sta pulendo e qualcuno apre il portone o rientra a casa, torna istantaneamente alla base
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.porta_contact
+      to: 'on'
+      id: portone_aperto
+    - trigger: state
+      entity_id:
+        - person.stefano
+        - person.laura
+      to: home
+      for:
+        seconds: 60
+      id: presenza_gps_confermata
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: template
+      value_template: '{% set s = states(''vacuum.dobby'') %} {% set base = states(''sensor.dobby_self_wash_base_status'')
+        %} {% set is_cleaning = s in [''cleaning'', ''sweeping'', ''mopping'', ''cleaning_auto'', ''zone_cleaning'', ''spot_cleaning'']
+        %} {% set out_of_base = base not in [''washing'', ''clean_add_water''] and (states(''sensor.dobby_cleaned_area'')
+        | int(0) > 0 or states(''sensor.dobby_cleaning_time'') | int(0) > 0) %} {{ is_cleaning and out_of_base }}'
+    - condition: template
+      value_template: "{% if trigger.id == 'portone_aperto' %}\n  {{ states('zone.home') | int(0) <= 1 }}\n{% else %}\n  true\n\
+        {% endif %}"
+  actions:
+    - action: vacuum.return_to_base
+      target:
+        entity_id: vacuum.dobby
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Dobby: Rientro immediato alla base per rientro persone'
+  mode: single
+- id: notifica_dobby_avvio_pulizia
+  alias: 🤖 Notifica Smart - Dobby Avvio Pulizia
+  description: Invia notifica quando Dobby inizia il ciclo di pulizia (esclude il lavaggio moci alla stazione)
+  triggers:
+    - trigger: state
+      entity_id: vacuum.dobby
+      to: cleaning
+  conditions:
+    - condition: template
+      value_template: "{{ states('sensor.dobby_self_wash_base_status') not in ['washing', 'clean_add_water'] and\n   states('sensor.dobby_state')\
+        \ not in ['washing', 'clean_add_water', 'station_cleaning'] and\n   states('sensor.dobby_task_status') in ['cleaning',\
+        \ 'room_cleaning'] }}"
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🤖 Dobby ha iniziato a pulire
+        messaggio: '{% if (states(''zone.home'') | int(0) == 0) and not is_state(''person.stefano'', ''home'') and not is_state(''person.laura'',
+          ''home'') %} Casa libera: Dobby ha avviato la pulizia dei pavimenti in modalità automatica CleanGenius e tornerà
+          alla base in automatico al rientro. {% else %} Dobby è partito dalla stazione e sta lavando e aspirando i pavimenti
+          in modalità automatica. {% endif %}'
+        categoria: elettrodomestici
+        priorita: normale
+        tag: dobby_status
+  mode: single
+- id: notifica_dobby_fine_pulizia
+  alias: 🤖 Notifica Smart - Dobby Pulizia Completata
+  description: Invia notifica quando Dobby completa la pulizia e torna alla base (attende il termine del lavaggio moci se
+    in corso)
+  triggers:
+    - trigger: state
+      entity_id: vacuum.dobby
+      from:
+        - cleaning
+        - returning
+      to: docked
+  conditions:
+    - condition: template
+      value_template: "{{ is_state('sensor.dobby_task_status', 'completed') and\n   (states('sensor.dobby_cleaned_area') |\
+        \ int(0) >= 3 or\n    states('sensor.dobby_cleaning_time') | int(0) >= 3) }}"
+    - condition: template
+      value_template: '{{ (as_timestamp(now()) - as_timestamp(state_attr(''automation.notifica_smart_dobby_pulizia_completata'',
+        ''last_triggered'') | default(0))) > 300 }}'
+  actions:
+    - delay: 00:00:15
+    - wait_template: "{{ states('sensor.dobby_self_wash_base_status') not in ['washing', 'clean_add_water'] and\n   states('sensor.dobby_state')\
+        \ not in ['washing', 'clean_add_water', 'auto_emptying'] }}"
+      timeout: 00:06:00
+      continue_on_timeout: true
+    - condition: template
+      value_template: '{{ is_state(''vacuum.dobby'', ''docked'') }}'
+    - action: script.notifica_smart
+      data:
+        titolo: '🤖 Dobby: Pulizia Terminata'
+        messaggio: Dobby ha completato il ciclo di pulizia e lavaggio moci ed è tornato alla base in ricarica. Pavimenti splendenti!
+        categoria: elettrodomestici
+        priorita: normale
+        tag: dobby_status
+  mode: single
+- id: notifica_dobby_errore_blocco
+  alias: ⚠️ Notifica Smart - Dobby Errore o Blocco
+  description: Invia allarme e azioni rapide (Riprova, Torna alla Base, Trova Dobby) se Dobby si blocca o segnala un'anomalia
+  triggers:
+    - trigger: state
+      entity_id: sensor.dobby_error
+      not_to:
+        - no_error
+        - unknown
+        - unavailable
+      id: errore_sensore
+    - trigger: state
+      entity_id: vacuum.dobby
+      to: error
+      id: errore_vacuum
+    - trigger: state
+      entity_id: sensor.dobby_status
+      to: error
+      id: errore_status
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_elettrodomestici
+      state: 'on'
+    - condition: template
+      value_template: "{{ states('sensor.dobby_error') not in ['no_error', 'unknown', 'unavailable', ''] or\n   states('vacuum.dobby')\
+        \ == 'error' or\n   states('sensor.dobby_status') == 'error' }}"
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: '🚨 SOS Dobby: Blocco o Difficoltà'
+        messaggio: '{% set err = states(''sensor.dobby_error'') | default(''Ostacolo o blocco'', true) | replace(''_'', ''
+          '') | capitalize %} {% set stanza = states(''sensor.dobby_current_room'') | default(''Stanza sconosciuta'', true)
+          %} {% set batt = states(''sensor.dobby_battery_level'') | default(''?'', true) %} Dobby si è bloccato in {{ stanza
+          }}! Causa: {{ err }} (Batteria: {{ batt }}%).'
+        categoria: elettrodomestici
+        priorita: alta
+        tag: dobby_sos
+        azioni:
+          - action: DOBBY_RETRY
+            title: 🔄 Riprova Pulizia
+          - action: DOBBY_DOCK
+            title: 🏠 Torna alla Base
+          - action: DOBBY_LOCATE
+            title: 🔊 Trova Dobby
+    - if:
+        - condition: template
+          value_template: '{{ not (now().hour >= 22 or now().hour < 8) }}'
+        - condition: state
+          entity_id: input_boolean.eco_home_silenzioso
+          state: 'off'
+        - condition: template
+          value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+      then:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: it
+            options:
+              tld: it
+            message: Attenzione, Dobby ha bisogno di aiuto in {{ states('sensor.dobby_current_room') }}.
+          continue_on_error: true
+  mode: single
+- id: notifica_dobby_azione_smartphone
+  alias: 🤖 Dobby - Gestione Azioni Notifiche Smartphone
+  description: Intercetta i pulsanti delle notifiche interattive per Dobby (Riprova, Torna alla Base, Trova Dobby)
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+  conditions:
+    - condition: template
+      value_template: '{{ trigger.event.data.action in [''DOBBY_RETRY'', ''DOBBY_DOCK'', ''DOBBY_LOCATE''] }}'
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''DOBBY_RETRY'' }}'
+          sequence:
+            - action: vacuum.start
+              target:
+                entity_id: vacuum.dobby
+            - action: script.notifica_smart
+              data:
+                titolo: 🤖 Dobby in Azione
+                messaggio: 'Comando ricevuto: Dobby ha ripreso la pulizia.'
+                categoria: elettrodomestici
+                priorita: bassa
+                tag: dobby_status
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''DOBBY_DOCK'' }}'
+          sequence:
+            - action: vacuum.return_to_base
+              target:
+                entity_id: vacuum.dobby
+            - action: script.notifica_smart
+              data:
+                titolo: 🏠 Dobby Rientro
+                messaggio: 'Comando ricevuto: Dobby sta rientrando alla base.'
+                categoria: elettrodomestici
+                priorita: bassa
+                tag: dobby_status
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''DOBBY_LOCATE'' }}'
+          sequence:
+            - action: vacuum.locate
+              target:
+                entity_id: vacuum.dobby
+              continue_on_error: true
+  mode: single
+- id: notifica_asciugatrice_panni_pronti
+  alias: 🧺 Notifica Smart - Promemoria Panni Asciugatrice
+  description: Invia notifica quando l'asciugatrice termina con pulsante per archiviare il promemoria
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.asciugatrice_panni_da_ritirare
+      to: 'on'
+      for:
+        minutes: 10
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🧺 Asciugatrice Terminata
+        messaggio: Il ciclo di asciugatura è finito da 10 minuti. I panni sono pronti da ritirare.
+        categoria: elettrodomestici
+        priorita: normale
+        tag: asciugatrice_pronta
+        azioni:
+          - action: SVUOTA_ASCIUGATRICE
+            title: ✅ Panni Ritirati
+  mode: single
+- id: eco_home_frigo_porta_aperta
+  alias: Eco Home - Allerta Porta Frigorifero Aperta (Sensore Ufficiale)
+  description: Annuncio vocale sarcastico o notifica silenziosa se la porta del frigorifero rimane aperta per più di 60 secondi
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.cucina_frigorifero_fridge_door
+      to: 'on'
+      for:
+        minutes: 1
+        seconds: 0
+  conditions:
+    - condition: template
+      value_template: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') or states(''input_boolean.eco_home_attivo'')
+        in [''unknown'', ''unavailable''] }}'
+    - condition: template
+      value_template: '{{ not is_state(''input_boolean.eco_home_silenzioso'', ''on'') }}'
+  actions:
+    - variables:
+        is_daytime: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+        frigo_msg: "{{ [\n  \"Attenzione! Frigo aperto da oltre un minuto: chiudete lo sportello!\",\n  \"Allarme frigo aperto!\
+          \ Chiudete subito, stiamo rinfrescando tutto il paese!\",\n  \"Chiudere il frigorifero! I pinguini all'interno chiedono\
+          \ coperte!\",\n  \"Sportello del frigo aperto da un minuto: decidete in fretta cosa mangiare!\",\n  \"Attenzione!\
+          \ Frigorifero aperto: chiudete prima che il fresco scappi!\"\n] | random }}"
+    - if:
+        - condition: template
+          value_template: '{{ is_daytime }}'
+      then:
+        - action: media_player.volume_set
+          target:
+            entity_id: media_player.nest_hub_sala
+          data:
+            volume_level: 0.8
+          continue_on_error: true
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: it
+            options:
+              tld: it
+            message: '{{ frigo_msg }}'
+          continue_on_error: true
+      else:
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
+          data:
+            title: ❄️ Frigorifero Aperto
+            message: Lo sportello del frigorifero è aperto da oltre 60 secondi!
+          continue_on_error: true
+        - action: notify.mobile_app_samsung_s22_di_laura
+          data:
+            title: ❄️ Frigorifero Aperto
+            message: Lo sportello del frigorifero è aperto da oltre 60 secondi!
+          continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Allarme Frigo: Porta aperta oltre 60s'
+      continue_on_error: true
+  mode: single
+- id: eco_home_freezer_porta_aperta
+  alias: Eco Home - Allerta Porta Freezer Aperta (Congelatore SmartThings)
+  description: Annuncio vocale sarcastico o notifica silenziosa se la porta del congelatore rimane aperta per più di 60 secondi
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.cucina_frigorifero_freezer_door
+      to: 'on'
+      for:
+        minutes: 1
+        seconds: 0
+  conditions:
+    - condition: template
+      value_template: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') or is_state(''input_boolean.eco_home_attivo'',
+        ''on'') or states(''input_boolean.eco_home_attivo'') in [''unknown'', ''unavailable''] }}'
+    - condition: template
+      value_template: '{{ not is_state(''input_boolean.eco_home_silenzioso'', ''on'') and not is_state(''input_boolean.eco_home_silenzioso'',
+        ''on'') }}'
+  actions:
+    - variables:
+        is_daytime: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+        freezer_msg: "{{ [\n  \"Attenzione! Freezer aperto da un minuto: salvate i gelati!\",\n  \"Allarme congelatore aperto!\
+          \ Chiudete prima che si sciolga il Polo Nord!\",\n  \"Chiudere il freezer! I surgelati stanno chiedendo asilo!\"\
+          ,\n  \"Emergenza freezer aperto! Chiudete subito lo sportello!\"\n] | random }}"
+    - if:
+        - condition: template
+          value_template: '{{ is_daytime }}'
+      then:
+        - action: media_player.volume_set
+          target:
+            entity_id: media_player.nest_hub_sala
+          data:
+            volume_level: 0.8
+          continue_on_error: true
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: it
+            options:
+              tld: it
+            message: '{{ freezer_msg }}'
+          continue_on_error: true
+      else:
+        - action: notify.mobile_app_samsung_s25_edge_di_stefano
+          data:
+            title: 🧊 Freezer Aperto
+            message: Lo sportello del congelatore è aperto da oltre 60 secondi!
+          continue_on_error: true
+        - action: notify.mobile_app_samsung_s22_di_laura
+          data:
+            title: 🧊 Freezer Aperto
+            message: Lo sportello del congelatore è aperto da oltre 60 secondi!
+          continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Allarme Freezer: Porta aperta oltre 60s'
+      continue_on_error: true
+  mode: single
+- id: eco_home_asciugatrice_ciclo_terminato
+  alias: Eco Home - Registrazione Fine Ciclo Asciugatrice
+  description: Registra la fine del ciclo asciugatrice e attiva il promemoria panni da ritirare
+  triggers:
+    - trigger: state
+      entity_id: sensor.esterno_asciugatrice_machine_state
+      from:
+        - run
+        - running
+        - drying
+        - cooling
+      to:
+        - 'off'
+        - idle
+        - stop
+        - complete
+        - completed
+        - finish
+        - finished
+    - trigger: state
+      entity_id: binary_sensor.asciugatrice_in_funzione
+      from: 'on'
+      to: 'off'
+  conditions:
+    - condition: template
+      value_template: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') or states(''input_boolean.eco_home_attivo'')
+        in [''unknown'', ''unavailable''] }}'
+  actions:
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.eco_home_asciugatrice_fine
+      data:
+        datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Asciugatrice: Ciclo terminato, panni in attesa di ritiro'
+      continue_on_error: true
+  mode: single
+- id: eco_home_asciugatrice_svuotata_terrazza
+  alias: Eco Home - Rilevamento Svuotamento Asciugatrice da Porta Terrazza
+  description: Annulla automaticamente il promemoria quando si apre la porta della terrazza per ritirare i panni
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.portaterrazzo_contact
+      to: 'on'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+      state: 'on'
+  actions:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Asciugatrice: Panni ritirati (porta terrazza aperta)'
+      continue_on_error: true
+  mode: single
+- id: eco_home_asciugatrice_promemoria_svuotamento
+  alias: Eco Home - Promemoria Asciugatrice da Svuotare (Samsung Dryer)
+  description: Promemoria vocale 30 minuti dopo la fine del ciclo asciugatrice solo se i panni non sono ancora stati ritirati
+  triggers:
+    - trigger: state
+      entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+      to: 'on'
+      for:
+        minutes: 30
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: template
+      value_template: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') or is_state(''input_boolean.eco_home_attivo'',
+        ''on'') or states(''input_boolean.eco_home_attivo'') in [''unknown'', ''unavailable''] }}'
+    - condition: template
+      value_template: '{{ not is_state(''input_boolean.eco_home_silenzioso'', ''on'') and not is_state(''input_boolean.eco_home_silenzioso'',
+        ''on'') }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+      state: 'on'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Promemoria asciugatrice: ciclo finito da mezz'ora, panni pronti da ritirare!\",\n  \"Attenzione\
+          \ asciugatrice: svuotatela prima che i vestiti diventino origami!\",\n  \"Bucato asciutto e pronto! È ora di svuotare\
+          \ l'asciugatrice!\",\n  \"I panni nell'asciugatrice vi aspettano al calduccio: andate a svuotarla!\"\n] | random\
+          \ }}"
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.eco_home_asciugatrice_da_annunciare
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Promemoria Asciugatrice: Panni da svuotare annunciato'
+      continue_on_error: true
+  mode: single
+- id: eco_home_allerta_cottura_dimenticata
+  alias: Eco Home - Allerta Cottura Dimenticata (60 Minuti)
+  description: Notifica WhatsApp e avviso vocale se il piano ad induzione o il forno rimangono accesi per più di 60 minuti
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.cucina_piano_cottura_potenza
+      to: 'on'
+      for:
+        minutes: 60
+      id: induzione_dimenticata
+    - trigger: state
+      entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+      to:
+        - In funzione
+        - Preriscaldamento
+      for:
+        minutes: 60
+      id: piano_dimenticato
+    - trigger: state
+      entity_id: sensor.cucina_forno_machine_state
+      to:
+        - running
+        - cooking
+      for:
+        minutes: 60
+      id: forno_dimenticato
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') or is_state(''person.simone_mancini'',
+        ''home'') or is_state(''person.monica'', ''home'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 3600 }}'
+  actions:
+    - action: rest_command.whatsapp_group_notify
+      data:
+        message: "{{ [\n  \"⚠️ Attenzione! Cottura o forno attivi da oltre 60 minuti: verificate le pentole!\",\n  \"\U0001F525\
+          \ Allarme Cucina! Fornelli accesi da oltre un'ora: controllate la cottura!\"\n] | random }}"
+    - if:
+        - condition: state
+          entity_id: input_boolean.eco_home_silenzioso
+          state: 'off'
+        - condition: template
+          value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+      then:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: it
+            options:
+              tld: it
+            message: "{{ [\n  \"Attenzione Stefano e Laura! Cottura attiva da oltre un'ora: controllate pentole e forno!\"\
+              ,\n  \"Allarme cucina! Fornelli accesi da sessanta minuti: verificate la cottura prima che bruci tutto!\",\n\
+              \  \"Avviso fornelli: è passata un'ora dall'accensione, controllate che l'acqua non sia evaporata!\"\n] | random\
+              \ }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Allarme Cucina: Cottura attiva da oltre 60 min'
+  mode: single
+- id: eco_home_annunci_cucina
+  alias: Eco Home - Annunci Vocali Cucina Sarcastici (Pure Battute)
+  mode: single
+  description: Riproduce battute vocali su Nest Hub al massimo 1 volta ogni 2 ore all'avvio della cottura.
+  triggers:
+    - trigger: state
+      entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+      from:
+        - ready
+        - 'off'
+        - Spento
+        - '0'
+        - unknown
+        - unavailable
+      to:
+        - run
+        - running
+        - 'on'
+      id: induzione_accesa
+    - trigger: state
+      entity_id:
+        - sensor.cucina_forno_machine_state
+        - sensor.cucina_forno_second_cavity_machine_state
+      from:
+        - ready
+        - 'off'
+        - unknown
+        - unavailable
+      to:
+        - running
+        - run
+        - preheating
+        - 'on'
+      id: forno_acceso
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: template
+      value_template: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') or states(''input_boolean.eco_home_attivo'')
+        in [''unknown'', ''unavailable''] }}'
+    - condition: template
+      value_template: '{{ not is_state(''input_boolean.eco_home_silenzioso'', ''on'') }}'
+    - condition: template
+      value_template: '{{ is_state(''input_boolean.eco_home_annunci_cucina'', ''on'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_sala
+      data:
+        volume_level: 0.6
+      continue_on_error: true
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{% set stefano_home = is_state('person.stefano', 'home') %} {% set laura_home = is_state('person.laura',\
+          \ 'home') %} {% if laura_home and not stefano_home %}\n  {{ [\n    \"Chef Laura ai fornelli! Stasera ricette stellate,\
+          \ speriamo senza detrazioni!\",\n    \"Laura in cucina! Profumino in arrivo, stasera si mangia raffinato!\",\n \
+          \   \"Cottura avviata da Laura! Ricordati di non usare il sale come un F ventiquattro!\",\n    \"Esperimento culinario\
+          \ di Laura in corso: buon appetito!\"\n  ] | random }}\n{% elif stefano_home and not laura_home %}\n  {{ [\n   \
+          \ \"Chef Stefano alla riscossa! Estintore a portata di mano per sicurezza!\",\n    \"Cucina attiva da Stefano! Ricordati\
+          \ che la cottura non si velocizza con l'overclock!\",\n    \"Stefano ai fornelli! Le micie sono già in attesa degli\
+          \ scarti prelibati!\",\n    \"Cottura in avvio da Stefano: speriamo sia una ricetta collaudata!\"\n  ] | random\
+          \ }}\n{% else %}\n  {{ [\n    \"Qualcosa bolle in pentola! Sfida Masterchef aperta tra Stefano e Laura!\",\n   \
+          \ \"Profumino in cucina! Chi cucina stasera non lava i piatti, è la regola!\",\n    \"Fornelli accesi! Buon appetito\
+          \ a Stefano e Laura!\"\n  ] | random }}\n{% endif %}"
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: '{% set stefano_home = is_state(''person.stefano'', ''home'') %} {% set laura_home = is_state(''person.laura'',
+          ''home'') %} {% if laura_home and not stefano_home %}Annuncio Cucina: Chef Laura {% elif stefano_home and not laura_home
+          %}Annuncio Cucina: Chef Stefano {% else %}Annuncio Cucina: Sfida Culinaria{% endif %}'
+      continue_on_error: true
+- id: eco_home_timer_pranzo_stefano
+  alias: Eco Home - Timer Pit-Stop Pranzo Stefano (Cottura > 25 min)
+  description: Promemoria vocale durante la pausa pranzo (13:05-14:30) se la cottura supera 25 minuti per non fare tardi
+  triggers:
+    - trigger: state
+      entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+      to:
+        - run
+        - running
+        - 'on'
+      for:
+        minutes: 25
+    - trigger: numeric_state
+      entity_id: binary_sensor.cucina_piano_cottura_potenza
+      above: 15
+      for:
+        minutes: 25
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: template
+      value_template: '{{ now().weekday() < 6 }}'
+    - condition: time
+      after: '13:05:00'
+      before: '14:30:00'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: state
+      entity_id: person.stefano
+      state: home
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Capitano Ste, venticinque minuti di cottura: controlla la padella per mangiare con calma prima\
+          \ che scada la pausa!\",\n  \"Timer pausa pranzo per Stefano: la pappa è pronta in tavola, buon appetito!\",\n \
+          \ \"Attenzione Stefano: cottura attiva da venticinque minuti, controlla la cucina!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Cucina Alert: Timer 25 min pausa pranzo Stefano'
+  mode: single
+- id: eco_home_check_uscita_pomeriggio_stefano
+  alias: Eco Home - Check Pre-Uscita Pomeriggio Stefano (Ore 15:45)
+  description: Avviso vocale alle 15:45 se Stefano è a casa e risultano luci accese o fornelli ancora attivi prima di tornare
+    al lavoro
+  triggers:
+    - trigger: time
+      at: '15:45:00'
+  conditions:
+    - condition: template
+      value_template: '{{ now().weekday() < 6 }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ not is_state(''input_boolean.eco_home_modalita_ferie'', ''on'') }}'
+    - condition: state
+      entity_id: person.stefano
+      state: home
+  actions:
+    - variables:
+        cucina_accesa: '{{ states(''sensor.cucina_piano_cottura_stato_di_funzionamento'') in [''run'', ''running'', ''on'']
+          or states(''binary_sensor.cucina_piano_cottura_potenza'') | float(0) > 15 }}'
+        luci_accese: '{{ is_state(''light.luceambiente'', ''on'') or is_state(''light.faretti_cucina'', ''on'') }}'
+    - if:
+        - condition: template
+          value_template: '{{ cucina_accesa or luci_accese }}'
+      then:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            language: it
+            options:
+              tld: it
+            message: "{{ [\n  \"Attenzione Stefano: sono le quindici e quarantacinque! Controlla che luci e cucina siano spente\
+              \ prima di uscire!\",\n  \"Promemoria pre-uscita per Stefano: check rapido a luci e fornelli prima di tornare\
+              \ a lavoro!\",\n  \"Capitano Ste, quasi ora di ripartire: assicurati che sia tutto spento!\"\n] | random }}"
+        - action: input_text.set_value
+          target:
+            entity_id: input_text.eco_home_ultimo_messaggio
+          data:
+            value: 'Check Pomeriggio: Avviso pre-uscita 15:45 Stefano'
+  mode: single
+- id: eco_home_fine_cottura_fornelli_masterchef
+  alias: Eco Home - Fischio Finale Masterchef (Fine Cottura Fornelli Serale)
+  description: Battuta vocale a sorpresa sul Nest Hub quando si spengono i fornelli o il forno la sera tra le 19:30 e le 22:00
+  triggers:
+    - trigger: state
+      entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+      from:
+        - run
+        - running
+        - 'on'
+      to:
+        - ready
+        - 'off'
+        - Spento
+        - '0'
+    - trigger: state
+      entity_id: sensor.cucina_forno_machine_state
+      from:
+        - running
+        - run
+        - preheating
+      to:
+        - ready
+        - 'off'
+        - idle
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: time
+      after: '19:30:00'
+      before: '22:00:00'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: state
+      entity_id: input_boolean.eco_home_annunci_cucina
+      state: 'on'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 3600 }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Fornelli spenti! Masterchef Casa si conclude qui: chi ha cucinato si riposa, l'altro lava i piatti!\"\
+          ,\n  \"Cottura terminata! Pentole a riposo: le micie Piccola e Luna attendono l'assaggio di controllo!\",\n  \"\
+          Cena pronta in tavola! Complimenti agli chef e buon appetito a Stefano e Laura!\",\n  \"Fischio finale in cucina!\
+          \ La cena è servita, godetevi la serata!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Cucina: Fine cottura fornelli e cena pronta'
+  mode: single

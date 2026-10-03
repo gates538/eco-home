@@ -1,0 +1,856 @@
+# ==============================================================================
+# CLIMATIZZAZIONE, TERMOCAMINO & RISPARMIO ENERGETICO — CASA MANCINI
+# ==============================================================================
+# Programmazione condizionatori Samsung Sala/Camera/Cameretta, termocamino a pellet, risparmio energetico infissi ed effetto brezza estiva.
+# Automazioni incluse in questo modulo: 20
+# ==============================================================================
+
+- id: eco_home_climate_120
+  alias: Eco Home Risparmio Energetico Clima
+  description: Spegne i condizionatori se almeno una delle 6 finestre (Sala, Camera, Cameretta, Bagno, Bagnetto, Cucina) resta
+    aperta per più di 3 minuti mentre il clima è attivo
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id:
+        - binary_sensor.finestrasala_contact
+        - binary_sensor.finestracamera_contact
+        - binary_sensor.finestracameretta_contact
+        - binary_sensor.finestrabagno_contact
+        - binary_sensor.finestrabagnetto_contact
+        - binary_sensor.finestracucina_contact
+      to: 'on'
+      for: 00:03:00
+  conditions:
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: climate.sala_condizionatore_sala
+          state: cool
+        - condition: state
+          entity_id: climate.sala_condizionatore_sala
+          state: heat
+        - condition: state
+          entity_id: climate.camera_condizionatore_camera
+          state: cool
+        - condition: state
+          entity_id: climate.camera_condizionatore_camera
+          state: heat
+  actions:
+    - action: climate.turn_off
+      target:
+        entity_id:
+          - climate.sala_condizionatore_sala
+          - climate.camera_condizionatore_camera
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: Risparmio Energetico
+        message: "{{ [\n  \"Attenzione, dispersione termica: ho spento i condizionatori perché la finestra è aperta da oltre\
+          \ 3 minuti.\",\n  \"Allarme dispersione termica! Climatizzatore spento: finestre aperte da oltre 3 minuti!\",\n\
+          \  \"Risparmio energetico: condizionatori spenti per finestre aperte!\"\n] | random }}"
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: Risparmio Energetico
+        message: 'Attenzione: condizionatori spenti per finestre aperte da oltre 3 minuti.'
+      continue_on_error: true
+- id: eco_home_notifica_clima_conferma
+  alias: Eco Home - Notifica Clima con Conferma Esplicita
+  description: Invia una notifica con pulsanti di conferma a Stefano e Laura prima di accendere il clima quando fa troppo
+    caldo o troppo freddo
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.temperatura_media
+      above: 26
+      for:
+        minutes: 10
+      id: troppo_caldo
+    - trigger: numeric_state
+      entity_id: sensor.temperatura_media
+      below: 19
+      for:
+        minutes: 10
+      id: troppo_freddo
+  conditions:
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: person.stefano
+          state: home
+        - condition: state
+          entity_id: person.laura
+          state: home
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - variables:
+        avviso_finestre: "{% set open = expand([\n  'binary_sensor.finestrasala_contact',\n  'binary_sensor.finestracamera_contact',\n\
+          \  'binary_sensor.finestracameretta_contact',\n  'binary_sensor.finestrabagno_contact',\n  'binary_sensor.finestrabagnetto_contact',\n\
+          \  'binary_sensor.finestracucina_contact'\n]) | selectattr('state', 'eq', 'on') | list %} {% if open | count > 0\
+          \ %} ⚠️ Finestre aperte: {{ open | map(attribute='name') | join(', ') }}. {% else %} {% endif %}"
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.id == ''troppo_caldo'' }}'
+          sequence:
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                title: '🌡️ Temperatura in casa: {{ states(''sensor.temperatura_media'') }}°C'
+                message: Fa caldo in casa! {{ avviso_finestre }} Vuoi che accenda i condizionatori o avete le finestre aperte
+                  per far arieggiare?
+                data:
+                  actions:
+                    - action: ACCENDI_CONDIZIONATORI
+                      title: ❄️ Sì, Accendi Clima
+                    - action: NO_FINESTRE_APERTE
+                      title: 🪟 No, Finestre Aperte
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                title: '🌡️ Temperatura in casa: {{ states(''sensor.temperatura_media'') }}°C'
+                message: Fa caldo in casa! {{ avviso_finestre }} Vuoi che accenda i condizionatori o avete le finestre aperte
+                  per far arieggiare?
+                data:
+                  actions:
+                    - action: ACCENDI_CONDIZIONATORI
+                      title: ❄️ Sì, Accendi Clima
+                    - action: NO_FINESTRE_APERTE
+                      title: 🪟 No, Finestre Aperte
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.id == ''troppo_freddo'' }}'
+          sequence:
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                title: '🌡️ Temperatura in casa: {{ states(''sensor.temperatura_media'') }}°C'
+                message: Fa freddino in casa! {{ avviso_finestre }} Vuoi accendere il termocamino a pellet o la pompa di calore
+                  per scaldare?
+                data:
+                  actions:
+                    - action: ACCENDI_RISCALDAMENTO
+                      title: 🔥 Sì, Riscalda Casa
+                    - action: NO_FINESTRE_APERTE
+                      title: 🪟 No, Finestre Aperte
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                title: '🌡️ Temperatura in casa: {{ states(''sensor.temperatura_media'') }}°C'
+                message: Fa freddino in casa! {{ avviso_finestre }} Vuoi accendere il termocamino a pellet o la pompa di calore
+                  per scaldare?
+                data:
+                  actions:
+                    - action: ACCENDI_RISCALDAMENTO
+                      title: 🔥 Sì, Riscalda Casa
+                    - action: NO_FINESTRE_APERTE
+                      title: 🪟 No, Finestre Aperte
+              continue_on_error: true
+  mode: single
+- id: eco_home_risposta_notifica_clima
+  alias: Eco Home - Esecuzione Azione Clima su Conferma Utente
+  description: Esegue accensione clima/riscaldamento SOLO ed ESCLUSIVAMENTE quando Stefano o Laura premono Sì sulla notifica
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ACCENDI_CONDIZIONATORI
+      id: accendi_condizionatori
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ACCENDI_RISCALDAMENTO
+      id: accendi_riscaldamento
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.id == ''accendi_condizionatori'' }}'
+          sequence:
+            - action: climate.turn_on
+              target:
+                entity_id: climate.sala_condizionatore_sala
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: climate.sala_condizionatore_sala
+              data:
+                hvac_mode: cool
+            - if:
+                - condition: template
+                  value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+              then:
+                - action: tts.speak
+                  target:
+                    entity_id: tts.google_translate_it_lt
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    language: it
+                    options:
+                      tld: it
+                    message: Condizionatori accesi come richiesto!
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.id == ''accendi_riscaldamento'' }}'
+          sequence:
+            - action: climate.turn_on
+              target:
+                entity_id: climate.sala_condizionatore_sala
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: climate.sala_condizionatore_sala
+              data:
+                hvac_mode: heat
+            - if:
+                - condition: template
+                  value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+              then:
+                - action: tts.speak
+                  target:
+                    entity_id: tts.google_translate_it_lt
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    language: it
+                    options:
+                      tld: it
+                    message: Riscaldamento avviato come richiesto!
+  mode: single
+- id: eco_home_brezza_naturale_estiva
+  alias: Eco Home - Effetto Brezza Naturale Estiva (Netatmo vs Climatizzatore)
+  description: Suggerimento vocale quando la temperatura esterna serale scende sensibilmente sotto quella interna mentre il
+    clima è attivo
+  triggers:
+    - trigger: time_pattern
+      minutes: /15
+    - trigger: state
+      entity_id:
+        - climate.sala_condizionatore_sala
+        - climate.camera_condizionatore_camera
+      to: cool
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: template
+      value_template: '{{ is_state(''sun.sun'', ''below_horizon'') or state_attr(''sun.sun'', ''elevation'') | float(90) <
+        12 }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+    - condition: template
+      value_template: '{{ is_state(''climate.sala_condizionatore_sala'', ''cool'') or is_state(''climate.camera_condizionatore_camera'',
+        ''cool'') }}'
+    - condition: template
+      value_template: '{% set s_in = states(''sensor.temperatura_media'') %} {% set s_out = states(''sensor.temperatura_media_esterna'')
+        %} {{ s_in not in [''unknown'', ''unavailable'', ''None''] and s_out not in [''unknown'', ''unavailable'', ''None'']
+        and (s_out | float(0) < (s_in | float(0) - 1.5)) }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Attenzione: fuori in terrazza è arrivato il fresco! Potete spegnere il clima e aprire le finestre!\"\
+          ,\n  \"Buone notizie: temperatura esterna più fresca di quella di casa! Spegnete il clima e aprite le finestre!\"\
+          ,\n  \"Serata fresca: fuori fa più fresco che dentro! Spegnete il clima e godetevi la brezza naturale!\"\n] | random\
+          \ }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Clima: Suggerimento brezza naturale estiva'
+  mode: single
+- id: eco_home_promemoria_termocamino_serale
+  alias: Eco Home - Promemoria Serbatoio Termocamino a Pellet Serale
+  description: Promemoria vocale alle 22:30 nei mesi invernali per verificare la carica di pellet del termocamino prima di
+    dormire
+  triggers:
+    - trigger: time
+      at: '22:30:00'
+  conditions:
+    - condition: template
+      value_template: '{{ now().month in [10, 11, 12, 1, 2, 3, 4] }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+    - condition: numeric_state
+      entity_id: sensor.temperatura_media_esterna
+      below: 13
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Promemoria termocamino: controllate il pellet prima di dormire, così domattina la casa sarà calda!\"\
+          ,\n  \"Capitano Stefano: controllo pellet al termocamino in sala prima di andare a letto!\",\n  \"Promemoria notte:\
+          \ verificate la carica del pellet per trovare la casa calda domattina!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Promemoria Serale: Controllo pellet termocamino'
+  mode: single
+- id: eco_home_luna_bagnetto_clima_estivo
+  alias: Eco Home - Termo-Alert Bagnetto per Luna (Avvio Clima Estivo)
+  description: Battuta vocale sul Nest Hub all avvio del climatizzatore estivo quando fa molto caldo
+  triggers:
+    - trigger: state
+      entity_id:
+        - climate.sala_condizionatore_sala
+        - climate.camera_condizionatore_camera
+      to: cool
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: template
+      value_template: '{{ now().month in [6, 7, 8, 9] }}'
+    - condition: numeric_state
+      entity_id: sensor.temperatura_media
+      above: 26.5
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 14400 }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Clima avviato! Luna può abbandonare il lavandino del bagnetto e tornare a riposare sul lettone!\"\
+          ,\n  \"Aria fresca in arrivo! Piccola e Luna approvano la scelta per il refrigerio in casa!\",\n  \"Climatizzatore\
+          \ attivo: il caldo è sconfitto, finalmente si respira!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Clima: Refrigerio estivo e relax per Luna'
+  mode: single
+- id: clima_accensione_programmata_slot_1
+  alias: Clima - Accensione Programmata Slot 1
+  description: All'orario impostato chiede conferma prima di accendere i condizionatori Slot 1
+  trigger:
+    - platform: time
+      at: input_datetime.clima_orario_accensione_1
+  condition:
+    - condition: state
+      entity_id: input_boolean.clima_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.clima_slot_1_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{% set mode = states('input_select.clima_giorni_programmati') %} {% if mode == 'Solo feriali (Lun-Ven)'\
+        \ %}\n  {{ now().weekday() < 5 }}\n{% elif mode == 'Solo weekend (Sab-Dom)' %}\n  {{ now().weekday() >= 5 }}\n{% else\
+        \ %}\n  true\n{% endif %}\n"
+  action:
+    - variables:
+        room_label: '{{ states(''input_select.clima_stanze_programmate'') }}'
+        mode_label: '{{ states(''input_select.clima_modalita_programmata'') }}'
+        temp_label: '{{ states(''input_number.clima_temperatura_programmata'') | int }}°C'
+        avviso_finestre: "{% set open = expand([\n  'binary_sensor.finestrasala_contact',\n  'binary_sensor.finestracamera_contact',\n\
+          \  'binary_sensor.finestracameretta_contact',\n  'binary_sensor.finestrabagno_contact',\n  'binary_sensor.finestrabagnetto_contact',\n\
+          \  'binary_sensor.finestracucina_contact'\n]) | selectattr('state', 'eq', 'on') | list %} {% if open | count > 0\
+          \ %} ⚠️ FINESTRE APERTE: {{ open | map(attribute='name') | join(', ') }}! Accendi lo stesso? {% else %} Confermi\
+          \ l'accensione? {% endif %}"
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: ❄️ Clima — Accensione Programmata Slot 1
+        message: 'Zona: {{ room_label }} | Modalità: {{ mode_label }} | Temp: {{ temp_label }}. {{ avviso_finestre }}'
+        data:
+          actions:
+            - action: ACCENDI_CLIMA_SLOT1
+              title: ❄️ Sì, Accendi
+            - action: ANNULLA_CLIMA_SLOT1
+              title: ❌ No, Annulla
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: ❄️ Clima — Accensione Programmata Slot 1
+        message: 'Zona: {{ room_label }} | Modalità: {{ mode_label }} | Temp: {{ temp_label }}. {{ avviso_finestre }}'
+        data:
+          actions:
+            - action: ACCENDI_CLIMA_SLOT1
+              title: ❄️ Sì, Accendi
+            - action: ANNULLA_CLIMA_SLOT1
+              title: ❌ No, Annulla
+      continue_on_error: true
+  mode: single
+- id: clima_conferma_accensione_slot_1
+  alias: Clima - Conferma Accensione Slot 1 (da Notifica)
+  description: Accende i condizionatori configurati nello Slot 1 solo dopo conferma da notifica
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ACCENDI_CLIMA_SLOT1
+  actions:
+    - variables:
+        target_entities: "{% set room = states('input_select.clima_stanze_programmate') %} {% if room == 'Solo Sala & Living'\
+          \ %}\n  ['climate.sala_condizionatore_sala']\n{% elif room == 'Solo Camere da Letto' %}\n  ['climate.camera_condizionatore_camera',\
+          \ 'climate.cameretta_condizionatore_cameretta']\n{% elif room == 'Solo Camera Padronale' %}\n  ['climate.camera_condizionatore_camera']\n\
+          {% elif room == 'Solo Cameretta' %}\n  ['climate.cameretta_condizionatore_cameretta']\n{% else %}\n  ['climate.sala_condizionatore_sala',\
+          \ 'climate.camera_condizionatore_camera', 'climate.cameretta_condizionatore_cameretta']\n{% endif %}\n"
+        hvac_mode_val: "{% set sel = states('input_select.clima_modalita_programmata') %} {% if 'Heat' in sel %}\n  heat\n\
+          {% elif 'Dry' in sel %}\n  dry\n{% elif 'Auto' in sel %}\n  auto\n{% else %}\n  cool\n{% endif %}\n"
+        temp_val: '{{ states(''input_number.clima_temperatura_programmata'') | float(25) }}'
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: '{{ target_entities }}'
+      data:
+        hvac_mode: '{{ hvac_mode_val }}'
+    - action: climate.set_temperature
+      target:
+        entity_id: '{{ target_entities }}'
+      data:
+        temperature: '{{ temp_val }}'
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Clima Slot 1: Accensione confermata da notifica'
+  mode: single
+- id: clima_spegnimento_programmato_slot_1
+  alias: Clima - Spegnimento Programmato Slot 1
+  description: Spegne automaticamente i condizionatori selezionati nello Slot 1
+  trigger:
+    - platform: time
+      at: input_datetime.clima_orario_spegnimento_1
+  condition:
+    - condition: state
+      entity_id: input_boolean.clima_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.clima_slot_1_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{% set mode = states('input_select.clima_giorni_programmati') %} {% if mode == 'Solo feriali (Lun-Ven)'\
+        \ %}\n  {{ now().weekday() < 5 }}\n{% elif mode == 'Solo weekend (Sab-Dom)' %}\n  {{ now().weekday() >= 5 }}\n{% else\
+        \ %}\n  true\n{% endif %}\n"
+  action:
+    - variables:
+        target_entities: "{% set room = states('input_select.clima_stanze_programmate') %} {% if room == 'Solo Sala & Living'\
+          \ %}\n  ['climate.sala_condizionatore_sala']\n{% elif room == 'Solo Camere da Letto' %}\n  ['climate.camera_condizionatore_camera',\
+          \ 'climate.cameretta_condizionatore_cameretta']\n{% elif room == 'Solo Camera Padronale' %}\n  ['climate.camera_condizionatore_camera']\n\
+          {% elif room == 'Solo Cameretta' %}\n  ['climate.cameretta_condizionatore_cameretta']\n{% else %}\n  ['climate.sala_condizionatore_sala',\
+          \ 'climate.camera_condizionatore_camera', 'climate.cameretta_condizionatore_cameretta']\n{% endif %}\n"
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: '{{ target_entities }}'
+      data:
+        hvac_mode: 'off'
+  mode: single
+- id: clima_accensione_programmata_slot_2
+  alias: Clima - Accensione Programmata Slot 2
+  description: All'orario impostato chiede conferma prima di accendere i condizionatori Slot 2
+  trigger:
+    - platform: time
+      at: input_datetime.clima_orario_accensione_2
+  condition:
+    - condition: state
+      entity_id: input_boolean.clima_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.clima_slot_2_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{% set mode = states('input_select.clima_giorni_programmati') %} {% if mode == 'Solo feriali (Lun-Ven)'\
+        \ %}\n  {{ now().weekday() < 5 }}\n{% elif mode == 'Solo weekend (Sab-Dom)' %}\n  {{ now().weekday() >= 5 }}\n{% else\
+        \ %}\n  true\n{% endif %}\n"
+  action:
+    - variables:
+        room_label: '{{ states(''input_select.clima_stanze_programmate'') }}'
+        mode_label: '{{ states(''input_select.clima_modalita_programmata'') }}'
+        temp_label: '{{ states(''input_number.clima_temperatura_programmata'') | int }}°C'
+        avviso_finestre: "{% set open = expand([\n  'binary_sensor.finestrasala_contact',\n  'binary_sensor.finestracamera_contact',\n\
+          \  'binary_sensor.finestracameretta_contact',\n  'binary_sensor.finestrabagno_contact',\n  'binary_sensor.finestrabagnetto_contact',\n\
+          \  'binary_sensor.finestracucina_contact'\n]) | selectattr('state', 'eq', 'on') | list %} {% if open | count > 0\
+          \ %} ⚠️ FINESTRE APERTE: {{ open | map(attribute='name') | join(', ') }}! Accendi lo stesso? {% else %} Confermi\
+          \ l'accensione? {% endif %}"
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: ❄️ Clima — Accensione Programmata Slot 2
+        message: 'Zona: {{ room_label }} | Modalità: {{ mode_label }} | Temp: {{ temp_label }}. {{ avviso_finestre }}'
+        data:
+          actions:
+            - action: ACCENDI_CLIMA_SLOT2
+              title: ❄️ Sì, Accendi
+            - action: ANNULLA_CLIMA_SLOT2
+              title: ❌ No, Annulla
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: ❄️ Clima — Accensione Programmata Slot 2
+        message: 'Zona: {{ room_label }} | Modalità: {{ mode_label }} | Temp: {{ temp_label }}. {{ avviso_finestre }}'
+        data:
+          actions:
+            - action: ACCENDI_CLIMA_SLOT2
+              title: ❄️ Sì, Accendi
+            - action: ANNULLA_CLIMA_SLOT2
+              title: ❌ No, Annulla
+      continue_on_error: true
+  mode: single
+- id: clima_conferma_accensione_slot_2
+  alias: Clima - Conferma Accensione Slot 2 (da Notifica)
+  description: Accende i condizionatori configurati nello Slot 2 solo dopo conferma da notifica
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ACCENDI_CLIMA_SLOT2
+  actions:
+    - variables:
+        target_entities: "{% set room = states('input_select.clima_stanze_programmate') %} {% if room == 'Solo Sala & Living'\
+          \ %}\n  ['climate.sala_condizionatore_sala']\n{% elif room == 'Solo Camere da Letto' %}\n  ['climate.camera_condizionatore_camera',\
+          \ 'climate.cameretta_condizionatore_cameretta']\n{% elif room == 'Solo Camera Padronale' %}\n  ['climate.camera_condizionatore_camera']\n\
+          {% elif room == 'Solo Cameretta' %}\n  ['climate.cameretta_condizionatore_cameretta']\n{% else %}\n  ['climate.sala_condizionatore_sala',\
+          \ 'climate.camera_condizionatore_camera', 'climate.cameretta_condizionatore_cameretta']\n{% endif %}\n"
+        hvac_mode_val: "{% set sel = states('input_select.clima_modalita_programmata') %} {% if 'Heat' in sel %}\n  heat\n\
+          {% elif 'Dry' in sel %}\n  dry\n{% elif 'Auto' in sel %}\n  auto\n{% else %}\n  cool\n{% endif %}\n"
+        temp_val: '{{ states(''input_number.clima_temperatura_programmata'') | float(25) }}'
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: '{{ target_entities }}'
+      data:
+        hvac_mode: '{{ hvac_mode_val }}'
+    - action: climate.set_temperature
+      target:
+        entity_id: '{{ target_entities }}'
+      data:
+        temperature: '{{ temp_val }}'
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Clima Slot 2: Accensione confermata da notifica'
+  mode: single
+- id: clima_spegnimento_programmato_slot_2
+  alias: Clima - Spegnimento Programmato Slot 2
+  description: Spegne automaticamente i condizionatori selezionati nello Slot 2
+  trigger:
+    - platform: time
+      at: input_datetime.clima_orario_spegnimento_2
+  condition:
+    - condition: state
+      entity_id: input_boolean.clima_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.clima_slot_2_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{% set mode = states('input_select.clima_giorni_programmati') %} {% if mode == 'Solo feriali (Lun-Ven)'\
+        \ %}\n  {{ now().weekday() < 5 }}\n{% elif mode == 'Solo weekend (Sab-Dom)' %}\n  {{ now().weekday() >= 5 }}\n{% else\
+        \ %}\n  true\n{% endif %}\n"
+  action:
+    - variables:
+        target_entities: "{% set room = states('input_select.clima_stanze_programmate') %} {% if room == 'Solo Sala & Living'\
+          \ %}\n  ['climate.sala_condizionatore_sala']\n{% elif room == 'Solo Camere da Letto' %}\n  ['climate.camera_condizionatore_camera',\
+          \ 'climate.cameretta_condizionatore_cameretta']\n{% elif room == 'Solo Camera Padronale' %}\n  ['climate.camera_condizionatore_camera']\n\
+          {% elif room == 'Solo Cameretta' %}\n  ['climate.cameretta_condizionatore_cameretta']\n{% else %}\n  ['climate.sala_condizionatore_sala',\
+          \ 'climate.camera_condizionatore_camera', 'climate.cameretta_condizionatore_cameretta']\n{% endif %}\n"
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: '{{ target_entities }}'
+      data:
+        hvac_mode: 'off'
+  mode: single
+- id: camino_accensione_programmata_slot_1
+  alias: Camino - Accensione Programmata Slot 1 (Mattina)
+  description: All'orario impostato chiede conferma prima di accendere il camino Slot 1
+  trigger:
+    - platform: time
+      at: input_datetime.camino_orario_accensione_1
+  condition:
+    - condition: state
+      entity_id: input_boolean.camino_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.camino_slot_1_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{% set mode = states('input_select.camino_giorni_programmati') %} {% if mode == 'Solo feriali (Lun-Ven)'\
+        \ %}\n  {{ now().weekday() < 5 }}\n{% elif mode == 'Solo weekend (Sab-Dom)' %}\n  {{ now().weekday() >= 5 }}\n{% else\
+        \ %}\n  true\n{% endif %}\n"
+  action:
+    - variables:
+        finestre_aperte: "{% set open = expand([\n  'binary_sensor.finestrasala_contact',\n  'binary_sensor.finestracamera_contact',\n\
+          \  'binary_sensor.finestracameretta_contact',\n  'binary_sensor.finestrabagno_contact',\n  'binary_sensor.finestrabagnetto_contact',\n\
+          \  'binary_sensor.finestracucina_contact'\n]) | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}\
+          \ {{ open | join(', ') }}"
+        avviso_finestre: "{% set open = expand([\n  'binary_sensor.finestrasala_contact',\n  'binary_sensor.finestracamera_contact',\n\
+          \  'binary_sensor.finestracameretta_contact',\n  'binary_sensor.finestrabagno_contact',\n  'binary_sensor.finestrabagnetto_contact',\n\
+          \  'binary_sensor.finestracucina_contact'\n]) | selectattr('state', 'eq', 'on') | list %} {% if open | count > 0\
+          \ %} ⚠️ FINESTRE APERTE: {{ open | map(attribute='name') | join(', ') }}! Accendi lo stesso? {% else %} Confermi\
+          \ l'accensione? {% endif %}"
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: 🔥 Camino — Accensione Programmata Slot 1
+        message: '{{ avviso_finestre }}'
+        data:
+          actions:
+            - action: ACCENDI_CAMINO_SLOT1
+              title: 🔥 Sì, Accendi
+            - action: ANNULLA_CAMINO_SLOT1
+              title: ❌ No, Annulla
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: 🔥 Camino — Accensione Programmata Slot 1
+        message: '{{ avviso_finestre }}'
+        data:
+          actions:
+            - action: ACCENDI_CAMINO_SLOT1
+              title: 🔥 Sì, Accendi
+            - action: ANNULLA_CAMINO_SLOT1
+              title: ❌ No, Annulla
+      continue_on_error: true
+  mode: single
+- id: camino_conferma_accensione_slot_1
+  alias: Camino - Conferma Accensione Slot 1 (da Notifica)
+  description: Accende il camino solo quando si preme Sì sulla notifica Slot 1
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ACCENDI_CAMINO_SLOT1
+  actions:
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: climate.camino
+      data:
+        hvac_mode: heat
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Camino Slot 1: Accensione confermata da notifica'
+  mode: single
+- id: camino_spegnimento_programmato_slot_1
+  alias: Camino - Spegnimento Programmato Slot 1 (Mattina)
+  description: Spegne automaticamente il camino all'orario impostato nello Slot 1
+  trigger:
+    - platform: time
+      at: input_datetime.camino_orario_spegnimento_1
+  condition:
+    - condition: state
+      entity_id: input_boolean.camino_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.camino_slot_1_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{% set mode = states('input_select.camino_giorni_programmati') %} {% if mode == 'Solo feriali (Lun-Ven)'\
+        \ %}\n  {{ now().weekday() < 5 }}\n{% elif mode == 'Solo weekend (Sab-Dom)' %}\n  {{ now().weekday() >= 5 }}\n{% else\
+        \ %}\n  true\n{% endif %}\n"
+  action:
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.camino
+      data:
+        hvac_mode: 'off'
+  mode: single
+- id: camino_accensione_programmata_slot_2
+  alias: Camino - Accensione Programmata Slot 2 (Sera)
+  description: All'orario impostato chiede conferma prima di accendere il camino Slot 2
+  trigger:
+    - platform: time
+      at: input_datetime.camino_orario_accensione_2
+  condition:
+    - condition: state
+      entity_id: input_boolean.camino_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.camino_slot_2_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{% set mode = states('input_select.camino_giorni_programmati') %} {% if mode == 'Solo feriali (Lun-Ven)'\
+        \ %}\n  {{ now().weekday() < 5 }}\n{% elif mode == 'Solo weekend (Sab-Dom)' %}\n  {{ now().weekday() >= 5 }}\n{% else\
+        \ %}\n  true\n{% endif %}\n"
+  action:
+    - variables:
+        avviso_finestre: "{% set open = expand([\n  'binary_sensor.finestrasala_contact',\n  'binary_sensor.finestracamera_contact',\n\
+          \  'binary_sensor.finestracameretta_contact',\n  'binary_sensor.finestrabagno_contact',\n  'binary_sensor.finestrabagnetto_contact',\n\
+          \  'binary_sensor.finestracucina_contact'\n]) | selectattr('state', 'eq', 'on') | list %} {% if open | count > 0\
+          \ %} ⚠️ FINESTRE APERTE: {{ open | map(attribute='name') | join(', ') }}! Accendi lo stesso? {% else %} Confermi\
+          \ l'accensione serale? {% endif %}"
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: 🔥 Camino — Accensione Programmata Slot 2
+        message: '{{ avviso_finestre }}'
+        data:
+          actions:
+            - action: ACCENDI_CAMINO_SLOT2
+              title: 🔥 Sì, Accendi
+            - action: ANNULLA_CAMINO_SLOT2
+              title: ❌ No, Annulla
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: 🔥 Camino — Accensione Programmata Slot 2
+        message: '{{ avviso_finestre }}'
+        data:
+          actions:
+            - action: ACCENDI_CAMINO_SLOT2
+              title: 🔥 Sì, Accendi
+            - action: ANNULLA_CAMINO_SLOT2
+              title: ❌ No, Annulla
+      continue_on_error: true
+  mode: single
+- id: camino_conferma_accensione_slot_2
+  alias: Camino - Conferma Accensione Slot 2 (da Notifica)
+  description: Accende il camino solo quando si preme Sì sulla notifica Slot 2
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ACCENDI_CAMINO_SLOT2
+  actions:
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: climate.camino
+      data:
+        hvac_mode: heat
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Camino Slot 2: Accensione confermata da notifica'
+  mode: single
+- id: camino_spegnimento_programmato_slot_2
+  alias: Camino - Spegnimento Programmato Slot 2 (Sera)
+  description: Spegne automaticamente il camino all'orario impostato nello Slot 2
+  trigger:
+    - platform: time
+      at: input_datetime.camino_orario_spegnimento_2
+  condition:
+    - condition: state
+      entity_id: input_boolean.camino_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.camino_slot_2_attivo
+      state: 'on'
+    - condition: template
+      value_template: "{% set mode = states('input_select.camino_giorni_programmati') %} {% if mode == 'Solo feriali (Lun-Ven)'\
+        \ %}\n  {{ now().weekday() < 5 }}\n{% elif mode == 'Solo weekend (Sab-Dom)' %}\n  {{ now().weekday() >= 5 }}\n{% else\
+        \ %}\n  true\n{% endif %}\n"
+  action:
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.camino
+      data:
+        hvac_mode: 'off'
+  mode: single
+- id: eco_home_comfort_termico_micie
+  alias: Eco Home - Comfort Termico Micie nei Giorni Torridi (Piccola e Luna)
+  description: Notifica interattiva agli smartphone se la casa è vuota e la temperatura interna supera 28.5°C in estate
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.temperatura_media
+      above: 28.5
+      for:
+        minutes: 20
+  conditions:
+    - condition: template
+      value_template: '{{ now().month in [6, 7, 8, 9] }}'
+    - condition: time
+      after: '10:00:00'
+      before: '17:30:00'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''not_home'') and is_state(''person.laura'', ''not_home'') }}'
+    - condition: state
+      entity_id: climate.sala_condizionatore_sala
+      state: 'off'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 14400 }}'
+  actions:
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: 🐱 Comfort Termico Micie (Piccola e Luna)
+        message: 'In casa ci sono {{ states(''sensor.temperatura_media'') }}°C: fa caldo per Piccola e Luna. Vuoi accendere
+          il clima sala a 25°C in modalità eco?'
+        data:
+          actions:
+            - action: ACCENDI_CLIMA_MICIE
+              title: ❄️ Accendi Clima Sala
+            - action: FINESTRE_APERTE_MICIE
+              title: 🪟 No, Finestre già Aperte
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: 🐱 Comfort Termico Micie (Piccola e Luna)
+        message: 'In casa ci sono {{ states(''sensor.temperatura_media'') }}°C: fa caldo per Piccola e Luna. Vuoi accendere
+          il clima sala a 25°C in modalità eco?'
+        data:
+          actions:
+            - action: ACCENDI_CLIMA_MICIE
+              title: ❄️ Accendi Clima Sala
+            - action: FINESTRE_APERTE_MICIE
+              title: 🪟 No, Finestre già Aperte
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Pet Alert: Notifica comfort termico estivo per micie'
+  mode: single
+- id: eco_home_risposta_clima_micie
+  alias: Eco Home - Esecuzione Clima Sala per Comfort Micie
+  description: Accende il clima sala a 25°C quando si preme Accendi Clima Sala dalla notifica micie
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ACCENDI_CLIMA_MICIE
+  actions:
+    - action: climate.turn_on
+      target:
+        entity_id: climate.sala_condizionatore_sala
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: climate.sala_condizionatore_sala
+      data:
+        hvac_mode: cool
+    - action: climate.set_temperature
+      target:
+        entity_id: climate.sala_condizionatore_sala
+      data:
+        temperature: 25
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Comfort Micie: Clima sala attivato a 25°C da notifica'
+  mode: single

@@ -1,0 +1,496 @@
+# ==============================================================================
+# INFRASTRUTTURA, ANTI-BLACKOUT & GESTIONE NOTIFICHE — CASA MANCINI
+# ==============================================================================
+# Protezione anti-blackout 6 kW, promemoria raccolta differenziata, salute batterie Zigbee, router eventi notifiche interattive e manutenzione sistema.
+# Automazioni incluse in questo modulo: 13
+# ==============================================================================
+
+- id: aggiornamento_automatico_periodico_sensori_10min
+  alias: ⚡ Aggiornamento Automatico Sensori e Posizione Gatti (Ogni 10 min)
+  description: Interroga automaticamente ogni 10 minuti la posizione dei gatti SurePet, i sensori meteo, ambientali ed elettrodomestici.
+  triggers:
+    - trigger: time_pattern
+      minutes: /10
+  conditions: []
+  actions:
+    - action: script.forza_aggiornamento_sensori
+  mode: restart
+- id: allerta_sovraccarico_elettrico_anti_blackout_6kw
+  alias: ⚡ Allerta & Protezione Sovraccarico Elettrico (Anti-Blackout 6 kW)
+  description: Se la potenza totale supera 6300 W per oltre 90 secondi (o 6900 W per oltre 15 secondi), invia notifica prioritaria
+    ed esegue annuncio vocale indicando l'assorbimento e gli elettrodomestici più energivori accesi per evitare il distacco
+    contatore.
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.potenza_totale_istantanea_casa
+      above: 6300
+      for:
+        seconds: 90
+      id: superamento_6kw_prolungato
+    - trigger: numeric_state
+      entity_id: sensor.potenza_totale_istantanea_casa
+      above: 6900
+      for:
+        seconds: 15
+      id: picco_critico_7kw
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_energia
+      state: 'on'
+  actions:
+    - choose:
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.eco_home_silenzioso
+              state: 'off'
+            - condition: template
+              value_template: '{% set last_ann = as_timestamp(states(''input_datetime.eco_home_ultimo_annuncio''), default=0)
+                %} {{ (as_timestamp(now()) - last_ann) > 600 }}'
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id:
+                  - media_player.nest_hub_sala
+                language: it
+                options:
+                  tld: it
+                message: "{% set watt = states('sensor.potenza_totale_istantanea_casa') %} {% set alert_intro = [\n  \"Attenzione!\
+                  \ Sovraccarico elettrico in corso: stiamo assorbendo \" ~ watt ~ \" Watt su 6 Kilowatt disponibili.\",\n\
+                  \  \"Allerta energia! Consumo elevato a \" ~ watt ~ \" Watt. Rischio scatto del contatore.\",\n  \"Attenzione,\
+                  \ picco di assorbimento: siamo a \" ~ watt ~ \" Watt su 6 kW contrattuali!\"\n] | random %} {{ alert_intro\
+                  \ }} {% set carichi = [] %} {% if states('sensor.cucina_forno_job_state') in ['cooking', 'running', 'preheating']\
+                  \ %}\n  {% set carichi = carichi + ['Forno'] %}\n{% endif %} {% if (states('sensor.potenza_stimata_piano_cottura')\
+                  \ | int(0)) > 500 %}\n  {% set carichi = carichi + ['Piano a Induzione'] %}\n{% endif %} {% if (states('sensor.esterno_asciugatrice_potenza')\
+                  \ | float(0)) > 200 %}\n  {% set carichi = carichi + ['Asciugatrice'] %}\n{% endif %} {% if (states('sensor.sala_condizionatore_sala_potenza')\
+                  \ | float(0) + states('sensor.camera_condizionatore_camera_potenza') | float(0) + states('sensor.cameretta_condizionatore_cameretta_potenza')\
+                  \ | float(0)) > 500 %}\n  {% set carichi = carichi + ['Condizionatori'] %}\n{% endif %} {% if carichi |\
+                  \ length > 0 %}\n  {{ [\n    \"Dispositivi ad alto carico attivi: \" ~ (carichi | join(', ')) ~ \". Ridurre\
+                  \ i carichi per evitare il distacco!\",\n    \"Elettrodomestici energivori al momento: \" ~ (carichi | join(',\
+                  \ ')) ~ \". Meglio spegnerne qualcuno!\",\n    \"Controllare: \" ~ (carichi | join(', ')) ~ \". Rischio\
+                  \ distacco imminente se non si riduce la potenza.\"\n  ] | random }}\n{% else %}\n  {{ [\n    \"Spegnere\
+                  \ qualche elettrodomestico per evitare il distacco del contatore!\",\n    \"Ridurre subito i consumi per\
+                  \ non far saltare la corrente!\",\n    \"Attenzione ai carichi accesi per evitare il blackout di casa.\"\
+                  \n  ] | random }}\n{% endif %}"
+              continue_on_error: true
+            - action: input_datetime.set_datetime
+              target:
+                entity_id: input_datetime.eco_home_ultimo_annuncio
+              data:
+                datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+              continue_on_error: true
+    - action: script.notifica_smart
+      data:
+        titolo: ⚡ ALLERTA ANTI-BLACKOUT (6 kW)
+        messaggio: 'Attenzione: assorbimento a {{ states(''sensor.potenza_totale_istantanea_casa'') }} W! Rischio scatto contatore
+          Enel 6 kW. Verifica carichi attivi.'
+        categoria: energia
+        priorita: alta
+        canale: entrambi
+        tag: allerta_blackout_6kw
+  mode: single
+- id: speedtest_aggiornamento_orario
+  alias: 🌐 SpeedTest - Misurazione Oraria Velocità Internet
+  description: Esegue automaticamente ogni ora lo SpeedTest per aggiornare la velocità reale di download, upload e ping della
+    linea WAN.
+  triggers:
+    - trigger: time_pattern
+      minutes: '0'
+  conditions:
+    - condition: state
+      entity_id: sensor.stato_rete_internet_wan
+      state: Online
+  actions:
+    - action: homeassistant.update_entity
+      target:
+        entity_id:
+          - sensor.speedtest_scarica
+  mode: single
+- id: notifica_smart_allarme_synology_storage
+  alias: 🖧 Notifica Smart - Allarme Storage Synology NAS
+  description: Invia notifica push ad alta priorità se un'unità SSD M.2, HDD o Volume RAID del NAS entra in stato degradato
+    o critico
+  triggers:
+    - trigger: state
+      entity_id:
+        - sensor.synologynas_m_2_drive_1_stato_intelligente
+        - sensor.synologynas_m_2_drive_2_stato_intelligente
+        - sensor.synologynas_volume_1_stato
+        - sensor.synologynas_drive_1_stato
+        - sensor.synologynas_drive_2_stato
+        - sensor.synologynas_drive_3_stato
+        - sensor.synologynas_drive_4_stato
+        - sensor.synologynas_drive_5_stato
+  conditions:
+    - condition: template
+      value_template: '{% set m1 = states(''sensor.synologynas_m_2_drive_1_stato_intelligente'') %} {% set m2 = states(''sensor.synologynas_m_2_drive_2_stato_intelligente'')
+        %} {% set vol = states(''sensor.synologynas_volume_1_stato'') %} {{ m1 in [''critical'', ''failing''] or m2 in [''critical'',
+        ''failing''] or vol in [''attention'', ''degraded'', ''crashed''] }}
+
+        '
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🖧 Allarme Hardware Synology NAS DS1522+
+        messaggio: 'Rilevata anomalia di integrità sullo storage del server Synology: - Volume 1: {{ states(''sensor.synologynas_volume_1_stato'')
+          | upper }} - NVMe M.2 Slot 1: S.M.A.R.T. {{ states(''sensor.synologynas_m_2_drive_1_stato_intelligente'') | upper
+          }} - NVMe M.2 Slot 2: S.M.A.R.T. {{ states(''sensor.synologynas_m_2_drive_2_stato_intelligente'') | upper }} Si
+          consiglia di accedere al DSM Synology (Storage Manager) per la verifica dell''unità SSD M.2 degradata.
+
+          '
+        categoria: sicurezza
+        priorita: alta
+        canale: stefano
+        tag: allarme_synology_storage
+  mode: single
+- id: eco_home_actions_150
+  alias: Eco Home - Gestione Azioni Notifiche Interattive
+  mode: parallel
+  description: Eco Home v1.5.0 - Gestisce le risposte interattive (Clima, Luci, Allarme).
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+  conditions:
+    - condition: template
+      value_template: "{{ (trigger.event.data.action | string).startswith('TURN_ON_AC_') or\n   (trigger.event.data.action\
+        \ | string).startswith('TURN_ON_HEAT_') or\n   (trigger.event.data.action | string).startswith('TURN_OFF_LIGHT_')\
+        \ or\n   (trigger.event.data.action | string).startswith('DISARM_ALARM_') }}\n"
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ (trigger.event.data.action | string).startswith(''TURN_ON_AC_'') }}
+
+                '
+          sequence:
+            - action: climate.turn_on
+              target:
+                entity_id: '{{ ac_climate_entities }}'
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: '{{ ac_climate_entities }}'
+              data:
+                hvac_mode: cool
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.eco_home_ultimo_esito
+              data:
+                value: Condizionatori accesi (Freddo)
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ (trigger.event.data.action | string).startswith(''TURN_ON_HEAT_'') }}
+
+                '
+          sequence:
+            - action: climate.turn_on
+              target:
+                entity_id: '{{ ac_climate_entities }}'
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: '{{ ac_climate_entities }}'
+              data:
+                hvac_mode: heat
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.eco_home_ultimo_esito
+              data:
+                value: Condizionatori accesi (Caldo)
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ (trigger.event.data.action | string).startswith(''TURN_OFF_LIGHT_'') }}
+
+                '
+          sequence:
+            - action: light.turn_off
+              target:
+                entity_id: '{{ light_entity }}'
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.eco_home_ultimo_esito
+              data:
+                value: Luce dimenticata spenta
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ (trigger.event.data.action | string).startswith(''DISARM_ALARM_'') }}
+
+                '
+          sequence:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.eco_home_allarme_inserito
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.eco_home_ultimo_esito
+              data:
+                value: Falso allarme disattivato
+              continue_on_error: true
+  variables:
+    debug: true
+    indoor_temp_sensors:
+      - sensor.temperatura_media_sala
+      - sensor.temperatura_media_camera
+    ac_climate_entities:
+      - climate.sala_condizionatore_sala
+      - climate.camera_condizionatore_camera
+    light_entity: light.luceambiente
+- id: eco_home_master_speaker_event_router
+  alias: Eco Home - Master Speaker Event Router
+  description: Router centrale per eventi eco_home_speak con gestione DND e fallback notifica
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: event
+      event_type: eco_home_speak
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+  actions:
+    - variables:
+        msg: '{{ trigger.event.data.message | default('''') }}'
+        title_str: '{{ trigger.event.data.title | default(''Eco Home'') }}'
+        prio: '{{ trigger.event.data.priority | default(''normal'') }}'
+        vol: '{{ trigger.event.data.volume | default(0.8) }}'
+        is_night: '{{ now().hour >= 23 or now().hour < 7 }}'
+        is_silent: '{{ is_state(''input_boolean.eco_home_silenzioso'', ''on'') }}'
+        allow_voice: '{{ (prio == ''critical'') or (not is_silent and not is_night) }}'
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ allow_voice and msg | trim != '''' }}'
+          sequence:
+            - action: media_player.volume_set
+              target:
+                entity_id: media_player.nest_hub_sala
+              data:
+                volume_level: '{{ vol }}'
+              continue_on_error: true
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                language: it
+                options:
+                  tld: it
+                message: '{{ msg }}'
+              continue_on_error: true
+      default:
+        - if:
+            - condition: template
+              value_template: '{{ msg | trim != '''' }}'
+          then:
+            - action: notify.notify
+              data:
+                title: '{{ title_str }}'
+                message: '{{ msg }}'
+              continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: '{{ (title_str ~ ": " ~ msg) | truncate(255, true, "") }}'
+      continue_on_error: true
+- id: notifica_anti_blackout_potenza
+  alias: ⚡ Notifica Smart - Allerta Anti-Blackout Sovraccarico 6 kW
+  description: Invia un allarme critico con tasto di spegnimento clima rapido se l'assorbimento supera 5800W per 45s
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.potenza_totale_istantanea_casa
+      above: 5800
+      for:
+        seconds: 45
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: ⚡ ALLERTA ASSORBIMENTO ELEVATO
+        messaggio: Consumo totale a {{ states('sensor.potenza_totale_istantanea_casa') }} W (> 5.8 kW) da oltre 45s! Rischio
+          distacco contatore Enel (Contratto 6 kW).
+        categoria: energia
+        priorita: critica
+        tag: anti_blackout
+        azioni:
+          - action: SPEGNI_CLIMA
+            title: ❄️ Spegni Condizionatori
+          - action: IGNORA
+            title: Ignora
+  mode: single
+- id: notifica_rifiuti_serale
+  alias: 🗑️ Notifica Smart - Promemoria Rifiuti Serale
+  description: Ogni sera alle 20:30 ricorda quale bidone della raccolta differenziata esporre per domani
+  triggers:
+    - trigger: time
+      at: '20:30:00'
+  conditions:
+    - condition: template
+      value_template: '{{ states(''sensor.raccolta_rifiuti'') not in [''unknown'', ''unavailable'', '''', ''Nessun ritiro'',
+        ''none''] }}'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🗑️ Raccolta Differenziata
+        messaggio: 'Stasera è da esporre: {{ states(''sensor.raccolta_rifiuti'') }} (per il ritiro di domani mattina nel paese).'
+        categoria: rifiuti
+        priorita: normale
+        tag: rifiuti_giorno
+  mode: single
+- id: notifica_report_energetico_giornaliero
+  alias: 📊 Notifica Smart - Report Energetico Giornaliero (23:00)
+  description: Invia alle 23:00 il riepilogo giornaliero dei kWh consumati e della spesa stimata
+  triggers:
+    - trigger: time
+      at: '23:00:00'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 📊 Report Energetico Casa Mancini
+        messaggio: '{% set kwh = states(''sensor.consumo_energia_giornaliero_totale_stimato'') | float(0) %} {% set costo_unit
+          = states(''input_number.costo_kwh_energia'') | float(0.25) %} {% set spesa = (kwh * costo_unit) | round(2) %} Oggi
+          sono stati consumati {{ kwh }} kWh per una spesa stimata di circa {{ spesa }} € (potenza attuale: {{ states(''sensor.potenza_totale_istantanea_casa'')
+          }} W).
+
+          '
+        categoria: energia
+        priorita: bassa
+        canale: stefano
+        tag: report_energia_giornaliero
+  mode: single
+- id: notifica_smart_batterie_scariche_rilevate
+  alias: 🪫 Notifica Smart - Allerta Batterie Scariche Rilevate
+  description: Invia un allarme immediato quando una o più batterie scendono sotto la soglia impostata o quando un sensore
+    binario segnala batteria scarica
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.allerta_batterie_scariche
+      to: 'on'
+    - trigger: state
+      entity_id: sensor.batterie_scariche_conteggio
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_batterie
+      state: 'on'
+    - condition: state
+      entity_id: binary_sensor.allerta_batterie_scariche
+      state: 'on'
+    - condition: template
+      value_template: "{% if trigger.entity_id == 'binary_sensor.allerta_batterie_scariche' %}\n  true\n{% elif trigger.entity_id\
+        \ == 'sensor.batterie_scariche_conteggio' and trigger.from_state is not none and trigger.to_state is not none %}\n\
+        \  {{ trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}\n{% else %}\n  false\n{% endif %}"
+    - condition: time
+      after: 08:00:00
+      before: '22:30:00'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🪫 ALLERTA BATTERIE SCARICHE
+        messaggio: 'Rilevate {{ states(''sensor.batterie_scariche_conteggio'') }} batterie con livello critico (sotto il {{
+          states(''input_number.soglia_batteria_bassa'') | int }}%): {{ states(''sensor.elenco_batterie_scariche'') }}.
+
+          Sostituire o ricaricare i dispositivi per evitare interruzioni di servizio.'
+        categoria: batterie
+        priorita: alta
+        tag: allerta_batterie_scariche
+        azioni:
+          - action: APRI_BATTERIE
+            title: 🔋 Apri Scheda Batterie
+            uri: /casa-mancini/batterie
+          - action: IGNORA_BATTERIE
+            title: 🔕 Ignora
+  mode: single
+- id: notifica_smart_batterie_scariche_promemoria_quotidiano
+  alias: 🔔 Notifica Smart - Promemoria Quotidiano Batterie Scariche
+  description: Ogni mattina alle 10:00 verifica se vi sono ancora batterie scariche in attesa di sostituzione
+  triggers:
+    - trigger: time
+      at: '10:00:00'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_batterie
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.batterie_notifica_giornaliera
+      state: 'on'
+    - condition: state
+      entity_id: binary_sensor.allerta_batterie_scariche
+      state: 'on'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🔔 [PROMEMORIA] Batterie Ancora Scariche
+        messaggio: 'Promemoria manutenzione: {{ states(''sensor.batterie_scariche_conteggio'') }} dispositivo/i necessitano
+          ancora della sostituzione della batteria: {{ states(''sensor.elenco_batterie_scariche'') }}.'
+        categoria: batterie
+        priorita: normale
+        tag: allerta_batterie_scariche
+        azioni:
+          - action: APRI_BATTERIE
+            title: 🔋 Apri Scheda Batterie
+            uri: /casa-mancini/batterie
+          - action: IGNORA_BATTERIE
+            title: 🔕 Ignora
+  mode: single
+- id: notifica_smart_batterie_gestione_azioni_smartphone
+  alias: 🪫 Notifica Smart - Gestione Azioni Notifiche Batterie
+  description: Intercetta le azioni dalle notifiche smartphone relative alle batterie per chiudere l'avviso
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: IGNORA_BATTERIE
+  actions:
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        message: clear_notification
+        data:
+          tag: allerta_batterie_scariche
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        message: clear_notification
+        data:
+          tag: allerta_batterie_scariche
+      continue_on_error: true
+    - if:
+        - condition: template
+          value_template: '{{ trigger.platform is defined and trigger.platform == ''event'' }}'
+      then:
+        - action: logbook.log
+          data:
+            name: Notifiche Smart
+            message: Allerta batterie scariche chiusa/ignorata via smartphone
+  mode: parallel
+- id: notifica_meteo_azione_abbassa_tapparelle
+  alias: 🪟 Meteo - Gestione Azione Abbassa Tapparelle da Notifica
+  description: Intercetta il pulsante Abbassa Tapparelle dalla notifica di pioggia o vento per abbassare le tapparelle
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ABBASSA_TAPPARELLE
+  actions:
+    - action: script.chiusura_standard_tapparelle
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        message: clear_notification
+        data:
+          tag: meteo_pioggia
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        message: clear_notification
+        data:
+          tag: meteo_pioggia
+      continue_on_error: true
+    - action: logbook.log
+      data:
+        name: Notifiche Smart
+        message: Tapparelle abbassate su richiesta da notifica meteo pioggia/vento
+  mode: single

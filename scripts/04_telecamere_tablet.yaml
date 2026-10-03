@@ -1,0 +1,115 @@
+# ==============================================================================
+# TELECAMERE DI SICUREZZA & TABLET A PARETE — CASA MANCINI
+# ==============================================================================
+# Snapshot live telecamere per plancia Lovelace e standby display tablet.
+# Script inclusi in questo modulo: 2
+# ==============================================================================
+
+aggiorna_anteprima_telecamera:
+  alias: 📸 Aggiorna Anteprima Telecamera
+  description: Cattura fotogrammi live e aggiorna le immagini snapshot in plancia
+  mode: parallel
+  max: 10
+  fields:
+    target_camera:
+      description: Entità telecamera da aggiornare (opzionale, default tutte)
+      example: camera.scale
+  sequence:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ target_camera is defined and target_camera not in ['''', none] }}'
+          sequence:
+            - variables:
+                cam_slug: '{{ target_camera | replace(''camera.'', '''') }}'
+            - action: camera.snapshot
+              target:
+                entity_id: '{{ target_camera }}'
+              data:
+                filename: /config/www/cam_snapshots/{{ cam_slug }}.jpg
+              continue_on_error: true
+      default:
+        - parallel:
+            - action: camera.snapshot
+              target:
+                entity_id: camera.scale
+              data:
+                filename: /config/www/cam_snapshots/scale.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.sala
+              data:
+                filename: /config/www/cam_snapshots/sala.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.sala_2
+              data:
+                filename: /config/www/cam_snapshots/sala_2.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.camera
+              data:
+                filename: /config/www/cam_snapshots/camera.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.cameretta
+              data:
+                filename: /config/www/cam_snapshots/cameretta.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.balcone_sala
+              data:
+                filename: /config/www/cam_snapshots/balcone_sala.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.balcone_camera
+              data:
+                filename: /config/www/cam_snapshots/balcone_camera.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.terrazza
+              data:
+                filename: /config/www/cam_snapshots/terrazza.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.terrazza_2
+              data:
+                filename: /config/www/cam_snapshots/terrazza_2.jpg
+              continue_on_error: true
+            - action: camera.snapshot
+              target:
+                entity_id: camera.terrazzo_3_2
+              data:
+                filename: /config/www/cam_snapshots/terrazzo_3_2.jpg
+              continue_on_error: true
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.ultimo_aggiornamento_telecamere
+      data:
+        datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+standby_tablet:
+  alias: 📱 Standby Tablet (Spegni Schermo)
+  description: Invia il comando di spegnimento schermo al Tablet Samsung Galaxy Tab S5e
+  icon: mdi:tablet-cellphone
+  mode: single
+  sequence:
+    - action: notify.mobile_app_tablet
+      data:
+        message: command_screen_off
+      continue_on_error: true
+    - action: notify.send_message
+      target:
+        entity_id:
+          - notify.tablet
+          - notify.sm_t725
+      data:
+        message: command_screen_off
+      continue_on_error: true

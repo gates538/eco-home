@@ -1,0 +1,338 @@
+# ==============================================================================
+# GESTIONE TAPPARELLE MOTORIZZATE — CASA MANCINI
+# ==============================================================================
+# Comandi di apertura, oscuramento totale, posizionamento standard 95%, profili estate/inverno e scenari notte.
+# Script inclusi in questo modulo: 9
+# ==============================================================================
+
+stop_tutte_le_tapparelle:
+  alias: Stop Tutte le Tapparelle
+  icon: mdi:stop-circle
+  mode: restart
+  sequence:
+    - action: cover.stop_cover
+      target:
+        entity_id:
+          - cover.tapparella_sala_2
+          - cover.tapparella_cucina_2
+          - cover.tapparella_camera_2
+          - cover.tapparella_cameretta_2
+          - cover.tapparella_bagno_2
+          - cover.tapparella_bagnetto_2
+applica_percentuale_tapparelle:
+  alias: Applica Percentuale a Tutte le Tapparelle
+  icon: mdi:window-shutter-cog
+  mode: restart
+  sequence:
+    - action: cover.set_cover_position
+      target:
+        entity_id:
+          - cover.tapparella_sala_homekit
+          - cover.tapparella_camera_homekit
+          - cover.tapparella_cameretta_homekit
+          - cover.tapparella_bagnetto_homekit
+      data:
+        position: '{{ states(''input_number.target_percentuale_tapparelle'') | int(50) }}'
+    - action: cover.set_cover_position
+      target:
+        entity_id:
+          - cover.tapparella_cucina_homekit
+          - cover.tapparella_bagno_homekit
+      data:
+        position: "{% set target = states('input_number.target_percentuale_tapparelle') | int(50) %} {% if target > 0 and\
+          \ target <= 10 %}\n  {{ [0, target - 1] | max }}\n{% else %}\n  {{ target }}\n{% endif %}\n"
+chiusura_totale_tapparelle:
+  alias: Oscuramento Totale Tapparelle (100% Serrate)
+  icon: mdi:weather-night
+  mode: restart
+  sequence:
+    - action: cover.set_cover_position
+      target:
+        entity_id:
+          - cover.tapparella_sala_homekit
+          - cover.tapparella_cucina_homekit
+          - cover.tapparella_camera_homekit
+          - cover.tapparella_cameretta_homekit
+          - cover.tapparella_bagno_homekit
+          - cover.tapparella_bagnetto_homekit
+      data:
+        position: 0
+chiusura_standard_tapparelle:
+  alias: Chiudi Tutte le Tapparelle (95% con Fessure)
+  icon: mdi:window-shutter
+  mode: restart
+  sequence:
+    - repeat:
+        for_each:
+          - entity_id: cover.tapparella_sala_homekit
+            pos: 5
+          - entity_id: cover.tapparella_camera_homekit
+            pos: 5
+          - entity_id: cover.tapparella_cameretta_homekit
+            pos: 5
+          - entity_id: cover.tapparella_bagnetto_homekit
+            pos: 5
+          - entity_id: cover.tapparella_cucina_homekit
+            pos: 4
+          - entity_id: cover.tapparella_bagno_homekit
+            pos: 4
+        sequence:
+          - if:
+              - condition: template
+                value_template: '{{ (state_attr(repeat.item.entity_id, ''current_position'') | int(0)) > 10 }}'
+            then:
+              - action: cover.set_cover_position
+                target:
+                  entity_id: '{{ repeat.item.entity_id }}'
+                data:
+                  position: '{{ repeat.item.pos }}'
+apri_tutte_le_tapparelle:
+  alias: Apri Tutte le Tapparelle (100%)
+  icon: mdi:window-shutter-open
+  mode: restart
+  sequence:
+    - action: cover.set_cover_position
+      target:
+        entity_id:
+          - cover.tapparella_sala_homekit
+          - cover.tapparella_cucina_homekit
+          - cover.tapparella_camera_homekit
+          - cover.tapparella_cameretta_homekit
+          - cover.tapparella_bagno_homekit
+          - cover.tapparella_bagnetto_homekit
+      data:
+        position: 100
+estate:
+  alias: ☀️ Estate (Tapparelle 50% & Clima Auto)
+  icon: mdi:weather-sunny
+  mode: restart
+  sequence:
+    - action: cover.set_cover_position
+      target:
+        entity_id:
+          - cover.tapparella_sala_homekit
+          - cover.tapparella_cucina_homekit
+          - cover.tapparella_camera_homekit
+          - cover.tapparella_cameretta_homekit
+          - cover.tapparella_bagno_homekit
+          - cover.tapparella_bagnetto_homekit
+      data:
+        position: 50
+    - action: climate.set_hvac_mode
+      target:
+        entity_id:
+          - climate.sala_condizionatore_sala
+          - climate.camera_condizionatore_camera
+          - climate.cameretta_condizionatore_cameretta
+      data:
+        hvac_mode: auto
+inverno:
+  alias: ❄️ Inverno (Tapparelle 100% & Camino)
+  icon: mdi:snowflake
+  mode: restart
+  sequence:
+    - action: cover.set_cover_position
+      target:
+        entity_id:
+          - cover.tapparella_sala_homekit
+          - cover.tapparella_cucina_homekit
+          - cover.tapparella_camera_homekit
+          - cover.tapparella_cameretta_homekit
+          - cover.tapparella_bagno_homekit
+          - cover.tapparella_bagnetto_homekit
+      data:
+        position: 100
+    - action: climate.set_hvac_mode
+      target:
+        entity_id:
+          - climate.camino
+      data:
+        hvac_mode: heat
+preparazione_notte:
+  alias: 🛏️ Preparazione Notte (Dinamica)
+  icon: mdi:bed-clock
+  mode: restart
+  sequence:
+    - choose:
+        - conditions:
+            - condition: or
+              conditions:
+                - condition: template
+                  value_template: '{{ states(''sensor.season'') == ''summer'' or now().month in [6, 7, 8, 9] }}
+
+                    '
+                - condition: template
+                  value_template: "{{ states('climate.sala_condizionatore_sala') in ['cool', 'auto', 'dry'] or\n   states('climate.camera_condizionatore_camera')\
+                    \ in ['cool', 'auto', 'dry'] or\n   states('climate.cameretta_condizionatore_cameretta') in ['cool', 'auto',\
+                    \ 'dry'] or\n   states('climate.tutti_i_condizionatori') in ['cool', 'auto', 'dry'] }}\n"
+          sequence:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{% set covers = ['cover.tapparella_sala_homekit', 'cover.tapparella_camera_homekit',\
+                        \ 'cover.tapparella_cameretta_homekit', 'cover.tapparella_bagnetto_homekit'] %} {% set ns = namespace(count=0)\
+                        \ %} {% for c in covers %}\n  {% if (state_attr(c, 'current_position') | int(0)) > 10 %}\n    {% set\
+                        \ ns.count = ns.count + 1 %}\n  {% endif %}\n{% endfor %} {{ ns.count > 0 }}\n"
+                  sequence:
+                    - action: cover.set_cover_position
+                      target:
+                        entity_id: "{% set covers = ['cover.tapparella_sala_homekit', 'cover.tapparella_camera_homekit', 'cover.tapparella_cameretta_homekit',\
+                          \ 'cover.tapparella_bagnetto_homekit'] %} {% set ns = namespace(to_close=[]) %} {% for c in covers\
+                          \ %}\n  {% if (state_attr(c, 'current_position') | int(0)) > 10 %}\n    {% set ns.to_close = ns.to_close\
+                          \ + [c] %}\n  {% endif %}\n{% endfor %} {{ ns.to_close }}\n"
+                      data:
+                        position: 5
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{% set covers = ['cover.tapparella_cucina_homekit', 'cover.tapparella_bagno_homekit']\
+                        \ %} {% set ns = namespace(count=0) %} {% for c in covers %}\n  {% if (state_attr(c, 'current_position')\
+                        \ | int(0)) > 10 %}\n    {% set ns.count = ns.count + 1 %}\n  {% endif %}\n{% endfor %} {{ ns.count\
+                        \ > 0 }}\n"
+                  sequence:
+                    - action: cover.set_cover_position
+                      target:
+                        entity_id: "{% set covers = ['cover.tapparella_cucina_homekit', 'cover.tapparella_bagno_homekit']\
+                          \ %} {% set ns = namespace(to_close=[]) %} {% for c in covers %}\n  {% if (state_attr(c, 'current_position')\
+                          \ | int(0)) > 10 %}\n    {% set ns.to_close = ns.to_close + [c] %}\n  {% endif %}\n{% endfor %}\
+                          \ {{ ns.to_close }}\n"
+                      data:
+                        position: 4
+            - action: media_player.turn_off
+              target:
+                entity_id:
+                  - media_player.sala_tv_sala
+                  - media_player.tv_cameretta
+            - action: climate.set_hvac_mode
+              target:
+                entity_id:
+                  - climate.sala_condizionatore_sala
+                  - climate.cameretta_condizionatore_cameretta
+              data:
+                hvac_mode: 'off'
+            - action: light.turn_off
+              target:
+                entity_id:
+                  - light.sala
+                  - light.mensolecamino
+                  - light.luceambiente
+                  - light.cucina
+                  - light.faretti_cucina
+                  - light.camera
+                  - light.cameretta
+                  - light.corridoio
+                  - light.bagno
+                  - light.bagno_specchio
+                  - light.bagnetto
+                  - light.bagnetto_specchio
+            - action: light.turn_on
+              target:
+                entity_id:
+                  - light.camera_letto_stefano
+                  - light.camera_letto_laura
+              data:
+                brightness_pct: 30
+      default:
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{% set covers = ['cover.tapparella_sala_homekit', 'cover.tapparella_camera_homekit', 'cover.tapparella_cameretta_homekit',\
+                    \ 'cover.tapparella_bagnetto_homekit'] %} {% set ns = namespace(count=0) %} {% for c in covers %}\n  {%\
+                    \ if (state_attr(c, 'current_position') | int(0)) > 10 %}\n    {% set ns.count = ns.count + 1 %}\n  {%\
+                    \ endif %}\n{% endfor %} {{ ns.count > 0 }}\n"
+              sequence:
+                - action: cover.set_cover_position
+                  target:
+                    entity_id: "{% set covers = ['cover.tapparella_sala_homekit', 'cover.tapparella_camera_homekit', 'cover.tapparella_cameretta_homekit',\
+                      \ 'cover.tapparella_bagnetto_homekit'] %} {% set ns = namespace(to_close=[]) %} {% for c in covers %}\n\
+                      \  {% if (state_attr(c, 'current_position') | int(0)) > 10 %}\n    {% set ns.to_close = ns.to_close\
+                      \ + [c] %}\n  {% endif %}\n{% endfor %} {{ ns.to_close }}\n"
+                  data:
+                    position: 5
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{% set covers = ['cover.tapparella_cucina_homekit', 'cover.tapparella_bagno_homekit'] %}\
+                    \ {% set ns = namespace(count=0) %} {% for c in covers %}\n  {% if (state_attr(c, 'current_position')\
+                    \ | int(0)) > 10 %}\n    {% set ns.count = ns.count + 1 %}\n  {% endif %}\n{% endfor %} {{ ns.count >\
+                    \ 0 }}\n"
+              sequence:
+                - action: cover.set_cover_position
+                  target:
+                    entity_id: "{% set covers = ['cover.tapparella_cucina_homekit', 'cover.tapparella_bagno_homekit'] %} {%\
+                      \ set ns = namespace(to_close=[]) %} {% for c in covers %}\n  {% if (state_attr(c, 'current_position')\
+                      \ | int(0)) > 10 %}\n    {% set ns.to_close = ns.to_close + [c] %}\n  {% endif %}\n{% endfor %} {{ ns.to_close\
+                      \ }}\n"
+                  data:
+                    position: 4
+        - action: media_player.turn_off
+          target:
+            entity_id:
+              - media_player.sala_tv_sala
+              - media_player.tv_cameretta
+        - action: climate.set_hvac_mode
+          target:
+            entity_id:
+              - climate.camino
+          data:
+            hvac_mode: 'off'
+        - action: climate.set_hvac_mode
+          target:
+            entity_id:
+              - climate.sala_condizionatore_sala
+              - climate.camera_condizionatore_camera
+              - climate.cameretta_condizionatore_cameretta
+          data:
+            hvac_mode: 'off'
+        - action: light.turn_off
+          target:
+            entity_id:
+              - light.sala
+              - light.mensolecamino
+              - light.luceambiente
+              - light.cucina
+              - light.faretti_cucina
+              - light.camera
+              - light.cameretta
+              - light.corridoio
+        - action: light.turn_on
+          target:
+            entity_id:
+              - light.camera_letto_stefano
+              - light.camera_letto_laura
+          data:
+            brightness_pct: 30
+attiva_scenario_selezionato:
+  alias: Attiva Scenario Selezionato
+  icon: mdi:play-circle
+  mode: restart
+  sequence:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ states(''input_text.scenario_casa_selezionato'') in [''🛏️ Preparazione Notte'', ''Preparazione
+                Notte''] }}'
+          sequence:
+            - action: script.preparazione_notte
+        - conditions:
+            - condition: template
+              value_template: '{{ states(''input_text.scenario_casa_selezionato'') in [''☀️ Estate'', ''Estate''] }}'
+          sequence:
+            - action: script.estate
+        - conditions:
+            - condition: template
+              value_template: '{{ states(''input_text.scenario_casa_selezionato'') in [''❄️ Inverno'', ''Inverno''] }}'
+          sequence:
+            - action: script.inverno
+        - conditions:
+            - condition: template
+              value_template: '{{ states(''input_text.scenario_casa_selezionato'') not in [''Seleziona Scenario...'', ''unknown'',
+                ''unavailable'', ''''] }}'
+          sequence:
+            - action: scene.turn_on
+              target:
+                entity_id: '{% set selected = states(''input_text.scenario_casa_selezionato'') %} {% set match = states.scene
+                  | selectattr(''name'', ''eq'', selected) | map(attribute=''entity_id'') | list %} {{ match[0] if match |
+                  length > 0 else ''none'' }}
+
+                  '

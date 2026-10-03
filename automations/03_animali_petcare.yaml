@@ -1,0 +1,1583 @@
+# ==============================================================================
+# ANIMALI DOMESTICI: GATTE (LUNA & PICCOLA) E ACQUARIO BIOTOPO — CASA MANCINI
+# ==============================================================================
+# Gattaiola SureFlap, PetKit dispenser, fontanella, lettiera PuraMax 2 e gestione integrale biotopo acquario.
+# Automazioni incluse in questo modulo: 32
+# ==============================================================================
+
+- id: acquario_fotoperiodo_biologico_neon_rasbore
+  alias: 🐠 Acquario - Ciclo Biologico Giorno/Notte (Neon & Rasbore)
+  description: 'Fotoperiodo naturale smart autunno/inverno con erogazione pasto giornaliera: risveglio (12:00), fotosintesi
+    (13:30), pasto giornaliero (15:00), tramonto (18:30), relax serale (20:00 se presenti a casa), spegnimento con scenario
+    notte o alle 23:30. 100% modificabile da UI.'
+  triggers:
+    - trigger: time
+      at: '12:00:00'
+      id: alba
+    - trigger: time
+      at: '13:30:00'
+      id: giorno_pieno
+    - trigger: time
+      at: input_datetime.acquario_orario_cibo
+      id: eroga_cibo
+    - trigger: time
+      at: '18:30:00'
+      id: tramonto
+    - trigger: time
+      at: '20:00:00'
+      id: relax_serale
+    - trigger: numeric_state
+      entity_id: zone.home
+      above: 0
+      id: rientro_a_casa
+    - trigger: state
+      entity_id: scene.preparazione_notte
+      id: spegni_notte
+      not_to:
+        - unavailable
+        - unknown
+      not_from:
+        - unavailable
+        - unknown
+    - trigger: state
+      entity_id: scene.buonanotte
+      id: spegni_buonanotte
+      not_to:
+        - unavailable
+        - unknown
+      not_from:
+        - unavailable
+        - unknown
+    - trigger: time
+      at: '23:30:00'
+      id: buio_limite
+    - trigger: homeassistant
+      event: start
+      id: avvio_sistema
+  conditions:
+    - condition: state
+      entity_id: input_boolean.acquario_override_manuale
+      state: 'off'
+    - condition: state
+      entity_id: input_boolean.acquario_buio_24h
+      state: 'off'
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: avvio_sistema
+          sequence:
+            - action: script.acquario_ripristina_luce_automatica
+        - conditions:
+            - condition: trigger
+              id: alba
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                brightness_pct: 25
+                rgbw_color:
+                  - 255
+                  - 110
+                  - 10
+                  - 15
+                transition: 900
+        - conditions:
+            - condition: trigger
+              id: giorno_pieno
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                brightness_pct: 75
+                rgbw_color:
+                  - 240
+                  - 230
+                  - 255
+                  - 255
+                transition: 900
+        - conditions:
+            - condition: trigger
+              id: eroga_cibo
+            - condition: state
+              entity_id: input_boolean.acquario_cibo_automatico
+              state: 'on'
+          sequence:
+            - action: script.acquario_eroga_cibo
+        - conditions:
+            - condition: trigger
+              id: tramonto
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                brightness_pct: 45
+                rgbw_color:
+                  - 255
+                  - 150
+                  - 40
+                  - 60
+                transition: 900
+        - conditions:
+            - condition: trigger
+              id: relax_serale
+          sequence:
+            - if:
+                - condition: numeric_state
+                  entity_id: zone.home
+                  above: 0
+                - condition: state
+                  entity_id: input_boolean.acquario_relax_serale
+                  state: 'on'
+              then:
+                - action: light.turn_on
+                  target:
+                    entity_id: light.fzone_acquario
+                  data:
+                    brightness_pct: 18
+                    rgbw_color:
+                      - 255
+                      - 75
+                      - 10
+                      - 0
+                    transition: 900
+              else:
+                - action: light.turn_off
+                  target:
+                    entity_id: light.fzone_acquario
+                  data:
+                    transition: 900
+        - conditions:
+            - condition: trigger
+              id: rientro_a_casa
+            - condition: time
+              after: '20:00:00'
+              before: '23:30:00'
+            - condition: state
+              entity_id: input_boolean.acquario_relax_serale
+              state: 'on'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                brightness_pct: 18
+                rgbw_color:
+                  - 255
+                  - 75
+                  - 10
+                  - 0
+                transition: 60
+        - conditions:
+            - condition: or
+              conditions:
+                - condition: trigger
+                  id: spegni_notte
+                - condition: trigger
+                  id: spegni_buonanotte
+                - condition: trigger
+                  id: buio_limite
+          sequence:
+            - action: light.turn_off
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                transition: 120
+  mode: restart
+- id: acquario_attivazione_override_manuale_1h
+  alias: 🐠 Acquario - Attivazione Override Manuale (1 Ora)
+  description: Quando il colore o la luminosità vengono modificati manualmente da app/plancia ad accensione attiva, avvia
+    un timer di 1 ora prima di tornare al ciclo automatico. Se spento a mano, la luce resta spenta.
+  triggers:
+    - trigger: state
+      entity_id: light.fzone_acquario
+  conditions:
+    - condition: template
+      value_template: '{{ trigger.to_state.context.user_id is not none }}'
+    - condition: state
+      entity_id: input_boolean.acquario_pasto_in_corso
+      state: 'off'
+    - condition: state
+      entity_id: input_boolean.acquario_buio_24h
+      state: 'off'
+    - condition: state
+      entity_id: script.acquario_ripristina_luce_automatica
+      state: 'off'
+    - condition: state
+      entity_id: script.acquario_toggle_buio_24h
+      state: 'off'
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.to_state.state == ''on'' }}'
+          sequence:
+            - action: timer.start
+              target:
+                entity_id: timer.acquario_override_manuale
+              data:
+                duration: 01:00:00
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.acquario_override_manuale
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.to_state.state == ''off'' }}'
+          sequence:
+            - action: timer.cancel
+              target:
+                entity_id: timer.acquario_override_manuale
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.acquario_override_manuale
+  mode: restart
+- id: acquario_ripristino_ciclo_automatico_dopo_1h
+  alias: 🐠 Acquario - Ripristino Ciclo Automatico dopo Override (1h)
+  description: Allo scadere dell'ora di override di luce accesa, richiama lo script di ripristino per impostare la fase di
+    luce corretta.
+  triggers:
+    - trigger: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.acquario_override_manuale
+      id: timer_scaduto
+  conditions: []
+  actions:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.acquario_override_manuale
+    - action: script.acquario_ripristina_luce_automatica
+  mode: restart
+- id: acquario_fine_modalita_pasto_5min
+  alias: 🐠 Acquario - Fine Modalità Pasto (5 min)
+  description: Allo scadere dei 5 minuti del pasto (o su interruzione manuale), spegne il flag pasto e ripristina la luce
+    biologica del momento.
+  triggers:
+    - trigger: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.acquario_modalita_pasto
+      id: timer_pasto_scaduto
+    - trigger: state
+      entity_id: input_boolean.acquario_pasto_in_corso
+      to: 'off'
+      id: toggle_pasto_off
+  conditions: []
+  actions:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.acquario_pasto_in_corso
+    - action: timer.finish
+      target:
+        entity_id: timer.acquario_modalita_pasto
+    - action: script.acquario_ripristina_luce_automatica
+  mode: restart
+- id: acquario_avvio_automatico_pasto_da_mangiatoia
+  alias: 🐠 Acquario - Avvio Automatico Modalità Pasto da Mangiatoia
+  description: Quando la mangiatoia automatica eroga cibo durante il giorno (10:00 - 21:30), attiva automaticamente la luce
+    nitida di pasto per 5 minuti.
+  triggers:
+    - trigger: state
+      entity_id: sensor.mangiatoia_acquario_ultima_erogazione
+  conditions:
+    - condition: template
+      value_template: "{{ trigger.from_state is not none and\n   trigger.to_state is not none and\n   trigger.from_state.state\
+        \ not in ['unknown', 'unavailable'] and\n   trigger.to_state.state not in ['unknown', 'unavailable'] and\n   trigger.to_state.state\
+        \ != trigger.from_state.state }}"
+    - condition: time
+      after: '10:00:00'
+      before: '21:30:00'
+    - condition: state
+      entity_id: input_boolean.acquario_buio_24h
+      state: 'off'
+  actions:
+    - action: script.acquario_modalita_pasto
+  mode: restart
+- id: acquario_promemoria_cambio_acqua_periodico
+  alias: 🐠 Acquario - Allerte e Promemoria Salute Vasca (TDS & Cambio Acqua)
+  description: 'Invia notifiche smart per proteggere i pesci: se il TDS supera 350 ppm per oltre 2 ore, se sono trascorsi
+    oltre 14 giorni dall''ultimo cambio acqua o se la mangiatoia ha cibo basso.'
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sensoreacquario_tds
+      above: 350
+      for:
+        hours: 2
+      id: tds_alto
+    - trigger: numeric_state
+      entity_id: sensor.acquario_giorni_da_ultimo_cambio_acqua
+      above: 14
+      id: giorni_scaduti
+    - trigger: state
+      entity_id: binary_sensor.mangiatoia_acquario_livello_cibo_basso
+      to: 'on'
+      for:
+        hours: 1
+      id: cibo_basso
+  conditions: []
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: tds_alto
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: '🐠 Acquario: TDS Elevato (Consigliato Cambio Acqua)'
+                messaggio: 'Il TDS dell''acqua ha raggiunto {{ states(''sensor.sensoreacquario_tds'') }} ppm (temperatura:
+                  {{ states(''sensor.sensoreacquario_probe_temperature'') }} °C). È raccomandato un cambio parziale del 20%
+                  con acqua dolce per neon e rasbore.'
+                categoria: pet
+                priorita: normale
+                canale: stefano
+                tag: acquario_avviso_tds
+        - conditions:
+            - condition: trigger
+              id: giorni_scaduti
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: '💧 Acquario: Promemoria Cambio Acqua Quindicinale'
+                messaggio: 'Sono trascorsi {{ states(''sensor.acquario_giorni_da_ultimo_cambio_acqua'') }} giorni dall''ultimo
+                  cambio d''acqua registrato. TDS attuale: {{ states(''sensor.sensoreacquario_tds'') }} ppm.'
+                categoria: pet
+                priorita: normale
+                canale: stefano
+                tag: acquario_promemoria_14gg
+        - conditions:
+            - condition: trigger
+              id: cibo_basso
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: '🍽️ Mangiatoia Acquario: Livello Cibo Basso'
+                messaggio: Il sensore della mangiatoia segnala che il cibo sta terminando. Ricordati di rifornire il serbatoio
+                  per i pesci.
+                categoria: pet
+                priorita: normale
+                canale: stefano
+                tag: mangiatoia_cibo_basso
+  mode: single
+- id: acquario_fine_buio_24h
+  alias: 🌑 Acquario - Fine Buio 24h & Ripristino Ciclo
+  description: Allo scadere delle 24 ore di buio continuo, disattiva il flag di buio e ripristina automaticamente il normale
+    fotoperiodo biologico della plafoniera.
+  triggers:
+    - trigger: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.acquario_buio_24h
+  conditions: []
+  actions:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.acquario_buio_24h
+    - action: script.acquario_ripristina_luce_automatica
+    - action: script.notifica_smart
+      data:
+        titolo: '🌿 Acquario: Trattamento Buio 24h Concluso'
+        messaggio: Il ciclo di buio continuo di 24 ore è terminato con successo. La plafoniera ha ripreso automaticamente
+          il normale fotoperiodo biologico.
+        categoria: pet
+        priorita: normale
+        canale: stefano
+        tag: acquario_buio_24h
+  mode: restart
+- id: acquario_accensione_ossigenatore_weekend_ferie
+  alias: 🐠 Acquario - Accensione Ossigenatore (Ore 09:30 Weekend & Ferie)
+  description: Accende automaticamente l'ossigenatore alle 09:30 il sabato e la domenica, oppure nei giorni infrasettimanali
+    se l'automazione Buongiorno è disattivata per ferie.
+  triggers:
+    - trigger: time
+      at: 09:30:00
+  conditions:
+    - condition: or
+      conditions:
+        - condition: time
+          weekday:
+            - sat
+            - sun
+        - condition: state
+          entity_id: automation.buongiorno_sveglia_lavoro_meteo_sarcastico_allerte
+          state: 'off'
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.ossigenatoreacquario
+    - action: logbook.log
+      data:
+        name: Acquario
+        message: Ossigenatore acceso automaticamente alle 09:30 (Weekend / Ferie)
+        entity_id: switch.ossigenatoreacquario
+  mode: single
+- id: dispenser_programmazione_pasto_mattina
+  alias: Petkit Dispenser - Erogazione Pasto Mattina (Slot 1)
+  description: Eroga automaticamente le crocchette impostate per la mattina se la programmazione è attiva e la ciotola non
+    è piena
+  triggers:
+    - trigger: time
+      at: input_datetime.dispenser_orario_slot_1
+  conditions:
+    - condition: state
+      entity_id: input_boolean.dispenser_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.dispenser_slot_1_attivo
+      state: 'on'
+  actions:
+    - if:
+        - condition: and
+          conditions:
+            - condition: state
+              entity_id: input_boolean.dispenser_controllo_ciotola_piena
+              state: 'on'
+            - condition: numeric_state
+              entity_id: sensor.dispenser_crocchette_riempimento_ciotola
+              above: 14
+      then:
+        - action: logbook.log
+          data:
+            name: Dispenser Crocchette
+            message: 'Pasto Mattina saltato: ciotola ancora piena ({{ states(''sensor.dispenser_crocchette_riempimento_ciotola'')
+              }}%)'
+            entity_id: sensor.dispenser_crocchette_riempimento_ciotola
+      else:
+        - action: script.eroga_crocchette_slot_1
+        - action: logbook.log
+          data:
+            name: Dispenser Crocchette
+            message: Pasto Mattina erogato regolarmente
+            entity_id: sensor.dispenser_crocchette_volte_erogato
+- id: dispenser_programmazione_pasto_pranzo
+  alias: Petkit Dispenser - Erogazione Pasto Pranzo (Slot 2)
+  description: Eroga automaticamente le crocchette impostate per il pranzo se la programmazione è attiva e la ciotola non
+    è piena
+  triggers:
+    - trigger: time
+      at: input_datetime.dispenser_orario_slot_2
+  conditions:
+    - condition: state
+      entity_id: input_boolean.dispenser_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.dispenser_slot_2_attivo
+      state: 'on'
+  actions:
+    - if:
+        - condition: and
+          conditions:
+            - condition: state
+              entity_id: input_boolean.dispenser_controllo_ciotola_piena
+              state: 'on'
+            - condition: numeric_state
+              entity_id: sensor.dispenser_crocchette_riempimento_ciotola
+              above: 14
+      then:
+        - action: logbook.log
+          data:
+            name: Dispenser Crocchette
+            message: 'Pasto Pranzo saltato: ciotola ancora piena ({{ states(''sensor.dispenser_crocchette_riempimento_ciotola'')
+              }}%)'
+            entity_id: sensor.dispenser_crocchette_riempimento_ciotola
+      else:
+        - action: script.eroga_crocchette_slot_2
+        - action: logbook.log
+          data:
+            name: Dispenser Crocchette
+            message: Pasto Pranzo erogato regolarmente
+            entity_id: sensor.dispenser_crocchette_volte_erogato
+- id: dispenser_programmazione_pasto_sera
+  alias: Petkit Dispenser - Erogazione Pasto Sera (Slot 3)
+  description: Eroga automaticamente le crocchette impostate per la sera se la programmazione è attiva e la ciotola non è
+    piena
+  triggers:
+    - trigger: time
+      at: input_datetime.dispenser_orario_slot_3
+  conditions:
+    - condition: state
+      entity_id: input_boolean.dispenser_programmazione_attiva
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.dispenser_slot_3_attivo
+      state: 'on'
+  actions:
+    - if:
+        - condition: and
+          conditions:
+            - condition: state
+              entity_id: input_boolean.dispenser_controllo_ciotola_piena
+              state: 'on'
+            - condition: numeric_state
+              entity_id: sensor.dispenser_crocchette_riempimento_ciotola
+              above: 14
+      then:
+        - action: logbook.log
+          data:
+            name: Dispenser Crocchette
+            message: 'Pasto Sera saltato: ciotola ancora piena ({{ states(''sensor.dispenser_crocchette_riempimento_ciotola'')
+              }}%)'
+            entity_id: sensor.dispenser_crocchette_riempimento_ciotola
+      else:
+        - action: script.eroga_crocchette_slot_3
+        - action: logbook.log
+          data:
+            name: Dispenser Crocchette
+            message: Pasto Sera erogato regolarmente
+            entity_id: sensor.dispenser_crocchette_volte_erogato
+- id: dispenser_notifica_ciotola_vuota_anticipo
+  alias: Petkit Dispenser - Avviso Ciotola Vuota prima del Pasto Successivo
+  description: Invia una notifica con pulsanti di erogazione rapida quando le gatte terminano le crocchette prima del pasto
+    successivo
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.dispenser_ciotola_con_cibo
+      from: 'on'
+      to: 'off'
+      for:
+        minutes: 2
+    - trigger: numeric_state
+      entity_id: sensor.dispenser_crocchette_riempimento_ciotola
+      below: 1
+      for:
+        minutes: 2
+  conditions:
+    - condition: state
+      entity_id: input_boolean.dispenser_notifica_ciotola_vuota
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: time
+      after: 07:00:00
+      before: '23:30:00'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 3600 }}'
+    - condition: template
+      value_template: "{% set now_ts = as_timestamp(now()) %} {% set today_str = now().strftime('%Y-%m-%d') %} {% set tomorrow_str\
+        \ = (now() + timedelta(days=1)).strftime('%Y-%m-%d') %} {% set slots = [\n  {'name': 'Mattina', 'time': states('input_datetime.dispenser_orario_slot_1'),\
+        \ 'active': is_state('input_boolean.dispenser_slot_1_attivo', 'on')},\n  {'name': 'Pranzo', 'time': states('input_datetime.dispenser_orario_slot_2'),\
+        \ 'active': is_state('input_boolean.dispenser_slot_2_attivo', 'on')},\n  {'name': 'Sera', 'time': states('input_datetime.dispenser_orario_slot_3'),\
+        \ 'active': is_state('input_boolean.dispenser_slot_3_attivo', 'on')}\n] %} {% set ns = namespace(min_diff=999999)\
+        \ %} {% for s in slots if s.active %}\n  {% set s_ts = as_timestamp(today_str ~ ' ' ~ s.time) %}\n  {% if s_ts > now_ts\
+        \ %}\n    {% set diff = s_ts - now_ts %}\n    {% if diff < ns.min_diff %}{% set ns.min_diff = diff %}{% endif %}\n\
+        \  {% else %}\n    {% set s_next_ts = as_timestamp(tomorrow_str ~ ' ' ~ s.time) %}\n    {% set diff = s_next_ts -\
+        \ now_ts %}\n    {% if diff < ns.min_diff %}{% set ns.min_diff = diff %}{% endif %}\n  {% endif %}\n{% endfor %} {{\
+        \ ns.min_diff >= 1800 }}"
+  actions:
+    - variables:
+        calcolo_pasto: "{% set now_ts = as_timestamp(now()) %} {% set today_str = now().strftime('%Y-%m-%d') %} {% set tomorrow_str\
+          \ = (now() + timedelta(days=1)).strftime('%Y-%m-%d') %} {% set slots = [\n  {'name': 'Mattina', 'time': states('input_datetime.dispenser_orario_slot_1'),\
+          \ 'active': is_state('input_boolean.dispenser_slot_1_attivo', 'on')},\n  {'name': 'Pranzo', 'time': states('input_datetime.dispenser_orario_slot_2'),\
+          \ 'active': is_state('input_boolean.dispenser_slot_2_attivo', 'on')},\n  {'name': 'Sera', 'time': states('input_datetime.dispenser_orario_slot_3'),\
+          \ 'active': is_state('input_boolean.dispenser_slot_3_attivo', 'on')}\n] %} {% set ns = namespace(next_name='Mattina',\
+          \ next_time='07:00', min_diff=999999) %} {% for s in slots if s.active %}\n  {% set s_ts = as_timestamp(today_str\
+          \ ~ ' ' ~ s.time) %}\n  {% if s_ts > now_ts %}\n    {% set diff = s_ts - now_ts %}\n    {% if diff < ns.min_diff\
+          \ %}\n      {% set ns.min_diff = diff %}\n      {% set ns.next_name = s.name %}\n      {% set ns.next_time = s.time\
+          \ %}\n    {% endif %}\n  {% else %}\n    {% set s_next_ts = as_timestamp(tomorrow_str ~ ' ' ~ s.time) %}\n    {%\
+          \ set diff = s_next_ts - now_ts %}\n    {% if diff < ns.min_diff %}\n      {% set ns.min_diff = diff %}\n      {%\
+          \ set ns.next_name = s.name %}\n      {% set ns.next_time = s.time %}\n    {% endif %}\n  {% endif %}\n{% endfor\
+          \ %} {% set ore = (ns.min_diff // 3600) | int %} {% set minuti = ((ns.min_diff % 3600) // 60) | int %} {% set tempo_str\
+          \ = (ore ~ 'h ' if ore > 0 else '') ~ minuti ~ ' min' %} Le gatte hanno terminato le crocchette nella ciotola. Il\
+          \ prossimo pasto ({{ ns.next_name }}) è alle {{ ns.next_time[:5] }} (tra {{ tempo_str }}). Vuoi erogare una dose\
+          \ extra?"
+    - action: script.notifica_smart
+      data:
+        titolo: 🥣 Ciotola Crocchette Vuota
+        messaggio: '{{ calcolo_pasto }}'
+        categoria: pet
+        priorita: normale
+        tag: dispenser_ciotola_vuota
+        azioni:
+          - action: DISPENSER_FEED_T2
+            title: 🥣 Eroga Dose Dx (T2)
+          - action: DISPENSER_FEED_T1
+            title: 🥣 Eroga Dose Sx (T1)
+          - action: DISPENSER_FEED_BOTH
+            title: 🍽️ Eroga Entrambe (2 Dosi)
+  mode: single
+- id: dispenser_notifica_tramoggia_esaurita
+  alias: Petkit Dispenser - Avviso Tramoggia o Crocchette Esaurite
+  description: Invia una notifica ad alta priorità quando una o entrambe le tramogge terminano le crocchette, con riproposta
+    ogni 3 ore se ignorata
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.dispenser_crocchette_livello_cibo_tramoggia_1
+      to: 'on'
+      for:
+        minutes: 1
+    - trigger: state
+      entity_id: binary_sensor.dispenser_crocchette_livello_cibo_tramoggia_2
+      to: 'on'
+      for:
+        minutes: 1
+    - trigger: time_pattern
+      minutes: /30
+  conditions:
+    - condition: state
+      entity_id: input_boolean.dispenser_notifica_tramoggia_vuota
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: template
+      value_template: '{{ is_state(''binary_sensor.dispenser_crocchette_livello_cibo_tramoggia_1'', ''on'') or is_state(''binary_sensor.dispenser_crocchette_livello_cibo_tramoggia_2'',
+        ''on'') }}'
+    - condition: time
+      after: 08:00:00
+      before: '22:30:00'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 10800 }}'
+  actions:
+    - variables:
+        is_reminder: '{{ this.attributes.last_triggered is not none and (now() - this.attributes.last_triggered).total_seconds()
+          > 10000 }}'
+        msg_tramoggia: "{% set t1 = is_state('binary_sensor.dispenser_crocchette_livello_cibo_tramoggia_1', 'on') %} {% set\
+          \ t2 = is_state('binary_sensor.dispenser_crocchette_livello_cibo_tramoggia_2', 'on') %} {% set prefix = 'Attenzione:\
+          \ il dispenser non è ancora stato rifornito! ' if is_reminder else '' %} {% if t1 and t2 %}\n  {{ prefix }}Entrambe\
+          \ le tramogge (Sinistra e Destra) sono esaurite! Il dispenser non può erogare cibo. Rifornire i serbatoi al più\
+          \ presto.\n{% elif t1 %}\n  {{ prefix }}La Tramoggia 1 (Sinistra) è vuota o in esaurimento. Rifornire il serbatoio\
+          \ per garantire i pasti programmati.\n{% elif t2 %}\n  {{ prefix }}La Tramoggia 2 (Destra) è vuota o in esaurimento.\
+          \ Rifornire il serbatoio per garantire i pasti programmati.\n{% else %}\n  {{ prefix }}Livello crocchette insufficiente\
+          \ nel dispenser. Rifornire le tramogge.\n{% endif %}"
+    - action: script.notifica_smart
+      data:
+        titolo: '{{ ''🔔 [PROMEMORIA] '' if is_reminder else '''' }}⚠️ Dispenser: Crocchette in Esaurimento!'
+        messaggio: '{{ msg_tramoggia }}'
+        categoria: pet
+        priorita: alta
+        tag: dispenser_tramoggia_vuota
+        azioni:
+          - action: DISPENSER_CONFERMA_RIFORNITO
+            title: ✅ Crocchette Rifornite
+  mode: single
+- id: dispenser_notifica_essiccante_esaurito
+  alias: Petkit Dispenser - Avviso Sacchetto Essiccante Esaurito
+  description: Ricorda quotidianamente di sostituire il sacchetto essiccante nel coperchio finché i giorni restano a 0
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.dispenser_crocchette_giorni_rimanenti_essicante
+      below: 1
+    - trigger: time
+      at: '10:30:00'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.dispenser_notifica_essiccante_esaurito
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: numeric_state
+      entity_id: sensor.dispenser_crocchette_giorni_rimanenti_essicante
+      below: 1
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 72000 }}'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: '💨 Dispenser: Sacchetto Essiccante Esaurito'
+        messaggio: Il sacchetto essiccante nel coperchio del dispenser Petkit è esaurito (0 giorni rimasti). Sostituiscilo
+          con uno nuovo per preservare la freschezza e la croccantezza del cibo.
+        categoria: pet
+        priorita: normale
+        tag: dispenser_essiccante_esaurito
+        azioni:
+          - action: DISPENSER_RESET_ESSICCANTE
+            title: 🔄 Reset Essiccante (30gg)
+  mode: single
+- id: dispenser_azione_erogazione_da_notifica
+  alias: Petkit Dispenser - Gestione Tasti Notifica Erogazione & Rifornimento
+  description: Intercetta il tocco sui pulsanti delle notifiche dello smartphone (Erogazione extra, Rifornimento, Reset Essiccante)
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+  conditions:
+    - condition: template
+      value_template: "{{ trigger.event.data.action in [\n  'DISPENSER_FEED_T1', 'DISPENSER_FEED_T2', 'DISPENSER_FEED_BOTH',\n\
+        \  'DISPENSER_CONFERMA_RIFORNITO', 'DISPENSER_RESET_ESSICCANTE'\n] }}"
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''DISPENSER_FEED_T1'' }}'
+          sequence:
+            - action: text.set_value
+              target:
+                entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
+              data:
+                value: '1'
+            - action: button.press
+              target:
+                entity_id: button.dispenser_crocchette_play_sound
+              continue_on_error: true
+            - action: logbook.log
+              data:
+                name: Dispenser Crocchette
+                message: Erogata 1 dose extra Tramoggia 1 (Sx) da notifica smartphone
+                entity_id: sensor.dispenser_crocchette_volte_erogato
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_ciotola_vuota
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_ciotola_vuota
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''DISPENSER_FEED_T2'' }}'
+          sequence:
+            - action: text.set_value
+              target:
+                entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
+              data:
+                value: '1'
+            - action: button.press
+              target:
+                entity_id: button.dispenser_crocchette_play_sound
+              continue_on_error: true
+            - action: logbook.log
+              data:
+                name: Dispenser Crocchette
+                message: Erogata 1 dose extra Tramoggia 2 (Dx) da notifica smartphone
+                entity_id: sensor.dispenser_crocchette_volte_erogato
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_ciotola_vuota
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_ciotola_vuota
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''DISPENSER_FEED_BOTH'' }}'
+          sequence:
+            - action: text.set_value
+              target:
+                entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
+              data:
+                value: '1'
+            - delay:
+                seconds: 3
+            - action: text.set_value
+              target:
+                entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
+              data:
+                value: '1'
+            - action: button.press
+              target:
+                entity_id: button.dispenser_crocchette_play_sound
+              continue_on_error: true
+            - action: logbook.log
+              data:
+                name: Dispenser Crocchette
+                message: Erogate 2 dosi extra (T1+T2) da notifica smartphone
+                entity_id: sensor.dispenser_crocchette_volte_erogato
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_ciotola_vuota
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_ciotola_vuota
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''DISPENSER_CONFERMA_RIFORNITO'' }}'
+          sequence:
+            - action: button.press
+              target:
+                entity_id: button.dispenser_crocchette_cibo_rifornito
+              continue_on_error: true
+            - action: logbook.log
+              data:
+                name: Dispenser Crocchette
+                message: Rifornimento cibo dispenser confermato via notifica smartphone
+                entity_id: sensor.dispenser_crocchette_volte_erogato
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_tramoggia_vuota
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_tramoggia_vuota
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''DISPENSER_RESET_ESSICCANTE'' }}'
+          sequence:
+            - action: button.press
+              target:
+                entity_id: button.dispenser_crocchette_reset_essicante
+              continue_on_error: true
+            - action: logbook.log
+              data:
+                name: Dispenser Crocchette
+                message: Sacchetto essiccante dispenser resettato a 30 giorni via notifica smartphone
+                entity_id: sensor.dispenser_crocchette_giorni_rimanenti_essicante
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_essiccante_esaurito
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: dispenser_essiccante_esaurito
+              continue_on_error: true
+  mode: parallel
+- id: eco_home_pet_alert_crocchette
+  alias: Eco Home - Pet Alert (Crocchette Rilasciate)
+  description: Annuncio vocale ed eventuale notifica quando il dispenser rilascia il pasto per Piccola e Luna
+  triggers:
+    - trigger: state
+      entity_id: image.dispenser_crocchette_ultimo_pasto
+      not_from:
+        - unknown
+        - unavailable
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') or is_state(''person.simone_mancini'',
+        ''home'') or is_state(''person.monica'', ''home'') }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Pasto erogato! Crocchette servite per Piccola e Luna!\",\n  \"Pappa pronta in ciotola! Buon appetito\
+          \ a Piccola e Luna!\",\n  \"Dispenser attivato! Luna, scendi dal lavandino, la pappa è servita!\",\n  \"Crocchette\
+          \ pronte! Piccola e Luna, banchetto reale servito!\"\n] | random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Pet Alert: Pasto erogato per Piccola e Luna'
+  mode: single
+- id: eco_home_allarme_temporale_finestre_micie
+  alias: Eco Home - Allarme Temporale & Finestre per le Micie (Casa Vuota)
+  description: Notifica smartphone urgente se scatta temporale o vento forte a casa vuota nel caso ci siano finestre aperte
+    per le gatte
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.terrazza_pulvirometro_precipitazione
+      above: 0.01
+    - trigger: numeric_state
+      entity_id: sensor.sala_anemometro_gust_strength
+      above: 20
+    - trigger: state
+      entity_id: weather.casa
+      to:
+        - rainy
+        - pouring
+        - lightning
+        - hail
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''not_home'') and is_state(''person.laura'', ''not_home'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 10800 }}'
+  actions:
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        title: ⛈️ Allarme Temporale in Paese!
+        message: '{% set pioggia = states(''sensor.terrazza_pulvirometro_precipitazione'') | float(0) > 0.01 %} {% set vento
+          = states(''sensor.sala_anemometro_gust_strength'') | float(0) %} Attenzione! Siete fuori casa e in terrazza {% if
+          pioggia %}sta piovendo{% else %}ci sono raffiche a {{ vento }} km/h{% endif %}! Se avete lasciato finestre aperte
+          per le micie (Piccola e Luna), verificate se rientrare!'
+        data:
+          push:
+            sound: default
+            critical: 1
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        title: ⛈️ Allarme Temporale in Paese!
+        message: '{% set pioggia = states(''sensor.terrazza_pulvirometro_precipitazione'') | float(0) > 0.01 %} {% set vento
+          = states(''sensor.sala_anemometro_gust_strength'') | float(0) %} Attenzione! Siete fuori casa e in terrazza {% if
+          pioggia %}sta piovendo{% else %}ci sono raffiche a {{ vento }} km/h{% endif %}! Se avete lasciato finestre aperte
+          per le micie (Piccola e Luna), verificate se rientrare!'
+        data:
+          push:
+            sound: default
+            critical: 1
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Meteo Alert: Temporale improvviso a casa vuota con finestre micie'
+  mode: single
+- id: notifica_acquario_temperatura_anomala
+  alias: 🐠 Notifica Smart - Temperatura Acqua Acquario Anomala
+  description: Avvisa se la temperatura della sonda acquario esce dal range di sicurezza (23°C - 30°C)
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sensoreacquario_probe_temperature
+      above: 30.0
+      for:
+        minutes: 5
+    - trigger: numeric_state
+      entity_id: sensor.sensoreacquario_probe_temperature
+      below: 23.0
+      for:
+        minutes: 5
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🐠 Allerta Temperatura Acquario
+        messaggio: La temperatura dell'acqua dell'acquario è a {{ states('sensor.sensoreacquario_probe_temperature') }}°C
+          (soglia ottimale 24-28°C). Verificare termoriscaldatore o ventole di raffreddamento!
+        categoria: acquario
+        priorita: alta
+        tag: acquario_temp_anomala
+  mode: single
+- id: notifica_acquario_tds_elevato
+  alias: 🐠 Notifica Smart - Qualità Acqua Acquario (TDS Elevato)
+  description: Avvisa se il livello TDS supera 450 ppm per oltre 30 minuti
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sensoreacquario_tds
+      above: 450
+      for:
+        minutes: 30
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: 🐠 Manutenzione Acquario (TDS Alto)
+        messaggio: Il livello TDS nell'acquario ha raggiunto {{ states('sensor.sensoreacquario_tds') }} ppm. Valutare un cambio
+          parziale d'acqua o la pulizia del filtro.
+        categoria: acquario
+        priorita: normale
+        tag: acquario_tds_alto
+  mode: single
+- id: notifica_luna_passaggio_gattaiola
+  alias: 🐾 Notifica Smart - Movimenti Luna (Gattaiola)
+  description: Invia notifica smartphone quando Luna esce o rientra in casa
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.luna
+      from: 'on'
+      to: 'off'
+      id: uscita
+    - trigger: state
+      entity_id: binary_sensor.luna
+      from: 'off'
+      to: 'on'
+      id: rientro
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: uscita
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: 🐾 Luna è uscita di casa
+                messaggio: Luna è appena passata dalla gattaiola verso l'esterno/giardino.
+                categoria: pet
+                priorita: normale
+                tag: pet_luna_status
+        - conditions:
+            - condition: trigger
+              id: rientro
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: 🐾 Luna è rientrata a casa
+                messaggio: Luna è appena rientrata in casa al sicuro dalla gattaiola.
+                categoria: pet
+                priorita: normale
+                tag: pet_luna_status
+  mode: parallel
+  max: 5
+- id: notifica_piccola_passaggio_gattaiola
+  alias: 🐾 Notifica Smart - Movimenti Piccola (Gattaiola)
+  description: Invia notifica smartphone quando Piccola esce o rientra in casa
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.piccola
+      from: 'on'
+      to: 'off'
+      id: uscita
+    - trigger: state
+      entity_id: binary_sensor.piccola
+      from: 'off'
+      to: 'on'
+      id: rientro
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: uscita
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: 🐾 Piccola è uscita di casa
+                messaggio: Piccola è appena passata dalla gattaiola verso l'esterno.
+                categoria: pet
+                priorita: normale
+                tag: pet_piccola_status
+        - conditions:
+            - condition: trigger
+              id: rientro
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: 🐾 Piccola è rientrata a casa
+                messaggio: Piccola è appena rientrata in casa al sicuro.
+                categoria: pet
+                priorita: normale
+                tag: pet_piccola_status
+  mode: parallel
+  max: 5
+- id: notifica_appello_notturno_gatte
+  alias: 🐾 Notifica Smart - Appello Notturno Gatte (22:30)
+  description: Avvisa alle 22:30 se Luna o Piccola risultano ancora all'esterno in giardino
+  triggers:
+    - trigger: time
+      at: '22:30:00'
+  conditions:
+    - condition: template
+      value_template: '{{ is_state(''binary_sensor.luna'', ''off'') or is_state(''binary_sensor.piccola'', ''off'') }}
+
+        '
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: '🐾 Appello Notturno: Gatta all''Esterno!'
+        messaggio: '{% set fuori = [] %} {% if is_state(''binary_sensor.luna'', ''off'') %}{% set fuori = fuori + [''Luna'']
+          %}{% endif %} {% if is_state(''binary_sensor.piccola'', ''off'') %}{% set fuori = fuori + [''Piccola''] %}{% endif
+          %} Attenzione: alle ore 22:30 {{ fuori | join('' e '') }} risulta ancora all''esterno della casa! Verificare prima
+          del riposo notturno.
+
+          '
+        categoria: pet
+        priorita: alta
+        tag: appello_notturno_gatte
+  mode: single
+- id: notifica_fontanella_mancanza_acqua
+  alias: 💧 Notifica Smart - Fontanella Petkit Senza Acqua
+  description: Avvisa ad alta priorità quando il sensore rileva mancanza di acqua nella fontanella, con riproposta ogni 2
+    ore se ignorata
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.fontanella2_avviso_mancanza_acqua
+      to: 'on'
+      for:
+        minutes: 1
+    - trigger: time_pattern
+      minutes: /30
+  conditions:
+    - condition: state
+      entity_id: input_boolean.fontanella_notifica_mancanza_acqua
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: state
+      entity_id: binary_sensor.fontanella2_avviso_mancanza_acqua
+      state: 'on'
+    - condition: time
+      after: 08:00:00
+      before: '23:30:00'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - variables:
+        is_reminder: '{{ this.attributes.last_triggered is not none and (now() - this.attributes.last_triggered).total_seconds()
+          > 7000 }}'
+    - action: script.notifica_smart
+      data:
+        titolo: '{{ ''🔔 [PROMEMORIA] '' if is_reminder else '''' }}💧 Fontanella Petkit: Acqua Esaurita!'
+        messaggio: '{{ ''Attenzione: il serbatoio della fontanella non è ancora stato riempito! '' if is_reminder else ''''
+          }}Il livello dell''acqua nella fontanella Petkit è critico o vuoto. Ricarica il serbatoio per permettere a Luna
+          e Piccola di bere in sicurezza.'
+        categoria: pet
+        priorita: alta
+        tag: fontanella_livello_acqua
+  mode: single
+- id: notifica_fontanella_filtro_esaurito
+  alias: 🫧 Notifica Smart - Fontanella Filtro da Pulire o Sostituire
+  description: Avvisa quotidianamente quando il filtro della fontanella è esaurito con tasto per resettare il conteggio dopo
+    la manutenzione
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.fontanella2_sostituire_filtro
+      to: 'on'
+      for:
+        minutes: 1
+    - trigger: numeric_state
+      entity_id: sensor.fontanella2_filtro_rimanente
+      below: 1
+    - trigger: time
+      at: '11:00:00'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.fontanella_notifica_filtro
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: template
+      value_template: '{{ is_state(''binary_sensor.fontanella2_sostituire_filtro'', ''on'') or states(''sensor.fontanella2_filtro_rimanente'')
+        | int(100) <= 0 }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 72000 }}'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: '🫧 Fontanella Petkit: Filtro da Pulire o Sostituire'
+        messaggio: La percentuale del filtro della fontanella è a {{ states('sensor.fontanella2_filtro_rimanente') }}%. Sostituisci
+          o lava accuratamente il filtro per mantenere l'acqua sempre limpida e fresca.
+        categoria: pet
+        priorita: normale
+        tag: fontanella_filtro
+        azioni:
+          - action: FONTANELLA_RESET_FILTRO
+            title: 🔄 Filtro Pulito/Cambiato (Reset)
+  mode: single
+- id: notifica_fontanella_reset_filtro_azione
+  alias: 🫧 Notifica Smart - Fontanella Reset Filtro da Tasto Notifica
+  description: Intercetta il tocco sul pulsante della notifica smartphone e resetta il filtro della fontanella
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+  conditions:
+    - condition: template
+      value_template: '{{ trigger.event.data.action == ''FONTANELLA_RESET_FILTRO'' }}'
+  actions:
+    - action: button.press
+      target:
+        entity_id: button.fontanella2_reset_filter
+      continue_on_error: true
+    - action: logbook.log
+      data:
+        name: Fontanella Smart
+        message: Filtro fontanella Petkit resettato al 100% via notifica smartphone
+        entity_id: sensor.fontanella2_filtro_rimanente
+    - action: notify.mobile_app_samsung_s25_edge_di_stefano
+      data:
+        message: clear_notification
+        data:
+          tag: fontanella_filtro
+      continue_on_error: true
+    - action: notify.mobile_app_samsung_s22_di_laura
+      data:
+        message: clear_notification
+        data:
+          tag: fontanella_filtro
+      continue_on_error: true
+  mode: parallel
+- id: notifica_smart_lettiera_cestino_pieno
+  alias: 🗑️ Notifica Smart - Lettiera Cestino Rifiuti Pieno
+  description: Avvisa quando il cassetto di raccolta rifiuti della lettiera Petkit è pieno, con riproposta ogni 3 ore se ignorata
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.petkit_puramax_2_cestino_pieno
+      to: 'on'
+      for:
+        minutes: 1
+    - trigger: time_pattern
+      minutes: /30
+  conditions:
+    - condition: state
+      entity_id: input_boolean.lettiera_notifica_cestino_pieno
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: state
+      entity_id: binary_sensor.petkit_puramax_2_cestino_pieno
+      state: 'on'
+    - condition: time
+      after: 08:00:00
+      before: '22:30:00'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 10800 }}'
+  actions:
+    - variables:
+        is_reminder: '{{ this.attributes.last_triggered is not none and (now() - this.attributes.last_triggered).total_seconds()
+          > 10000 }}'
+    - action: script.notifica_smart
+      data:
+        titolo: '{{ ''🔔 [PROMEMORIA] '' if is_reminder else '''' }}🗑️ Lettiera Petkit: Cestino Rifiuti Pieno!'
+        messaggio: '{{ ''Attenzione: il cassetto rifiuti non è ancora stato svuotato! '' if is_reminder else '''' }}Il cassetto
+          dei rifiuti della lettiera automatica PuraMax 2 è pieno. Svuota il cassetto e sostituisci il sacchetto per consentire
+          i prossimi cicli di pulizia.'
+        categoria: pet
+        priorita: alta
+        tag: lettiera_cestino_pieno
+        azioni:
+          - action: LETTIERA_CESTA_SVUOTATA
+            title: ✅ Sacchetto Sostituito
+  mode: single
+- id: notifica_smart_lettiera_mancanza_sabbia
+  alias: 🏖️ Notifica Smart - Lettiera Sabbia Scarsa o Esaurita
+  description: Avvisa quando la sabbia scende sotto la soglia minima di sicurezza, con riproposta ogni 6 ore se ignorata
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.petkit_puramax_2_mancanza_sabbia
+      to: 'on'
+      for:
+        minutes: 2
+    - trigger: numeric_state
+      entity_id: sensor.petkit_puramax_2_livello_lettiera
+      below: 25
+    - trigger: time_pattern
+      hours: /1
+  conditions:
+    - condition: state
+      entity_id: input_boolean.lettiera_notifica_mancanza_sabbia
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: template
+      value_template: '{{ is_state(''binary_sensor.petkit_puramax_2_mancanza_sabbia'', ''on'') or states(''sensor.petkit_puramax_2_livello_lettiera'')
+        | int(100) < 25 }}'
+    - condition: time
+      after: 08:00:00
+      before: '22:30:00'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 21600 }}'
+  actions:
+    - variables:
+        is_reminder: '{{ this.attributes.last_triggered is not none and (now() - this.attributes.last_triggered).total_seconds()
+          > 20000 }}'
+    - action: script.notifica_smart
+      data:
+        titolo: '{{ ''🔔 [PROMEMORIA] '' if is_reminder else '''' }}🏖️ Lettiera Petkit: Sabbia in Esaurimento!'
+        messaggio: '{{ ''Attenzione: la sabbia non è ancora stata ricaricata! '' if is_reminder else '''' }}Il livello della
+          sabbia nella lettiera PuraMax 2 è basso ({{ states(''sensor.petkit_puramax_2_livello_lettiera'') }}%). Ricarica
+          con sabbia fresca per garantire il benessere di Luna e Piccola.'
+        categoria: pet
+        priorita: normale
+        tag: lettiera_sabbia_scarsa
+        azioni:
+          - action: LETTIERA_LIVELLA_SABBIA
+            title: ⚖️ Livella Sabbia
+  mode: single
+- id: notifica_smart_lettiera_deodorante_esaurito
+  alias: 🌸 Notifica Smart - Lettiera Deodorante N50 Esaurito
+  description: Avvisa quotidianamente finché il dischetto deodorante N50 non viene sostituito
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.petkit_puramax_2_odor_eliminator_n50_left_days
+      below: 1
+    - trigger: time
+      at: '11:30:00'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.lettiera_notifica_deodorante_esaurito
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: numeric_state
+      entity_id: sensor.petkit_puramax_2_odor_eliminator_n50_left_days
+      below: 1
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 72000 }}'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: '🌸 Lettiera Petkit: Deodorante N50 Esaurito'
+        messaggio: Il dischetto deodorante N50 nella lettiera PuraMax 2 è esaurito (0 giorni rimasti). Sostituiscilo per mantenere
+          l'ambiente sempre profumato e neutralizzare gli odori.
+        categoria: pet
+        priorita: normale
+        tag: lettiera_deodorante_esaurito
+        azioni:
+          - action: LETTIERA_RESET_N50
+            title: 🔄 Reset Deodorante N50
+  mode: single
+- id: notifica_smart_lettiera_anomalia_blocco
+  alias: 🚨 Notifica Smart - Lettiera Anomalia, Blocco o Errore Peso
+  description: Allerta ad alta priorità se la lettiera va in blocco sicurezza o presenta anomalie, con riproposta ogni 90
+    minuti se ignorata
+  triggers:
+    - trigger: state
+      entity_id: sensor.petkit_puramax_2_errore
+    - trigger: state
+      entity_id: binary_sensor.petkit_puramax_2_weight_error
+      to: 'on'
+    - trigger: time_pattern
+      minutes: /30
+  conditions:
+    - condition: state
+      entity_id: input_boolean.lettiera_notifica_anomalia
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: template
+      value_template: '{{ (states(''sensor.petkit_puramax_2_errore'') not in [''No error'', ''unknown'', ''unavailable'',
+        ''None'', '''']) or is_state(''binary_sensor.petkit_puramax_2_weight_error'', ''on'') }}'
+    - condition: time
+      after: 08:00:00
+      before: '23:30:00'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 5400 }}'
+  actions:
+    - variables:
+        is_reminder: '{{ this.attributes.last_triggered is not none and (now() - this.attributes.last_triggered).total_seconds()
+          > 5000 }}'
+    - action: script.notifica_smart
+      data:
+        titolo: '{{ ''🔔 [PROMEMORIA] '' if is_reminder else '''' }}🚨 Allerta Sicurezza: Errore Lettiera Petkit!'
+        messaggio: '{{ ''Attenzione: la lettiera risulta ancora in errore o bloccata! '' if is_reminder else '''' }}Rilevata
+          anomalia nella lettiera PuraMax 2: {{ states(''sensor.petkit_puramax_2_errore'') }}{% if is_state(''binary_sensor.petkit_puramax_2_weight_error'',
+          ''on'') %} (Errore bilancia/peso){% endif %}. Verificare che non vi siano ostacoli o gatte bloccate!'
+        categoria: pet
+        priorita: alta
+        tag: lettiera_errore_blocco
+        azioni:
+          - action: LETTIERA_RESET_ERRORE
+            title: 🔄 Reset Lettiera
+  mode: single
+- id: notifica_smart_lettiera_uso_frequente_salute
+  alias: 🩺 Notifica Smart - Lettiera Uso Frequente (Salute Gatte)
+  description: Avviso preventivo salute felina quando una gatta visita la lettiera con frequenza anomala ravvicinata
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.petkit_puramax_2_frequent_use_detection
+      to: 'on'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.lettiera_notifica_uso_frequente
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: '🩺 Lettiera: Rilevato Uso Frequente!'
+        messaggio: La lettiera Petkit ha registrato accessi ripetuti ravvicinati da parte di {{ states('sensor.petkit_puramax_2_ultimo_utilizzo_da')
+          | default('una delle gatte', true) }}. Si raccomanda di verificare che non vi siano sintomi di cistite o problemi
+          urinari.
+        categoria: pet
+        priorita: alta
+        tag: lettiera_uso_frequente
+  mode: single
+- id: notifica_smart_lettiera_dispositivo_offline
+  alias: 🔌 Notifica Smart - Lettiera Offline o Scollegata
+  description: Avvisa se la lettiera perde la connessione o l'alimentazione per oltre 15 minuti
+  triggers:
+    - trigger: state
+      entity_id: sensor.petkit_puramax_2_stato_dispositivo
+      to: Offline
+      for:
+        minutes: 15
+  conditions:
+    - condition: state
+      entity_id: input_boolean.lettiera_notifica_offline
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_abilitate_generale
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_pet
+      state: 'on'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 43200 }}'
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: '🔌 Lettiera Petkit: Dispositivo Offline'
+        messaggio: La lettiera PuraMax 2 non comunica con la rete da oltre 15 minuti. Verificare presa elettrica e connessione
+          Wi-Fi.
+        categoria: pet
+        priorita: normale
+        tag: lettiera_offline
+  mode: single
+- id: notifica_smart_lettiera_gestione_tasti_smartphone
+  alias: 🐾 Notifica Smart - Lettiera Gestione Azioni Smartphone
+  description: Intercetta i tocchi sui pulsanti delle notifiche per la lettiera, invia i comandi Petkit e chiude gli avvisi
+    su entrambi i telefoni
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+  conditions:
+    - condition: template
+      value_template: '{{ trigger.event.data.action in [''LETTIERA_CESTA_SVUOTATA'', ''LETTIERA_LIVELLA_SABBIA'', ''LETTIERA_RESET_N50'',
+        ''LETTIERA_RESET_ERRORE''] }}'
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''LETTIERA_CESTA_SVUOTATA'' }}'
+          sequence:
+            - action: logbook.log
+              data:
+                name: Lettiera PuraMax 2
+                message: Cassetto rifiuti svuotato e sacchetto sostituito confermato da notifica smartphone
+                entity_id: binary_sensor.petkit_puramax_2_cestino_pieno
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: lettiera_cestino_pieno
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: lettiera_cestino_pieno
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''LETTIERA_LIVELLA_SABBIA'' }}'
+          sequence:
+            - action: button.press
+              target:
+                entity_id: button.petkit_puramax_2_level_litter
+              continue_on_error: true
+            - action: logbook.log
+              data:
+                name: Lettiera PuraMax 2
+                message: Ciclo livellamento sabbia avviato da notifica smartphone
+                entity_id: sensor.petkit_puramax_2_livello_lettiera
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: lettiera_sabbia_scarsa
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: lettiera_sabbia_scarsa
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''LETTIERA_RESET_N50'' }}'
+          sequence:
+            - action: button.press
+              target:
+                entity_id: button.petkit_puramax_2_reset_n50_odor_eliminator
+              continue_on_error: true
+            - action: logbook.log
+              data:
+                name: Lettiera PuraMax 2
+                message: Contatore dischetto deodorante N50 resettato via notifica smartphone
+                entity_id: sensor.petkit_puramax_2_odor_eliminator_n50_left_days
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: lettiera_deodorante_esaurito
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: lettiera_deodorante_esaurito
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.event.data.action == ''LETTIERA_RESET_ERRORE'' }}'
+          sequence:
+            - action: button.press
+              target:
+                entity_id: button.petkit_puramax_2_azione_reset
+              continue_on_error: true
+            - action: logbook.log
+              data:
+                name: Lettiera PuraMax 2
+                message: Comando di Reset anomalia lettiera inviato via notifica smartphone
+                entity_id: sensor.petkit_puramax_2_errore
+            - action: notify.mobile_app_samsung_s25_edge_di_stefano
+              data:
+                message: clear_notification
+                data:
+                  tag: lettiera_errore_blocco
+              continue_on_error: true
+            - action: notify.mobile_app_samsung_s22_di_laura
+              data:
+                message: clear_notification
+                data:
+                  tag: lettiera_errore_blocco
+              continue_on_error: true
+  mode: parallel

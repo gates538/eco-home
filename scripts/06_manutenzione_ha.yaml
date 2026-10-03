@@ -1,0 +1,113 @@
+# ==============================================================================
+# MANUTENZIONE SISTEMA & BACKUP — CASA MANCINI
+# ==============================================================================
+# Backup automatico Home Assistant, snapshot VM Synology e aggiornamento forzato sensori.
+# Script inclusi in questo modulo: 3
+# ==============================================================================
+
+avvia_backup_home_assistant:
+  alias: 📦 Avvia Backup Home Assistant
+  icon: mdi:cloud-upload
+  sequence:
+    - action: hassio.backup_full
+      data:
+        name: Backup_Manuale_{{ now().strftime('%Y%m%d_%H%M%S') }}
+        compressed: true
+    - action: script.notifica_smart
+      data:
+        titolo: 📦 Backup Home Assistant
+        messaggio: Backup completo di sistema avviato con successo.
+        canale: stefano
+        priorita: bassa
+        categoria: generale
+snapshot_vm_synology:
+  alias: 📸 Snapshot VM Synology
+  icon: mdi:camera-timer
+  sequence:
+    - action: shell_command.snapshot_vm_synology
+    - action: script.notifica_smart
+      data:
+        titolo: 📸 Istantanea Synology
+        messaggio: Comando scatto istantanea VM inviato a Synology VMM.
+        canale: stefano
+        priorita: bassa
+        categoria: generale
+forza_aggiornamento_sensori:
+  alias: ⚡ Forza Aggiornamento Globale Sensori
+  description: Forza il polling e l'aggiornamento immediato di tutti i sensori fisici, meteo, gattaiola SurePet, Luna, Piccola,
+    energetici e template di Casa Mancini
+  icon: mdi:sync-alert
+  mode: restart
+  sequence:
+    - action: homeassistant.update_entity
+      target:
+        entity_id:
+          - binary_sensor.luna
+          - binary_sensor.piccola
+          - lock.cucina_gattaiola_locked_all
+          - sensor.cucina_gattaiola_battery_level
+          - sensor.luna_uscite_oggi
+          - sensor.piccola_uscite_oggi
+          - sensor.luna_tempo_fuori_oggi
+          - sensor.piccola_tempo_fuori_oggi
+          - sensor.petkit_puramax_2_stato_dispositivo
+          - sensor.petkit_puramax_2_livello_lettiera
+          - sensor.petkit_puramax_2_peso_lettiera
+          - sensor.fontanella2_filtro_rimanente
+          - sensor.fontanella2_battery
+          - sensor.dispenser_crocchette_stato_dispositivo
+    - action: homeassistant.update_entity
+      target:
+        entity_id:
+          - sensor.terrazza_stazione_meteo_modulo_esterno_temperature
+          - sensor.terrazza_stazione_meteo_modulo_esterno_humidity
+          - sensor.sala_stazione_meteo_sala_pressione_atmosferica
+          - sensor.terrazza_anemometro_velocita_del_vento
+          - sensor.sala_anemometro_gust_strength
+          - sensor.terrazza_pulvirometro_precipitazione
+          - sensor.terrazza_pulvirometro_precipitazioni_oggi
+          - weather.meteoam_home
+          - sensor.dipartimento_protezione_civile_alert
+          - sensor.dipartimento_protezione_civile_vigilance
+          - sensor.ingv_earthquakes_casa_status
+          - sensor.casa_lightning_counter
+    - action: homeassistant.update_entity
+      target:
+        entity_id:
+          - sensor.co2_media
+          - sensor.co2_media_sala
+          - sensor.co2_media_camera
+          - sensor.co2_media_cameretta
+          - sensor.co2_media_bagno
+          - sensor.temperatura_media
+          - sensor.temperatura_media_sala
+          - sensor.temperatura_media_cucina
+          - sensor.temperatura_media_camera
+          - sensor.temperatura_media_cameretta
+          - sensor.temperatura_media_bagno
+          - sensor.temperatura_media_bagnetto
+          - sensor.temperatura_media_corridoio
+          - sensor.umidita_media_corridoio
+          - sensor.sensoreripostiglio_temperature
+          - sensor.termostatorouteresterno_temperature_c
+    - action: homeassistant.update_entity
+      target:
+        entity_id:
+          - sensor.cucina_frigorifero_fridge_temperature
+          - sensor.cucina_frigorifero_freezer_temperature
+          - sensor.cucina_forno_machine_state
+          - sensor.esterno_asciugatrice_machine_state
+          - sensor.camino_status
+          - sensor.camino_water_temperature
+          - sensor.camino_flame_temperature
+          - sensor.stampante_stato
+          - sensor.stampante_toner_nero_rimanente
+          - sensor.stampante_toner_ciano_rimanente
+          - sensor.stampante_toner_magenta_rimanente
+          - sensor.stampante_toner_giallo_rimanente
+          - sensor.batterie_scariche_conteggio
+          - sensor.speedtest_scarica
+    - action: persistent_notification.dismiss
+      data:
+        notification_id: aggiornamento_sensori_ok
+      continue_on_error: true

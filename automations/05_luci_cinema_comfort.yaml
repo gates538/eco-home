@@ -1,0 +1,1242 @@
+# ==============================================================================
+# ILLUMINAZIONE, CINEMA & SCENARI QUOTIDIANI — CASA MANCINI
+# ==============================================================================
+# Controllo luci ambiente/cucina, modalità cinema con Emby TV, telecomando divano Zigbee, scenari Buongiorno e Buonanotte.
+# Automazioni incluse in questo modulo: 15
+# ==============================================================================
+
+- id: '1781725137553'
+  alias: Comando lampada ambiente
+  description: 'Controllo rotellina Zigbee: - Rotazione lenta: ±2% - Rotazione veloce: ±10% - Pulsanti 1/2/3/4: Toggle On
+    (4000K, 100%) / Off
+
+    '
+  triggers:
+    - trigger: mqtt
+      topic: zigbee2mqtt/ComandoLuceAmbiente/action
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload in [''dial_rotate_right_fast'', ''brightness_step_up''] }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.luceambiente
+              data:
+                brightness_step_pct: 10
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload in [''dial_rotate_left_fast'', ''brightness_step_down''] }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.luceambiente
+              data:
+                brightness_step_pct: -10
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''dial_rotate_right'' }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.luceambiente
+              data:
+                brightness_step_pct: 2
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''dial_rotate_left'' }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: light.luceambiente
+              data:
+                brightness_step_pct: -2
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.payload in [\n  'button_1_press', 'button_1_press_release',\n  'button_2_press',\
+                \ 'button_2_press_release',\n  'button_3_press', 'button_3_press_release',\n  'button_4_press', 'button_4_press_release'\n\
+                ] }}\n"
+          sequence:
+            - choose:
+                - conditions:
+                    - condition: state
+                      entity_id: light.luceambiente
+                      state: 'on'
+                  sequence:
+                    - action: light.turn_off
+                      target:
+                        entity_id: light.luceambiente
+                - conditions:
+                    - condition: state
+                      entity_id: light.luceambiente
+                      state: 'off'
+                  sequence:
+                    - action: light.turn_on
+                      target:
+                        entity_id: light.luceambiente
+                      data:
+                        brightness_pct: 100
+                        color_temp_kelvin: 4000
+  mode: single
+- id: '1781874601142'
+  alias: Comando Faretti cucina
+  description: Controllo rotellina e pulsanti 4 scene faretti cucina
+  triggers:
+    - trigger: mqtt
+      topic: zigbee2mqtt/ComandoFaretti/action
+  variables:
+    entity: light.faretti_cucina
+    current_brightness: '{{ state_attr(entity, ''brightness'') | int(1) }}'
+    current_pct: '{{ (current_brightness / 2.55) | round(0) }}'
+    slow_up: '{{ [current_pct + 2, 100] | min }}'
+    fast_up: '{{ [current_pct + 10, 100] | min }}'
+    slow_down: '{{ [current_pct - 2, 1] | max }}'
+    fast_down: '{{ [current_pct - 10, 1] | max }}'
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''dial_rotate_right_step'' }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ entity }}'
+              data:
+                brightness: '{{ (slow_up * 2.55) | int }}'
+                transition: 0.12
+                color_temp_kelvin: 4000
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''brightness_step_up'' }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ entity }}'
+              data:
+                brightness: '{{ (fast_up * 2.55) | int }}'
+                transition: 0.12
+                color_temp_kelvin: 4000
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''dial_rotate_left_slow'' }}'
+          sequence:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: '{{ current_pct <= 2 }}'
+                  sequence:
+                    - action: light.turn_off
+                      target:
+                        entity_id: '{{ entity }}'
+              default:
+                - action: light.turn_on
+                  target:
+                    entity_id: '{{ entity }}'
+                  data:
+                    brightness: '{{ (slow_down * 2.55) | int }}'
+                    transition: 0.12
+                    color_temp_kelvin: 4000
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''brightness_step_down'' }}'
+          sequence:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: '{{ current_pct <= 10 }}'
+                  sequence:
+                    - action: light.turn_off
+                      target:
+                        entity_id: '{{ entity }}'
+              default:
+                - action: light.turn_on
+                  target:
+                    entity_id: '{{ entity }}'
+                  data:
+                    brightness: '{{ (fast_down * 2.55) | int }}'
+                    transition: 0.12
+                    color_temp_kelvin: 4000
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload in [''button_1_press'', ''button_1_press_release''] }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ entity }}'
+              data:
+                brightness_pct: 100
+                transition: 0.2
+                color_temp_kelvin: 4000
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload in [''button_2_press'', ''button_2_press_release''] }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ entity }}'
+              data:
+                brightness_pct: 75
+                transition: 0.2
+                color_temp_kelvin: 4000
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload in [''button_3_press'', ''button_3_press_release''] }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ entity }}'
+              data:
+                brightness_pct: 50
+                transition: 0.2
+                color_temp_kelvin: 4000
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload in [''button_4_press'', ''button_4_press_release''] }}'
+          sequence:
+            - action: light.turn_on
+              target:
+                entity_id: '{{ entity }}'
+              data:
+                brightness_pct: 25
+                transition: 0.2
+                color_temp_kelvin: 4000
+        - conditions:
+            - condition: template
+              value_template: '{{ ''hold'' in trigger.payload }}'
+          sequence:
+            - action: light.turn_off
+              target:
+                entity_id: '{{ entity }}'
+  mode: restart
+- id: eco_home_zero_sprechi_spegnimento_luci
+  alias: Eco Home - Zero Sprechi Spegnimento Luci all Uscita
+  description: Spegne automaticamente tutte le luci della casa quando tutti i membri escono di casa
+  triggers:
+    - trigger: state
+      entity_id:
+        - person.stefano
+        - person.laura
+        - person.simone_mancini
+        - person.monica
+      to: not_home
+      id: persona_uscita
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: template
+      value_template: '{{ states(''person.stefano'') not in [''home'', ''casa''] and states(''person.laura'') not in [''home'',
+        ''casa''] and states(''person.simone_mancini'') not in [''home'', ''casa''] and states(''person.monica'') not in [''home'',
+        ''casa''] }}'
+  actions:
+    - action: light.turn_off
+      target:
+        entity_id:
+          - light.luceambiente
+          - light.faretti_cucina
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Zero Sprechi: Luci spente all''uscita di tutti'
+  mode: single
+- id: eco_home_luci_accese_pieno_giorno
+  alias: 'Eco Home - Zero Sprechi: Luci Accese in Pieno Giorno (> 1 Ora)'
+  description: Suggerimento vocale discreto se la luce ambiente o i faretti restano accesi per oltre 60 minuti con pieno sole
+  triggers:
+    - trigger: state
+      entity_id:
+        - light.luceambiente
+        - light.faretti_cucina
+      to: 'on'
+      for:
+        minutes: 60
+  conditions:
+    - condition: template
+      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: state
+      entity_id: sun.sun
+      state: above_horizon
+    - condition: template
+      value_template: '{{ state_attr(''sun.sun'', ''elevation'') | float(0) > 15 }}'
+    - condition: template
+      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 7200 }}'
+  actions:
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Promemoria risparmio: le luci sono accese da un'ora con pieno sole fuori! Volete spegnerle?\"\
+          ,\n  \"Avviso zero sprechi: c'è una bella luce naturale all'esterno, verificate se le luci interne servono ancora!\"\
+          ,\n  \"Consiglio eco: splendida giornata di sole fuori, possiamo spegnere le luci e risparmiare corrente!\"\n] |\
+          \ random }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Zero Sprechi: Luci accese oltre 1h di giorno'
+  mode: single
+- id: cinema_tv_sala_avvio_film
+  alias: 🍿 Cinema - Avvio Visione Film TV Sala
+  description: Abbassa le luci e la tapparella quando si avvia un contenuto multimediale di sera
+  triggers:
+    - trigger: state
+      entity_id: media_player.sala_tv_sala
+      to: playing
+  conditions:
+    - condition: state
+      entity_id: sun.sun
+      state: below_horizon
+  actions:
+    - action: light.turn_off
+      target:
+        entity_id: light.sala
+      continue_on_error: true
+    - action: light.turn_on
+      target:
+        entity_id: light.mensolecamino
+      data:
+        brightness_pct: 15
+      continue_on_error: true
+    - action: light.turn_on
+      target:
+        entity_id: light.luceambiente
+      data:
+        brightness_pct: 10
+      continue_on_error: true
+    - if:
+        - condition: numeric_state
+          entity_id: cover.tapparella_sala_homekit
+          attribute: current_position
+          above: 10
+      then:
+        - action: cover.set_cover_position
+          target:
+            entity_id: cover.tapparella_sala_homekit
+          data:
+            position: 5
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.eco_home_silenzioso
+      continue_on_error: true
+    - action: light.turn_off
+      target:
+        entity_id: light.faretti_cucina
+      continue_on_error: true
+    - action: script.standby_tablet
+      continue_on_error: true
+  mode: single
+- id: cinema_tv_sala_pausa_stop
+  alias: 🍿 Cinema - Pausa o Stop Film TV Sala
+  description: Rialza dolcemente le luci soffuse quando si mette in pausa o si arresta il film
+  triggers:
+    - trigger: state
+      entity_id: media_player.sala_tv_sala
+      from: playing
+      to:
+        - paused
+        - idle
+        - 'off'
+  conditions:
+    - condition: state
+      entity_id: sun.sun
+      state: below_horizon
+  actions:
+    - action: light.turn_on
+      target:
+        entity_id: light.mensolecamino
+      data:
+        brightness_pct: 40
+      continue_on_error: true
+    - action: light.turn_on
+      target:
+        entity_id: light.luceambiente
+      data:
+        brightness_pct: 35
+      continue_on_error: true
+    - if:
+        - condition: template
+          value_template: '{{ trigger.to_state.state in [''idle'', ''off''] }}'
+      then:
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.eco_home_silenzioso
+          continue_on_error: true
+  mode: single
+- id: cinema_telecomando_divano_controllo
+  alias: 🛋️ Telecomando Divano - Cinema, TV & Tapparella Sala
+  description: 'Controllo da divano con telecomando IKEA Rodret: Scena Cinema, Pausa TV & Luce Sala, e Tapparella Sala'
+  triggers:
+    - trigger: mqtt
+      topic: zigbee2mqtt/0x287681fffe496d70/action
+    - trigger: mqtt
+      topic: zigbee2mqtt/TelecomandoDivano/action
+  actions:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''on'' }}'
+          sequence:
+            - action: scene.turn_on
+              target:
+                entity_id: scene.cinema_relax
+            - action: script.standby_tablet
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''off'' }}'
+          sequence:
+            - action: media_player.media_pause
+              target:
+                entity_id:
+                  - media_player.sala_tv_sala
+                  - media_player.tv_sala_ue85du7170uxzt
+              continue_on_error: true
+            - if:
+                - condition: state
+                  entity_id: sun.sun
+                  state: below_horizon
+              then:
+                - action: light.turn_on
+                  target:
+                    entity_id: light.sala
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''brightness_move_up'' }}'
+          sequence:
+            - action: cover.set_cover_position
+              target:
+                entity_id: cover.tapparella_sala_homekit
+              data:
+                position: 100
+        - conditions:
+            - condition: template
+              value_template: '{{ trigger.payload == ''brightness_move_down'' }}'
+          sequence:
+            - action: cover.set_cover_position
+              target:
+                entity_id: cover.tapparella_sala_homekit
+              data:
+                position: 5
+  mode: restart
+- id: eco_home_cinema_silenzioso_avvio
+  alias: Eco Home - Modalità Cinema Soffusa & Silenzioso (Avvio Film Emby/TV)
+  description: Attiva modalità silenziosa e abbassa dolcemente la luce ambiente al 15% caldo all avvio del film dopo il tramonto
+  triggers:
+    - trigger: state
+      entity_id:
+        - media_player.emby_edge_windows
+        - media_player.emby_homeassistant
+        - media_player.emby_homeassistant_2
+      to: playing
+      not_from:
+        - paused
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+  actions:
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.eco_home_silenzioso
+    - if:
+        - condition: state
+          entity_id: sun.sun
+          state: below_horizon
+      then:
+        - action: light.turn_on
+          target:
+            entity_id: light.luceambiente
+          data:
+            brightness_pct: 15
+            color_temp_kelvin: 2200
+            transition: 3
+          continue_on_error: true
+        - action: light.turn_off
+          target:
+            entity_id: light.faretti_cucina
+          data:
+            transition: 2
+          continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Scena Cinema: Avvio film, luce soffusa al 15% e silenzioso attivo'
+  mode: single
+- id: eco_home_cinema_pausa_luci
+  alias: 'Eco Home - Pausa Film: Luce Ambiente Media (Snack & Spostamenti)'
+  description: Alza temporaneamente la luce al 45% durante la pausa del film per consentire spostamenti in sicurezza
+  triggers:
+    - trigger: state
+      entity_id:
+        - media_player.emby_edge_windows
+        - media_player.emby_homeassistant
+        - media_player.emby_homeassistant_2
+      to: paused
+      for:
+        seconds: 10
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: sun.sun
+      state: below_horizon
+  actions:
+    - action: light.turn_on
+      target:
+        entity_id: light.luceambiente
+      data:
+        brightness_pct: 45
+        color_temp_kelvin: 2700
+        transition: 2
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Scena Cinema: Pausa film, luce al 45%'
+  mode: single
+- id: eco_home_cinema_ripresa_luci
+  alias: 'Eco Home - Ripresa Film: Ritorno a Luce Soffusa 15%'
+  description: Riabbassa la luce ambiente al 15% quando si riprende la visione del film
+  triggers:
+    - trigger: state
+      entity_id:
+        - media_player.emby_edge_windows
+        - media_player.emby_homeassistant
+        - media_player.emby_homeassistant_2
+      from: paused
+      to: playing
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: sun.sun
+      state: below_horizon
+  actions:
+    - action: light.turn_on
+      target:
+        entity_id: light.luceambiente
+      data:
+        brightness_pct: 15
+        color_temp_kelvin: 2200
+        transition: 2
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Scena Cinema: Ripresa film, luce soffusa al 15%'
+  mode: single
+- id: eco_home_cinema_silenzioso_fine
+  alias: 'Eco Home - Fine Film: Ripristino Silenzioso & Luce Normale'
+  description: Disattiva la modalità silenziosa e ripristina la luce quando la riproduzione del film termina
+  triggers:
+    - trigger: state
+      entity_id:
+        - media_player.emby_edge_windows
+        - media_player.emby_homeassistant
+        - media_player.emby_homeassistant_2
+      to:
+        - idle
+        - 'off'
+      for:
+        minutes: 2
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'on'
+  actions:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.eco_home_silenzioso
+    - if:
+        - condition: state
+          entity_id: sun.sun
+          state: below_horizon
+      then:
+        - action: light.turn_on
+          target:
+            entity_id: light.luceambiente
+          data:
+            brightness_pct: 60
+            color_temp_kelvin: 2700
+            transition: 3
+          continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Scena Cinema: Fine film, silenzioso disattivato e luce ripristinata'
+  mode: single
+- id: eco_home_momenti_relax_silenzio_coppia
+  alias: Eco Home - Momenti di Relax & Sorrisi di Coppia (Silenzio in Sala)
+  description: Riproduce una battuta carina e rilassante sul Nest Hub quando Stefano e Laura sono entrambi a casa, è giorno
+    e c'è silenzio prolungato in sala, con filtri avanzati anti-falsi positivi (sonno/riposino)
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.sala_stazione_meteo_sala_noise_2
+      below: 42
+      for:
+        minutes: 45
+        seconds: 0
+  conditions:
+    - condition: state
+      entity_id: person.stefano
+      state: home
+    - condition: state
+      entity_id: person.laura
+      state: home
+    - condition: state
+      entity_id: sun.sun
+      state: above_horizon
+    - condition: template
+      value_template: '{% set h = now().hour + (now().minute / 60) %} {{ (h >= 10.5 and h < 13.5) or (h >= 16.5 and h < 19.5)
+        }}'
+    - condition: template
+      value_template: "{{ is_state('cover.tapparella_camera_homekit', 'open') or\n   (state_attr('cover.tapparella_camera_homekit',\
+        \ 'current_position') | int(100) > 50) }}"
+    - condition: template
+      value_template: '{{ states(''sensor.samsung_s25_edge_di_stefano_do_not_disturb_sensor'') not in [''total_silence'',
+        ''alarms_only''] }}'
+    - condition: template
+      value_template: "{{ states('media_player.sala_tv_sala') != 'playing' and\n   states('media_player.tv_sala_ue85du7170uxzt')\
+        \ != 'playing' and\n   states('media_player.tv_sala') != 'playing' and\n   states('media_player.emby_edge_windows')\
+        \ != 'playing' }}"
+    - condition: state
+      entity_id: input_boolean.eco_home_attivo
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: state
+      entity_id: input_boolean.eco_home_annunci_relax
+      state: 'on'
+    - condition: template
+      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
+        > 28800 }}'
+  actions:
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_sala
+      data:
+        volume_level: 0.6
+      continue_on_error: true
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id: media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "{{ [\n  \"Tutto tace a Casa Mancini... Cù, Là, o vi siete addormentati sul divano o state tramando qualcosa!\"\
+          ,\n  \"Che pace! Cù e Là in modalità relax assoluto. Godetevi questo momento prima che le micie chiedano la pappa!\"\
+          ,\n  \"Silenzio perfetto in sala! O state leggendo, o Luna e Piccola vi hanno ipnotizzati per le coccole!\",\n \
+          \ \"Interrompo il silenzio solo per dirvi: ottimo lavoro di relax a voi due. Meritato!\",\n  \"Nessuna lite per\
+          \ il telecomando: regna la pace perfetta tra Cù e Là.\",\n  \"Troppo silenzio... le micie dormono, Cù e Pì si riposano.\
+          \ Godetevi la pace!\"\n] | random }}"
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: 'Relax di Coppia: Annuncio di quiete e sorrisi'
+      continue_on_error: true
+    - action: logbook.log
+      data:
+        name: Eco Home - Relax Coppia
+        message: Battuta e momento di relax in sala annunciati su Nest Hub
+        entity_id: automation.eco_home_momenti_di_relax_sorrisi_di_coppia_silenzio_in_sala
+      continue_on_error: true
+  mode: single
+- id: standby_tablet_scenari_casa
+  alias: 📱 Tablet - Standby per Cinema, Buonanotte & Fuori Casa
+  description: Mette in standby lo schermo del tablet quando si attiva Cinema & Relax, Buonanotte o Fuori Casa
+  triggers:
+    - trigger: state
+      entity_id: scene.cinema_relax
+      not_to:
+        - unavailable
+        - unknown
+      not_from:
+        - unavailable
+        - unknown
+    - trigger: state
+      entity_id: scene.buonanotte
+      not_to:
+        - unavailable
+        - unknown
+      not_from:
+        - unavailable
+        - unknown
+    - trigger: state
+      entity_id: switch.buonanotte
+      to: 'on'
+    - trigger: state
+      entity_id: scene.fuori_casa
+      not_to:
+        - unavailable
+        - unknown
+      not_from:
+        - unavailable
+        - unknown
+  actions:
+    - action: script.standby_tablet
+      continue_on_error: true
+  mode: restart
+- id: buonanotte_annuncio_meteo_sarcastico
+  alias: 🌙 Buonanotte - Meteo Sarcastico & Allerte Notturne Nest Hub (Tutti i Dispositivi)
+  description: All'attivazione dello scenario Buonanotte, annuncia su tutti i 3 Nest Hub (Camera, Cameretta, Sala) al 90%
+    di volume orario con battute sarcastiche, previsioni meteo di domani, allerte notturne (pioggia e gelo solo se previsti),
+    stato di Luna e Piccola se fuori, tempo residuo asciugatrice se in funzione, stato batterie telefoni, spegne tutte le
+    luci residue (incluso acquario), spegne le TV e ripristina istantaneamente il quadrante orologio sui Nest Hub.
+  triggers:
+    - trigger: state
+      entity_id: scene.buonanotte
+      not_to:
+        - unavailable
+        - unknown
+      not_from:
+        - unavailable
+        - unknown
+    - trigger: state
+      entity_id: switch.buonanotte
+      to: 'on'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: template
+      value_template: '{{ trigger.entity_id != ''scene.buonanotte'' or (trigger.from_state is defined and trigger.to_state
+        is defined and trigger.from_state.state != trigger.to_state.state and trigger.to_state.state not in [''unavailable'',
+        ''unknown''] and trigger.from_state.state not in [''unavailable'', ''unknown'']) }}'
+  actions:
+    - action: weather.get_forecasts
+      target:
+        entity_id:
+          - weather.meteoam_home
+          - weather.casa
+      data:
+        type: daily
+      response_variable: meteo_daily
+    - action: weather.get_forecasts
+      target:
+        entity_id:
+          - weather.meteoam_home
+          - weather.casa
+      data:
+        type: hourly
+      response_variable: meteo_hourly
+    - action: media_player.turn_on
+      target:
+        entity_id:
+          - media_player.nest_hub_camera
+          - media_player.nest_hub_cameretta
+          - media_player.nest_hub_sala
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id:
+          - media_player.nest_hub_camera
+          - media_player.nest_hub_cameretta
+          - media_player.nest_hub_sala
+      data:
+        volume_level: 0.9
+      continue_on_error: true
+    - delay:
+        milliseconds: 800
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id:
+          - media_player.nest_hub_camera
+          - media_player.nest_hub_cameretta
+          - media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "... ... {% set h = now().hour %} {% set m = now().minute %} {% set m_str = \"%02d\"|format(m) %} {% set\
+          \ orario_str = h ~ \" e \" ~ m_str %} {%- set w_today = now().weekday() -%} {%- if h < 22 or (h == 22 and m < 30)\
+          \ -%}\n  {%- if w_today == 4 -%}\n    {{ [\n      \"Le \" ~ orario_str ~ \". Già a letto di venerdì? Là si riposa\
+          \ per il weekend, ma Cù domani si lavora.\",\n      \"Sono le \" ~ orario_str ~ \". Record del venerdì sera: Lalla\
+          \ libera domani, Ste tocca a te.\",\n      \"Le \" ~ orario_str ~ \". Venerdì da pensionati. Là dorme, Cù prepara\
+          \ la divisa.\"\n    ] | random }}\n  {%- elif w_today == 3 -%}\n    {{ [\n      \"Le \" ~ orario_str ~ \". Giovedì\
+          \ sera a nanna presto. Domani venerdì, il traguardo è vicino.\",\n      \"Sono le \" ~ orario_str ~ \". Dopo il\
+          \ pomeriggio di riposo di Cù, tutti a nanna presto.\"\n    ] | random }}\n  {%- else -%}\n    {{ [\n      \"Le \"\
+          \ ~ orario_str ~ \". Già a letto? Come le galline.\",\n      \"Sono le \" ~ orario_str ~ \". Pì, Cù, siete sicuri?\"\
+          ,\n      \"Le \" ~ orario_str ~ \". Record di precocità per Pì e Cù. Complimenti.\",\n      \"Le \" ~ orario_str\
+          \ ~ \" e già sotto le coperte. Il divano è rimasto orfano.\",\n      \"Sono le \" ~ orario_str ~ \". Pì, Cù: forse\
+          \ troppo presto anche per le micie.\"\n    ] | random }}\n  {%- endif -%}\n{%- elif (h == 0 and m >= 45) or (h >=\
+          \ 1 and h < 6) -%}\n  {%- if w_today == 4 -%}\n    {{ [\n      \"Le \" ~ orario_str ~ \" di notte. Pì può dormire\
+          \ domani, ma Cù domattina la sveglia non perdona!\",\n      \"Le \" ~ orario_str ~ \". Pì domani relax totale, Cù\
+          \ domani ti tocca lavorare, a letto!\",\n      \"Sono le \" ~ orario_str ~ \". Pì beata lei si riposa, Cù domani\
+          \ hai la sveglia. Vampiri!\"\n    ] | random }}\n  {%- else -%}\n    {{ [\n      \"Le \" ~ orario_str ~ \" di notte.\
+          \ Domattina vietato lamentarsi della sveglia.\",\n      \"Le \" ~ orario_str ~ \". Perfino Luna dorme da tre ore.\"\
+          ,\n      \"Sono le \" ~ orario_str ~ \". Pì, Cù: ufficialmente vampiri.\",\n      \"Le \" ~ orario_str ~ \". Avrete\
+          \ le occhiaie fino al weekend.\",\n      \"Sono le \" ~ orario_str ~ \" di notte. Pì, Cù, sotto il piumone ora.\"\
+          \n    ] | random }}\n  {%- endif -%}\n{%- else -%}\n  {%- if w_today == 4 -%}\n    {{ [\n      \"Sono le \" ~ orario_str\
+          \ ~ \". Venerdì sera: Là festeggia il weekend, Cù prepara la sveglia del sabato.\",\n      \"Le \" ~ orario_str\
+          \ ~ \". Notte di venerdì: Lalla in vacanza, Ste domani si timbra.\",\n      \"Le \" ~ orario_str ~ \". Cù, domani\
+          \ si lavora. Là, goditi il sabato libero!\"\n    ] | random }}\n  {%- elif w_today == 2 -%}\n    {{ [\n      \"\
+          Sono le \" ~ orario_str ~ \". Mercoledì archiviato: Cù, domani pomeriggio sei libero!\",\n      \"Le \" ~ orario_str\
+          \ ~ \". A nanna: domani per Ste il giovedì pomeriggio è di relax.\"\n    ] | random }}\n  {%- else -%}\n    {{ [\n\
+          \      \"Sono le \" ~ orario_str ~ \". Ci siamo.\",\n      \"Le \" ~ orario_str ~ \". Orario da persone normali.\"\
+          ,\n      \"Sono le \" ~ orario_str ~ \". Andate a dormire, dai.\"\n    ] | random }}\n  {%- endif -%}\n{%- endif\
+          \ -%}\n{# --- PREVISIONI: 1. Google Weather (weather.casa), 2. Open-Meteo se presente, 3. MeteoAM, 4. Altri ---\
+          \ #} {%- set fc_daily = (meteo_daily['weather.casa'].forecast if 'weather.casa' in meteo_daily and meteo_daily['weather.casa'].forecast\
+          \ | length > 0\n  else (meteo_daily['weather.open_meteo'].forecast if 'weather.open_meteo' in meteo_daily and meteo_daily['weather.open_meteo'].forecast\
+          \ | length > 0\n  else (meteo_daily['weather.meteoam_home'].forecast if 'weather.meteoam_home' in meteo_daily and\
+          \ meteo_daily['weather.meteoam_home'].forecast | length > 0\n  else (meteo_daily.values() | selectattr('forecast',\
+          \ 'defined') | map(attribute='forecast') | first | default([]))))) -%}\n{%- set fc_hourly = (meteo_hourly['weather.casa'].forecast\
+          \ if 'weather.casa' in meteo_hourly and meteo_hourly['weather.casa'].forecast | length > 0\n  else (meteo_hourly['weather.open_meteo'].forecast\
+          \ if 'weather.open_meteo' in meteo_hourly and meteo_hourly['weather.open_meteo'].forecast | length > 0\n  else (meteo_hourly['weather.meteoam_home'].forecast\
+          \ if 'weather.meteoam_home' in meteo_hourly and meteo_hourly['weather.meteoam_home'].forecast | length > 0\n  else\
+          \ (meteo_hourly.values() | selectattr('forecast', 'defined') | map(attribute='forecast') | first | default([])))))\
+          \ -%}\n{%- set tomorrow = fc_daily[1] if fc_daily | length > 1 else (fc_daily[0] if fc_daily | length > 0 else {})\
+          \ -%} {%- set t_max = (tomorrow.temperature | default(20)) | round(0) -%} {%- set t_min = (tomorrow.templow if tomorrow.templow\
+          \ is defined else (tomorrow.temperature | default(15))) | round(0) -%} {%- set cond = tomorrow.condition | default('sunny')\
+          \ -%} {%- set night_hours = fc_hourly[:9] -%} {# Pioggia notturna: richiede pioggia consistente (>1.0 mm o probabilità\
+          \ >=65% o forte rovescio/temporale) per evitare falsi allarmi #} {%- set rain_night = (night_hours | selectattr('condition',\
+          \ 'in', ['pouring', 'lightning', 'lightning-rainy']) | list | length > 0)\n   or (night_hours | selectattr('precipitation',\
+          \ 'defined') | selectattr('precipitation', 'gt', 1.0) | list | length > 0)\n   or (night_hours | selectattr('precipitation_probability',\
+          \ 'defined') | selectattr('precipitation_probability', 'ge', 65) | list | length > 0)\n   or (night_hours | selectattr('condition',\
+          \ 'in', ['rainy']) | list | length >= 2) -%}\n{%- set ice_night = night_hours | selectattr('condition', 'in', ['snowy',\
+          \ 'snowy-rainy', 'hail']) | list | length > 0\n   or night_hours | selectattr('temperature', 'defined') | selectattr('temperature',\
+          \ 'le', 0.5) | list | length > 0 -%}\n\n{%- if cond in ['sunny', 'clear-night'] -%}\n  {%- if t_max >= 28 -%}\n\
+          \    {{ \" \" ~ [\n      \"Domani sole a picco e ben \" ~ t_max ~ \" gradi, con minima di \" ~ t_min ~ \". Preparate\
+          \ gli occhiali da sole o chiudetevi col condizionatore prima che vi sciogliate.\",\n      \"Domani sole che spacca\
+          \ le pietre e \" ~ t_max ~ \" gradi. Praticamente tempo da mare, peccato solo per il piccolo dettaglio del lavoro.\"\
+          \n    ] | random }}\n  {%- else -%}\n    {{ \" \" ~ [\n      \"Domani bella giornata di sole e cielo sereno, massima\
+          \ di \" ~ t_max ~ \" gradi e minima di \" ~ t_min ~ \". Incredibile ma vero, il meteo ha deciso di fare il bravo.\"\
+          ,\n      \"Domani cielo limpido e aria fresca con \" ~ t_max ~ \" gradi. Giornata ideale per uscire, o per fare\
+          \ finta di essere produttivi.\"\n    ] | random }}\n  {%- endif -%}\n{%- elif cond in ['partlycloudy', 'cloudy']\
+          \ -%}\n  {{ \" \" ~ [\n    \"Domani tempo indeciso tra sole e nuvole con massima di \" ~ t_max ~ \" gradi e minima\
+          \ di \" ~ t_min ~ \". Il sole ha chiesto il part-time, ma almeno non dovrebbe piovervi in testa.\",\n    \"Domani\
+          \ nuvole sparse a passeggio e \" ~ t_max ~ \" gradi. Cielo grigetto d'ordinanza, perfetto per accompagnare il caffè\
+          \ del mattino.\"\n  ] | random }}\n{%- elif cond in ['rainy', 'pouring', 'lightning', 'lightning-rainy'] -%}\n \
+          \ {{ \" \" ~ [\n    \"Domani tempo da lupi: piove e ci saranno al massimo \" ~ t_max ~ \" gradi. Se proprio dovete\
+          \ uscire dal letto, ricordatevi l'ombrello o direttamente le pinne.\",\n    \"Domani giornata bagnata e grigia con\
+          \ \" ~ t_max ~ \" gradi. Il piumone vi ringrazierà se decidete di non muovervi.\"\n  ] | random }}\n{%- elif cond\
+          \ in ['snowy', 'snowy-rainy'] -%}\n  {{ \" \" ~ [\n    \"Domani è prevista neve con massima di appena \" ~ t_max\
+          \ ~ \" gradi. Tirate fuori gli scarponi o costruite un pupazzo di neve in terrazza.\",\n    \"Domani fiocchi di\
+          \ neve e freddo cane con \" ~ t_max ~ \" gradi. Modalità pinguino ufficialmente attivata.\"\n  ] | random }}\n{%-\
+          \ else -%}\n  {{ \" Domani previsti \" ~ t_max ~ \" gradi di massima e \" ~ t_min ~ \" di minima con tempo variabile.\"\
+          \ }}\n{%- endif -%}\n{%- if rain_night -%}\n  {{ \" \" ~ [\n    \"Attenzione però: stanotte è prevista pioggia.\
+          \ Se avete lasciato finestre aperte o panni stesi al chiaro di luna, forse è il caso di controllare prima di svegliarvi\
+          \ allagati!\",\n    \"Psst, tra le coperte si sta benissimo, ma stanotte arriva la pioggia. Date un'occhiata alle\
+          \ finestre se non volete svegliarvi con l'idromassaggio in camera.\"\n  ] | random }}\n{%- endif -%}\n{%- if ice_night\
+          \ -%}\n  {{ \" \" ~ [\n    \"Occhio che stanotte si gela con temperature sottozero e rischio lastre di ghiaccio.\
+          \ Domattina non fate i piloti di Formula Uno sulla Punto o sulla Discovery!\",\n    \"Attenzione: stanotte la colonnina\
+          \ va sotto zero con rischio gelate. Domattina occhio a dove mettete i piedi e le ruote per strada!\"\n  ] | random\
+          \ }}\n{%- endif -%}\n{%- set luna_fuori = is_state('binary_sensor.luna', 'off') -%} {%- set piccola_fuori = is_state('binary_sensor.piccola',\
+          \ 'off') -%} {%- if luna_fuori and piccola_fuori -%}\n  {{ \" \" ~ [\n    \"Attenzione gatti: Luna e Piccola sono\
+          \ ancora tutte e due fuori! Forse è il caso di farle rientrare prima di addormentarvi.\",\n    \"Promemoria mici:\
+          \ sia Luna che Piccola sono rimaste fuori in giardino. Non chiudetele fuori tutta la notte!\"\n  ] | random }}\n\
+          {%- elif luna_fuori -%}\n  {{ \" \" ~ [\n    \"Attenzione: Luna è ancora fuori per i fatti suoi. Non dimenticatevela\
+          \ fuori al freddo!\",\n    \"Promemoria gatti: Luna non è ancora rientrata. Date un'occhiata alla gattaiola prima\
+          \ di dormire.\"\n  ] | random }}\n{%- elif piccola_fuori -%}\n  {{ \" \" ~ [\n    \"Attenzione: Piccola è ancora\
+          \ fuori a caccia. Non dimenticatevela fuori al freddo!\",\n    \"Promemoria gatti: Piccola non è ancora rientrata.\
+          \ Date un'occhiata alla gattaiola prima di dormire.\"\n  ] | random }}\n{%- endif -%}\n{%- set asciugatrice_on =\
+          \ is_state('binary_sensor.asciugatrice_in_funzione', 'on') -%} {%- set tempo_residuo = states('sensor.asciugatrice_tempo_residuo')\
+          \ -%} {%- if asciugatrice_on and tempo_residuo not in ['unavailable', 'unknown', 'Spenta', 'spenta', ''] -%}\n \
+          \ {{ \" \" ~ [\n    \"Per vostra informazione, l'asciugatrice è ancora in funzione: mancano \" ~ tempo_residuo ~\
+          \ \" alla fine del ciclo.\",\n    \"Nota sul bucato: l'asciugatrice sta ancora lavorando, tempo residuo previsto:\
+          \ \" ~ tempo_residuo ~ \".\"\n  ] | random }}\n{%- elif asciugatrice_on -%}\n  {{ \" \" ~ [\n    \"Per vostra informazione,\
+          \ l'asciugatrice è ancora in funzione per completare il ciclo di asciugatura.\",\n    \"Nota sul bucato: l'asciugatrice\
+          \ sta ancora accesa e sta completando il ciclo.\"\n  ] | random }}\n{%- endif -%}\n{# --- MEMORIA POSIZIONI PRECEDENTI\
+          \ DELLA GIORNATA --- #} {%- set z_stefano = states('input_text.stefano_ultima_zona') | default('Sconosciuta') -%}\
+          \ {%- set z_laura = states('input_text.laura_ultima_zona') | default('Sconosciuta') -%} {%- set rientrati_insieme\
+          \ = is_state('input_text.coppia_rientro_insieme', 'si') -%} {%- if rientrati_insieme and z_stefano not in ['Sconosciuta',\
+          \ 'home', 'not_home'] and z_stefano == z_laura -%}\n  {{ \" \" ~ [\n    \"Vedo che oggi siete stati insieme da \"\
+          \ ~ z_stefano ~ \". Bella giornata in coppia, ora meritato riposo.\",\n    \"Rientrati insieme da \" ~ z_stefano\
+          \ ~ \": missione compiuta. A nanna adesso!\"\n  ] | random }}\n{%- elif z_stefano == 'Palestra' or z_laura == 'Palestra'\
+          \ -%}\n  {%- if z_stefano == 'Palestra' and z_laura == 'Palestra' -%}\n    {{ \" \" ~ [\n      \"Bravi tutti e due\
+          \ per la palestra oggi. I muscoli vi ringrazieranno sotto il piumone.\",\n      \"Sessione di palestra archiviata\
+          \ per entrambi: stasera crollerete subito.\"\n    ] | random }}\n  {%- elif z_stefano == 'Palestra' -%}\n    {{\
+          \ \" \" ~ [\n      \"Cù, dopo la faticata in palestra stasera crollerai subito. Fai riposare i muscoli!\",\n   \
+          \   \"Ste, fatica in palestra oggi? Il letto ti aspetta.\"\n    ] | random }}\n  {%- elif z_laura == 'Palestra'\
+          \ -%}\n    {{ \" \" ~ [\n      \"Là, dopo la palestra stasera ti sei meritata il piumone a cinque stelle!\",\n \
+          \     \"Lalla, ottima sessione in palestra oggi: adesso relax totale.\"\n    ] | random }}\n  {%- endif -%}\n{%-\
+          \ elif z_stefano == 'Casa Monica' or z_laura == 'Casa Monica' -%}\n  {{ \" \" ~ [\n    \"Salutata mamma Monica oggi?\
+          \ Ora siete a casa tranquilli al caldo.\",\n    \"Visita da Monica archiviata: buona serata di relax sul divano.\"\
+          \n  ] | random }}\n{%- elif z_stefano == 'Casa Simone' or z_laura == 'Casa Simone' -%}\n  {{ \" \" ~ [\n    \"Fatto\
+          \ un salto da Simone oggi? Ora tutti a nanna a ricaricare le pile.\",\n    \"Visita da Simone completata: adesso\
+          \ piumone e relax.\"\n  ] | random }}\n{%- elif 'Grazia' in z_laura or 'Alfredo' in z_laura or 'Nonni' in z_laura\
+          \ -%}\n  {{ \" \" ~ [\n    \"Là, salutati i parenti oggi? Adesso ricarica le energie!\",\n    \"Giro di visite familiari\
+          \ completato per Là: buona nanna.\"\n  ] | random }}\n{%- elif z_stefano == 'Parrucchiere Stefano' -%}\n  {{ \"\
+          \ \" ~ [\n    \"Ste, fresco di taglio dal parrucchiere? Cerca di non spettinarti troppo sul cuscino!\",\n    \"\
+          Capo, nuovo look approvato. Ora vai a dormire.\"\n  ] | random }}\n{%- elif z_stefano == 'Conad' or z_laura == 'Conad'\
+          \ -%}\n  {{ \" \" ~ [\n    \"Spesa al Conad fatta, dispensa piena e pancia piena. Pronti per dormire.\",\n    \"\
+          Missione spesa superata: buona digestione e buonanotte!\"\n  ] | random }}\n{%- endif -%}\n{%- set stefano_charging\
+          \ = is_state('binary_sensor.samsung_s25_edge_di_stefano_is_charging', 'on') or is_state('sensor.samsung_s25_edge_di_stefano_battery_state',\
+          \ 'charging') or (states('sensor.samsung_s25_edge_di_stefano_charger_type') not in ['none', 'unavailable', 'unknown',\
+          \ '']) -%} {%- set laura_charging = is_state('sensor.samsung_s22_di_laura_battery_state', 'charging') or (states('sensor.samsung_s22_di_laura_charger_type')\
+          \ not in ['none', 'unavailable', 'unknown', '']) -%} {%- set stefano_batt = states('sensor.samsung_s25_edge_di_stefano_battery_level')\
+          \ -%} {%- set laura_batt = states('sensor.samsung_s22_di_laura_battery_level') -%} {%- set stefano_has_batt = stefano_batt\
+          \ not in ['unavailable', 'unknown', ''] -%} {%- set laura_has_batt = laura_batt not in ['unavailable', 'unknown',\
+          \ ''] -%} {%- if not stefano_charging and not laura_charging and (stefano_has_batt or laura_has_batt) -%}\n  {{\
+          \ \" \" ~ [\n    \"Promemoria telefoni: nessuno dei due è sotto carica! \" ~ ((\"Stefano sei al \" ~ stefano_batt\
+          \ ~ \"% \") if stefano_has_batt else \"\") ~ ((\"e Laura sei al \" ~ laura_batt ~ \"%. \") if laura_has_batt else\
+          \ \". \") ~ \"Se non volete trovarli scarichi domattina, attaccateli alla presa!\",\n    \"Attenzione batterie:\
+          \ sia il telefono di Stefano\" ~ ((\" al \" ~ stefano_batt ~ \"%\") if stefano_has_batt else \"\") ~ \" che quello\
+          \ di Laura\" ~ ((\" al \" ~ laura_batt ~ \"%\") if laura_has_batt else \"\") ~ \" non sono in carica. Ricordatevi\
+          \ i caricatori prima di dormire!\"\n  ] | random }}\n{%- elif not stefano_charging and stefano_has_batt -%}\n  {{\
+          \ \" \" ~ [\n    \"Stefano, promemoria: il tuo telefono è al \" ~ stefano_batt ~ \"% e non è sotto carica. Attaccalo\
+          \ prima di addormentarti!\",\n    \"Stefano, occhio alla batteria: sei al \" ~ stefano_batt ~ \"% e il telefono\
+          \ non è in carica.\"\n  ] | random }}\n{%- elif not laura_charging and laura_has_batt -%}\n  {{ \" \" ~ [\n    \"\
+          Laura, promemoria: il tuo telefono è al \" ~ laura_batt ~ \"% e non è sotto carica. Attaccalo prima di addormentarti!\"\
+          ,\n    \"Laura, occhio alla batteria: sei al \" ~ laura_batt ~ \"% e il telefono non è in carica.\"\n  ] | random\
+          \ }}\n{%- endif -%}\n{%- if w_today == 4 -%}\n  {{ \" \" ~ [\n    \"Buonanotte. Pì dormi serena, Cù prepara la sveglia\
+          \ per domani.\",\n    \"Notte ragazzi. Pì goditi il sabato libero, Cù fai il bravo a lavoro.\",\n    \"Buonanotte\
+          \ Pì e Cù. Chi lavora e chi si riposa, fate i bravi.\",\n    \"Lalla buona vacanza, Capo riposati che domani si\
+          \ produce. Notte.\",\n    \"Notte Pì, notte Cù. Domani a ognuno il suo destino.\"\n  ] | random }}\n{%- elif w_today\
+          \ == 2 -%}\n  {{ \" \" ~ [\n    \"Buonanotte Pì e Cù. Ste, domani pomeriggio relax meritato.\",\n    \"Notte ragazzi.\
+          \ Cù, domani pomeriggio libero!\",\n    \"Buonanotte Pì e Cù. A domani.\"\n  ] | random }}\n{%- else -%}\n  {{ \"\
+          \ \" ~ [\n    \"Buonanotte. Fate i bravi.\",\n    \"Notte ragazzi. A domani.\",\n    \"Buonanotte Pì e Cù. Schiacciate\
+          \ un occhio.\",\n    \"Ok, ci siamo. Notte.\",\n    \"Luce spenta, pensieri spenti. Buonanotte.\",\n    \"Buonanotte\
+          \ Pì e Cù. Mi taccio.\",\n    \"Notte fonda. Riposate.\",\n    \"Tutto spento, tutti a letto. Notte.\",\n    \"\
+          Buonanotte Pì. Cù, non russare.\",\n    \"Chiudiamo qui. Notte Ste, notte Pì.\"\n  ] | random }}\n{%- endif -%}"
+    - parallel:
+        - parallel:
+            - sequence:
+                - delay: 00:00:20
+                - wait_for_trigger:
+                    - trigger: state
+                      entity_id: media_player.nest_hub_camera
+                      to:
+                        - idle
+                        - 'off'
+                      for:
+                        seconds: 6
+                  timeout: 00:01:30
+                  continue_on_timeout: true
+                - action: media_player.turn_off
+                  target:
+                    entity_id: media_player.nest_hub_camera
+                  continue_on_error: true
+            - sequence:
+                - delay: 00:00:20
+                - wait_for_trigger:
+                    - trigger: state
+                      entity_id: media_player.nest_hub_cameretta
+                      to:
+                        - idle
+                        - 'off'
+                      for:
+                        seconds: 6
+                  timeout: 00:01:30
+                  continue_on_timeout: true
+                - action: media_player.turn_off
+                  target:
+                    entity_id: media_player.nest_hub_cameretta
+                  continue_on_error: true
+            - sequence:
+                - delay: 00:00:20
+                - wait_for_trigger:
+                    - trigger: state
+                      entity_id: media_player.nest_hub_sala
+                      to:
+                        - idle
+                        - 'off'
+                      for:
+                        seconds: 6
+                  timeout: 00:01:30
+                  continue_on_timeout: true
+                - action: media_player.turn_off
+                  target:
+                    entity_id: media_player.nest_hub_sala
+                  continue_on_error: true
+        - sequence:
+            - action: light.turn_off
+              target:
+                entity_id:
+                  - light.tutte_le_luci
+                  - light.fzone_acquario
+              continue_on_error: true
+            - action: switch.turn_off
+              target:
+                entity_id: switch.ossigenatoreacquario
+              continue_on_error: true
+        - sequence:
+            - action: script.standby_tablet
+              continue_on_error: true
+        - sequence:
+            - action: script.chiusura_standard_tapparelle
+              continue_on_error: true
+        - sequence:
+            - if:
+                - condition: state
+                  entity_id: media_player.sala_tv_sala
+                  state: 'on'
+              then:
+                - action: media_player.turn_off
+                  target:
+                    entity_id: media_player.sala_tv_sala
+                  continue_on_error: true
+            - if:
+                - condition: state
+                  entity_id: media_player.tv_cameretta
+                  state: 'on'
+              then:
+                - action: media_player.turn_off
+                  target:
+                    entity_id: media_player.tv_cameretta
+                  continue_on_error: true
+  mode: single
+- id: buongiorno_sveglia_meteo_sarcastico
+  alias: ☀️ Buongiorno - Sveglia Lavoro, Meteo Sarcastico & Allerte (Tutti i Dispositivi)
+  description: Alle 07:00 dal lunedì al venerdì (o all'attivazione manuale dello scenario/switch Buongiorno), annuncia la
+    sveglia breve e coincisa all'80% di volume su tutti i 3 Nest Hub (Camera, Cameretta, Sala) con giorno della settimana,
+    meteo di oggi, orario di eventuale pioggia prevista nella giornata (solo se positiva), allerte asfalto bagnato o rischio
+    ghiaccio (solo se positivi), ripristinando l'orologio sui Nest Hub al termine.
+  triggers:
+    - trigger: time
+      at: 07:00:00
+      id: orario_lavorativo
+    - trigger: state
+      entity_id: switch.buongiorno
+      to: 'on'
+      id: manuale
+    - trigger: state
+      entity_id: scene.buongiorno
+      id: manuale
+      not_to:
+        - unavailable
+        - unknown
+      not_from:
+        - unavailable
+        - unknown
+  conditions:
+    - condition: state
+      entity_id: input_boolean.eco_home_silenzioso
+      state: 'off'
+    - condition: or
+      conditions:
+        - condition: trigger
+          id: manuale
+        - condition: and
+          conditions:
+            - condition: trigger
+              id: orario_lavorativo
+            - condition: time
+              weekday:
+                - mon
+                - tue
+                - wed
+                - thu
+                - fri
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.ossigenatoreacquario
+      continue_on_error: true
+    - action: weather.get_forecasts
+      target:
+        entity_id:
+          - weather.meteoam_home
+          - weather.casa
+      data:
+        type: daily
+      response_variable: meteo_daily
+    - action: weather.get_forecasts
+      target:
+        entity_id:
+          - weather.meteoam_home
+          - weather.casa
+      data:
+        type: hourly
+      response_variable: meteo_hourly
+    - action: media_player.turn_on
+      target:
+        entity_id:
+          - media_player.nest_hub_camera
+          - media_player.nest_hub_cameretta
+          - media_player.nest_hub_sala
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id:
+          - media_player.nest_hub_camera
+          - media_player.nest_hub_cameretta
+          - media_player.nest_hub_sala
+      data:
+        volume_level: 0.8
+      continue_on_error: true
+    - delay:
+        milliseconds: 800
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id:
+          - media_player.nest_hub_camera
+          - media_player.nest_hub_cameretta
+          - media_player.nest_hub_sala
+        language: it
+        options:
+          tld: it
+        message: "... ... {% set giorni = [\"Lunedì\", \"Martedì\", \"Mercoledì\", \"Giovedì\", \"Venerdì\", \"Sabato\", \"\
+          Domenica\"] %} {% set w = now().weekday() %} {% set giorno_settimana = giorni[w] %}\n{% set sveglia_intro = [\n\
+          \  \"Buongiorno ragazzi, buon \" ~ giorno_settimana ~ \"!\",\n  \"Buongiorno Pì e Cù! Buon \" ~ giorno_settimana\
+          \ ~ \".\",\n  \"Sveglia! Buon \" ~ giorno_settimana ~ \".\",\n  \"Buongiorno Pì e Cù. È \" ~ giorno_settimana ~\
+          \ \".\",\n  giorno_settimana ~ \". Si parte.\",\n  \"Buongiorno Pì e Cù. Buon \" ~ giorno_settimana ~ \"!\",\n \
+          \ \"Su su, buon \" ~ giorno_settimana ~ \"!\",\n  \"Buongiorno Tesoro e Ste. Buon \" ~ giorno_settimana ~ \".\"\n\
+          ] | random %}\n{# --- NOTA SUL LAVORO/PROGRAMMA GIORNALIERO --- #} {% set nota_giorno = \"\" %} {% if w == 3 %}\n\
+          \  {% set nota_giorno = [\n    \"Promemoria giovedì: per Cù mezza giornata lavorativa! Pomeriggio negozio chiuso\
+          \ e riposo.\",\n    \"Ricordatevi che oggi è giovedì: Ste stacca all'una ed ha il pomeriggio libero. Pì tieni duro!\"\
+          ,\n    \"Buon giovedì: Ste, oggi pomeriggio relax e ricarica batterie in vista di venerdì e sabato.\",\n    \"Oggi\
+          \ è giovedì: turno mattutino per Cù, poi pomeriggio di riposo per chiusura negozio.\"\n  ] | random %}\n{% elif\
+          \ w == 4 %}\n  {% set nota_giorno = [\n    \"Venerdì arrivato! Pì da stasera sei libera per tutto il weekend. Ste,\
+          \ tieni duro che per te c'è il sabato.\",\n    \"È venerdì: ultimo sforzo per Pì prima del meritato weekend. Cù,\
+          \ domani ti tocca il sabato ma il traguardo è vicino.\",\n    \"Venerdì! Pì pregusta il sabato libero, Cù fai il\
+          \ pieno di caffè anche per domani.\",\n    \"Venerdì mattina: Pì vede già il traguardo del fine settimana, Ste prepara\
+          \ le energie per il sabato.\"\n  ] | random %}\n{% elif w == 5 %}\n  {% set nota_giorno = [\n    \"È sabato! Pì\
+          \ dormi beata che non lavori. Cù, a te tocca lavorare: coraggio e buona produzione!\",\n    \"Buon sabato: Pì relax\
+          \ e divano, Ste al lavoro. A ciascuno il suo!\",\n    \"Sabato mattina: Pì in vacanza e riposo, Cù in trincea a\
+          \ lavorare. Forza Ste!\",\n    \"Sabato arrivato: Pì giornata tutta per te senza lavoro, Ste ultimo turno della\
+          \ settimana!\"\n  ] | random %}\n{% elif w == 0 %}\n  {% set nota_giorno = [\n    \"Lunedì mattina: si ricomincia\
+          \ la settimana. Coraggio Pì e Cù!\",\n    \"È lunedì: riattivare i neuroni e caffè doppio. Buona ripartenza a tutti\
+          \ e due!\",\n    \"Nuova settimana al via: pronti alla carica ragazzi!\"\n  ] | random %}\n{% elif w == 1 %}\n \
+          \ {% set nota_giorno = [\n    \"Martedì: la settimana è entrata nel vivo, buona giornata a entrambi!\",\n    \"\
+          Buon martedì ragazzi, pedalare con grinta!\"\n  ] | random %}\n{% elif w == 2 %}\n  {% set nota_giorno = [\n   \
+          \ \"Mercoledì: siamo a metà settimana, il weekend comincia a intravedersi!\",\n    \"Giro di boa del mercoledì:\
+          \ coraggio ragazzi, la discesa si avvicina!\"\n  ] | random %}\n{% endif %}\n{# --- PREVISIONI: 1. Google Weather\
+          \ (weather.casa), 2. Open-Meteo se presente, 3. MeteoAM, 4. Altri --- #} {% set fc_daily = (meteo_daily['weather.casa'].forecast\
+          \ if 'weather.casa' in meteo_daily and meteo_daily['weather.casa'].forecast | length > 0\n  else (meteo_daily['weather.open_meteo'].forecast\
+          \ if 'weather.open_meteo' in meteo_daily and meteo_daily['weather.open_meteo'].forecast | length > 0\n  else (meteo_daily['weather.meteoam_home'].forecast\
+          \ if 'weather.meteoam_home' in meteo_daily and meteo_daily['weather.meteoam_home'].forecast | length > 0\n  else\
+          \ (meteo_daily.values() | selectattr('forecast', 'defined') | map(attribute='forecast') | first | default([])))))\
+          \ %}\n\n{% set fc_hourly = (meteo_hourly['weather.casa'].forecast if 'weather.casa' in meteo_hourly and meteo_hourly['weather.casa'].forecast\
+          \ | length > 0\n  else (meteo_hourly['weather.open_meteo'].forecast if 'weather.open_meteo' in meteo_hourly and\
+          \ meteo_hourly['weather.open_meteo'].forecast | length > 0\n  else (meteo_hourly['weather.meteoam_home'].forecast\
+          \ if 'weather.meteoam_home' in meteo_hourly and meteo_hourly['weather.meteoam_home'].forecast | length > 0\n  else\
+          \ (meteo_hourly.values() | selectattr('forecast', 'defined') | map(attribute='forecast') | first | default([])))))\
+          \ %}\n\n{% set today = fc_daily[0] if fc_daily | length > 0 else {} %} {% set t_max = (today.temperature | default(20))\
+          \ | round(0) %} {% set cond = today.condition | default('sunny') %}\n{# --- TEMPERATURA ATTUALE ESTERNA: 1. Sensori\
+          \ locali, 2. Google, 3. Open-Meteo, 4. MeteoAM --- #} {% set t_est = (states('sensor.eco_home_temperatura_esterna_prioritaria')\
+          \ | float(states('sensor.casa_temperatura') | float(20))) | round(1) %}\n{# --- CONDIZIONE ATTUALE: 1. Sensori locali\
+          \ (se pioggia), 2. Google, 3. Altri --- #} {% set is_raining_now = is_state('binary_sensor.eco_home_pioggia_rilevata',\
+          \ 'on') %}\n{% set commento_meteo = \"\" %} {% if cond in ['sunny', 'clear-night'] %}\n  {% if t_max >= 28 %}\n\
+          \    {% set commento_meteo = [\n      \"Oggi sole a picco e caldo estivo con massima di \" ~ t_max ~ \" gradi.\"\
+          ,\n      \"Giornata caldissima e soleggiata: picco di \" ~ t_max ~ \" gradi.\",\n      \"Sole pieno oggi, massima\
+          \ di \" ~ t_max ~ \" gradi. Preparatevi al caldo!\"\n    ] | random %}\n  {% else %}\n    {% set commento_meteo\
+          \ = [\n      \"Oggi bel tempo con cielo sereno e massima di \" ~ t_max ~ \" gradi.\",\n      \"Giornata luminosa\
+          \ e piacevole: sole e massima di \" ~ t_max ~ \" gradi.\",\n      \"Cielo limpido e sole: prevista massima di \"\
+          \ ~ t_max ~ \" gradi.\"\n    ] | random %}\n  {% endif %}\n{% elif cond in ['partlycloudy', 'cloudy'] %}\n  {% set\
+          \ commento_meteo = [\n    \"Oggi nuvoloso con massima di \" ~ t_max ~ \" gradi.\",\n    \"Cielo con nuvole sparse\
+          \ e schiarite, temperatura fino a \" ~ t_max ~ \" gradi.\",\n    \"Tempo un po' coperto oggi, massima prevista di\
+          \ \" ~ t_max ~ \" gradi.\"\n  ] | random %}\n{% elif cond in ['rainy', 'pouring', 'lightning', 'lightning-rainy']\
+          \ %}\n  {% set commento_meteo = [\n    \"Oggi è prevista pioggia con massima di \" ~ t_max ~ \" gradi. Ricordatevi\
+          \ l'ombrello!\",\n    \"Giornata bagnata oggi: precipitazioni e massima di \" ~ t_max ~ \" gradi.\",\n    \"Tempo\
+          \ piovoso in arrivo oggi: massima di \" ~ t_max ~ \" gradi, occhio alla strada.\"\n  ] | random %}\n{% elif cond\
+          \ in ['snowy', 'snowy-rainy'] %}\n  {% set commento_meteo = [\n    \"Oggi freddo pungente con fiocchi di neve e\
+          \ massima di \" ~ t_max ~ \" gradi.\",\n    \"Attenzione alla neve oggi, massima di appena \" ~ t_max ~ \" gradi.\"\
+          \n  ] | random %}\n{% else %}\n  {% set commento_meteo = [\n    \"Oggi tempo variabile con massima di \" ~ t_max\
+          \ ~ \" gradi.\",\n    \"Previsioni variabili per oggi, termometro fino a \" ~ t_max ~ \" gradi.\"\n  ] | random\
+          \ %}\n{% endif %}\n{# --- ORA PIOGGIA PREVISTA (soglia consistente: pioggia, rovesci o probabilità >=60% o mm >\
+          \ 0.8) --- #} {% set ns_pioggia = namespace(ora=none, in_corso=is_raining_now) %} {% for h in fc_hourly %}\n  {%\
+          \ set dt = as_local(as_datetime(h.datetime)) %}\n  {% if dt.date() == now().date() and dt >= now() - timedelta(minutes=30)\
+          \ and ns_pioggia.ora is none %}\n    {% set is_rain = h.condition in ['pouring', 'lightning', 'lightning-rainy']\n\
+          \       or (h.condition == 'rainy' and ((h.precipitation is defined and h.precipitation | float(0) >= 0.8) or (h.precipitation_probability\
+          \ is defined and h.precipitation_probability | int(0) >= 60)))\n       or (h.precipitation is defined and h.precipitation\
+          \ | float(0) >= 1.0)\n       or (h.precipitation_probability is defined and h.precipitation_probability | int(0)\
+          \ >= 65) %}\n    {% if is_rain %}\n      {% set ns_pioggia.ora = dt.strftime('%H:%M') %}\n    {% endif %}\n  {%\
+          \ endif %}\n{% endfor %}\n{% set commento_pioggia_oggi = \"\" %} {% if ns_pioggia.in_corso %}\n  {% set commento_pioggia_oggi\
+          \ = [\n    \"Pioggia già in corso questa mattina.\",\n    \"Fuori sta già piovendo questa mattina.\",\n    \"Ombrelli\
+          \ a portata di mano: sta già piovendo.\"\n  ] | random %}\n{% elif ns_pioggia.ora is not none %}\n  {% set commento_pioggia_oggi\
+          \ = [\n    \"Possibile pioggia a partire dalle \" ~ ns_pioggia.ora ~ \".\",\n    \"Attenzione a possibili precipitazioni\
+          \ verso le \" ~ ns_pioggia.ora ~ \".\",\n    \"Portate l'ombrello: pioggia prevista attorno alle \" ~ ns_pioggia.ora\
+          \ ~ \".\"\n  ] | random %}\n{% endif %}\n{# --- PIOGGIA NOTTURNA DAI SENSORI LOCALI --- #} {% set pioggia_oggi_mm\
+          \ = states('sensor.terrazza_pulvirometro_precipitazioni_oggi') %} {% set ha_piovuto_notte = pioggia_oggi_mm not\
+          \ in ['unavailable', 'unknown', ''] and pioggia_oggi_mm | float(0) > 0.2 %} {% set commento_pioggia_notte = \"\"\
+          \ %} {% if ha_piovuto_notte and not ns_pioggia.in_corso %}\n  {% set commento_pioggia_notte = [\n    \"Attenzione\
+          \ all'asfalto bagnato per la pioggia caduta stanotte.\",\n    \"Ha piovuto durante la notte: asfalto bagnato per\
+          \ strada, guidate con prudenza.\",\n    \"Strade bagnate stamattina per le precipitazioni notturne.\"\n  ] | random\
+          \ %}\n{% endif %}\n{# --- RISCHIO GHIACCIO (solo se positivo) --- #} {% set t_min = (today.templow if today.templow\
+          \ is defined else today.temperature | default(10)) | round(0) %} {% set rischio_ghiaccio = t_est <= 3.0 or t_min\
+          \ <= 1.0 %} {% set commento_ghiaccio = \"\" %} {% if rischio_ghiaccio %}\n  {% set commento_ghiaccio = [\n    \"\
+          Possibile ghiaccio sui parabrezza: fuori ci sono \" ~ t_est ~ \" gradi.\",\n    \"Attenzione al ghiaccio su strada\
+          \ e vetri auto: temperatura esterna di \" ~ t_est ~ \" gradi.\",\n    \"Freddo intenso stamattina: \" ~ t_est ~\
+          \ \" gradi fuori, occhio a possibili lastre di ghiaccio.\"\n  ] | random %}\n{% endif %}\n{% set saluto_finale =\
+          \ [\n  \"Buona giornata!\",\n  \"Buona giornata a tutti e due!\",\n  \"Forza e coraggio, buona giornata!\",\n  \"\
+          Buona giornata Pì, buona giornata Cù!\",\n  \"In bocca al lupo per la giornata ragazzi!\"\n] | random %} {% if w\
+          \ == 5 %}\n  {% set saluto_finale = [\n    \"Buon lavoro a Ste, buon riposo a Pì!\",\n    \"Buon sabato a tutti\
+          \ e due, chi a lavoro e chi a casa!\",\n    \"Pì goditi il sabato, Ste buona giornata di lavoro!\",\n    \"Buon\
+          \ fine settimana a Pì e buon turno a Ste!\"\n  ] | random %}\n{% elif w == 3 %}\n  {% set saluto_finale = [\n  \
+          \  \"Buon giovedì! Ste, ci vediamo a pranzo per il pomeriggio di riposo.\",\n    \"Buona giornata ragazzi, e buon\
+          \ pomeriggio di riposo a Cù!\",\n    \"Buon giovedì a entrambi, con mezza giornata per Ste!\"\n  ] | random %}\n\
+          {% endif %}\n{% set msg_parts = [sveglia_intro, nota_giorno, commento_meteo, commento_pioggia_oggi, commento_pioggia_notte,\
+          \ commento_ghiaccio, saluto_finale] | select() | list %} {{ msg_parts | join(' ') }}"
+    - parallel:
+        - sequence:
+            - delay: 00:00:15
+            - wait_for_trigger:
+                - trigger: state
+                  entity_id: media_player.nest_hub_camera
+                  to:
+                    - idle
+                    - 'off'
+                  for:
+                    seconds: 6
+              timeout: 00:01:30
+              continue_on_timeout: true
+            - action: media_player.turn_off
+              target:
+                entity_id: media_player.nest_hub_camera
+              continue_on_error: true
+        - sequence:
+            - delay: 00:00:15
+            - wait_for_trigger:
+                - trigger: state
+                  entity_id: media_player.nest_hub_cameretta
+                  to:
+                    - idle
+                    - 'off'
+                  for:
+                    seconds: 6
+              timeout: 00:01:30
+              continue_on_timeout: true
+            - action: media_player.turn_off
+              target:
+                entity_id: media_player.nest_hub_cameretta
+              continue_on_error: true
+        - sequence:
+            - delay: 00:00:15
+            - wait_for_trigger:
+                - trigger: state
+                  entity_id: media_player.nest_hub_sala
+                  to:
+                    - idle
+                    - 'off'
+                  for:
+                    seconds: 6
+              timeout: 00:01:30
+              continue_on_timeout: true
+            - action: media_player.turn_off
+              target:
+                entity_id: media_player.nest_hub_sala
+              continue_on_error: true
+  mode: single
