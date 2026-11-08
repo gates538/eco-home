@@ -22,8 +22,7 @@ Il progetto raccoglie **102 automazioni** e **105 script** organizzati in un'arc
 eco-home/
 ├── automations/      # 7 moduli logici di automazione (102 automazioni totali)
 ├── scripts/          # 6 moduli script operativi e AI per Home Assistant (105 script totali)
-├── docs/             # Guide tecniche, dipendenze e requisiti hardware
-└── archive/          # Release storiche archiviate per versione (v1.1.1 -> v1.5.0)
+└── docs/             # Guide tecniche, dipendenze e requisiti hardware
 ```
 
 ---
@@ -65,11 +64,3 @@ eco-home/
 
 ---
 
-## 📦 Archivio Versioni Storiche (`/archive`)
-
-Le versioni precedenti sono archiviate e ordinate nelle rispettive cartelle:
-- [`archive/v1.1.1`](archive/v1.1.1) fino a [`archive/v1.1.8`](archive/v1.1.8)
-- [`archive/v1.2.0`](archive/v1.2.0)
-- [`archive/v1.3.0`](archive/v1.3.0)
-- [`archive/v1.4.0`](archive/v1.4.0)
-- [`archive/v1.5.0`](archive/v1.5.0)
