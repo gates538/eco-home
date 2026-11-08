@@ -9,8 +9,8 @@ Questo file elenca le dipendenze software e gli entity ID dell'ecosistema comple
 ## Entità Principali
 
 ```text
-person.stefano
-person.laura
+person.utente_1
+person.utente_2
 binary_sensor.porta_contact
 media_player.nest_hub_sala
 tts.google_translate_it_lt

@@ -1,0 +1,790 @@
+# ==============================================================================
+# 02 — CLIMA, TERMOCAMINO A PELLET, POMPA DI CALORE ACS & TERMOSTATI TECNICI
+# ==============================================================================
+
+- id: 'termostato_router_esterno_raffreddamento'
+  alias: 'Termostato: Router Esterno RT2600ac-Terrazza Raffreddamento Automatico (>35°C)'
+  description: "Attiva la ventola di raffreddamento nella scatola stagna del nodo Mesh RT2600ac-Terrazza (posizionato in terrazza a destra della porta terrazzo, tra la porta e la fontana, dove in estate supera facilmente i 40°C) se la temperatura supera i 35°C e la spegne sotto i 33°C."
+  mode: single
+  trigger:
+    - trigger: numeric_state
+      entity_id: sensor.termostato_router_esterno_temperature_c
+      above: 35
+      id: accendi_raffreddamento
+    - trigger: numeric_state
+      entity_id: sensor.termostato_router_esterno_temperature_c
+      below: 33
+      id: spegni_raffreddamento
+    - trigger: numeric_state
+      entity_id: sensor.termostato_router_esterno_temperature_c
+      above: 46
+      for:
+        minutes: 10
+      id: allerta_surriscaldamento_router_esterno
+  action:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: accendi_raffreddamento
+          sequence:
+            - action: select.select_option
+              target:
+                entity_id: select.termostato_router_esterno_work_mode
+              data:
+                option: cooling
+              continue_on_error: true
+            - action: number.set_value
+              target:
+                entity_id: number.termostato_router_esterno_temperature_c_setpoint
+              data:
+                value: 35
+              continue_on_error: true
+            - action: switch.turn_on
+              target:
+                entity_id: switch.termostato_router_esterno
+        - conditions:
+            - condition: trigger
+              id: spegni_raffreddamento
+          sequence:
+            - action: switch.turn_off
+              target:
+                entity_id: switch.termostato_router_esterno
+        - conditions:
+            - condition: trigger
+              id: allerta_surriscaldamento_router_esterno
+          sequence:
+            - action: switch.turn_on
+              target:
+                entity_id: switch.termostato_router_esterno
+            - action: script.notifica_smart
+              data:
+                titolo: "🌡️ Allerta Temperatura Scatola Router Terrazza"
+                messaggio: "La scatola stagna del router RT2600ac-Terrazza (tra porta terrazzo e fontana) ha raggiunto {{ states('sensor.termostato_router_esterno_temperature_c') }}°C nonostante la ventola attiva."
+                canale: utente_1
+                priorita: media
+                categoria: sicurezza
+                tag: "allerta_temp_router_terrazza"
+
+- id: 'termostato_nicchia_raffreddamento'
+  alias: 'Termostato: Nicchia Corridoio Raffreddamento Automatico (>35°C)'
+  description: "Attiva la ventola di raffreddamento nella Nicchia in corridoio (rientranza nel muro chiusa da sportello, non visibile dalle telecamere e senza UPS, che ospita alimentatore antenna FWA Internet, router principale RT6600ax, hub gattaiola SurePet, coordinatore Zigbee SLZB-06Mg24U e sintonizzatore HDHomeRun) se la temperatura supera i 35°C e la spegne sotto i 33°C."
+  mode: single
+  trigger:
+    - trigger: numeric_state
+      entity_id: sensor.termostato_nicchia_temperature
+      above: 35
+      id: accendi_raffreddamento
+    - trigger: numeric_state
+      entity_id: sensor.termostato_nicchia_temperature
+      below: 33
+      id: spegni_raffreddamento
+    - trigger: numeric_state
+      entity_id: sensor.termostato_nicchia_temperature
+      above: 45
+      for:
+        minutes: 10
+      id: allerta_surriscaldamento_nicchia
+  action:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: accendi_raffreddamento
+          sequence:
+            - action: switch.turn_on
+              target:
+                entity_id: switch.termostato_nicchia
+        - conditions:
+            - condition: trigger
+              id: spegni_raffreddamento
+          sequence:
+            - action: switch.turn_off
+              target:
+                entity_id: switch.termostato_nicchia
+        - conditions:
+            - condition: trigger
+              id: allerta_surriscaldamento_nicchia
+          sequence:
+            - action: switch.turn_on
+              target:
+                entity_id: switch.termostato_nicchia
+            - action: script.notifica_smart
+              data:
+                titolo: "🌡️ Allerta Temperatura Nicchia Corridoio"
+                messaggio: "La Nicchia in corridoio (FWA, RT6600ax, SLZB-06Mg24U, Hub SurePet, HDHomeRun) ha raggiunto {{ states('sensor.termostato_nicchia_temperature') }}°C nonostante la ventola attiva."
+                canale: utente_1
+                priorita: media
+                categoria: sicurezza
+                tag: "allerta_temp_nicchia_corridoio"
+
+- id: 'clima_notifica_accensione_condizionatori'
+  alias: "Clima: Notifica Accensione Climatizzatori"
+  description: "Invia una notifica con tasto spegni rapido quando un condizionatore viene acceso."
+  mode: parallel
+  triggers:
+    - trigger: state
+      entity_id:
+        - climate.sala_condizionatore_sala
+        - climate.camera_condizionatore_camera
+        - climate.cameretta_condizionatore_cameretta
+      from: 'off'
+      not_to:
+        - 'off'
+        - 'unavailable'
+        - 'unknown'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_clima
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_clima_accensione
+      state: 'on'
+  actions:
+    - variables:
+        stanza: >-
+          {% if 'sala' in trigger.entity_id %}Sala{% elif 'camera' in trigger.entity_id and 'cameretta' not in trigger.entity_id %}Camera da Letto{% else %}Cameretta{% endif %}
+        azione_spegni: >-
+          {% if 'sala' in trigger.entity_id %}SPEGNI_CLIMA_SALA{% elif 'camera' in trigger.entity_id and 'cameretta' not in trigger.entity_id %}SPEGNI_CLIMA_CAMERA{% else %}SPEGNI_CLIMA_CAMERETTA{% endif %}
+        mod_icona: >-
+          {% set m = trigger.to_state.state %}
+          {% if m == 'cool' %}❄️ Raffrescamento{% elif m == 'heat' %}🔥 Riscaldamento{% elif m == 'dry' %}💧 Deumidificazione{% elif m == 'fan_only' %}🌀 Ventilazione{% else %}⚙️ Automatico{% endif %}
+        target_temp: "{{ trigger.to_state.attributes.temperature | default('?', true) }}"
+        curr_temp: "{{ trigger.to_state.attributes.current_temperature | default('?', true) }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "❄️ Clima {{ stanza }} Acceso"
+        messaggio: "Acceso in modalità {{ mod_icona }} (Target: {{ target_temp }}°C, Attuale: {{ curr_temp }}°C)."
+        priorita: "alta"
+        categoria: "clima"
+        tag: "clima_{{ trigger.entity_id.split('.')[1] }}"
+        azioni:
+          - action: "{{ azione_spegni }}"
+            title: "🛑 Spegni {{ stanza }}"
+          - action: "URI"
+            title: "📱 Gestisci Clima"
+            uri: "/eco-home/panoramica"
+
+- id: 'clima_notifica_spegnimento_condizionatori'
+  alias: "Clima: Notifica Spegnimento Climatizzatori"
+  description: "Invia una notifica quando un condizionatore viene spento."
+  mode: parallel
+  triggers:
+    - trigger: state
+      entity_id:
+        - climate.sala_condizionatore_sala
+        - climate.camera_condizionatore_camera
+        - climate.cameretta_condizionatore_cameretta
+      to: 'off'
+      not_from:
+        - 'off'
+        - 'unavailable'
+        - 'unknown'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_clima
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_clima_spegnimento
+      state: 'on'
+  actions:
+    - variables:
+        stanza: >-
+          {% if 'sala' in trigger.entity_id %}Sala{% elif 'camera' in trigger.entity_id and 'cameretta' not in trigger.entity_id %}Camera da Letto{% else %}Cameretta{% endif %}
+        curr_temp: "{{ trigger.to_state.attributes.current_temperature | default('?', true) }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "⏹️ Clima {{ stanza }} Spento"
+        messaggio: "Il climatizzatore in {{ stanza }} è stato spento (Temperatura attuale: {{ curr_temp }}°C)."
+        priorita: "normale"
+        categoria: "clima"
+        tag: "clima_{{ trigger.entity_id.split('.')[1] }}"
+        azioni:
+          - action: "URI"
+            title: "📱 Apri Clima"
+            uri: "/eco-home/panoramica"
+
+- id: 'clima_notifica_accensione_camino'
+  alias: "Camino: Notifica Accensione Termocamino"
+  description: "Invia una sola notifica con snapshot live da Telecamera Sala, telemetria e tasto di spegnimento quando il termocamino Klover entra effettivamente a regime (WORK), ignorando le pulizie periodiche del braciere (CLEANING -> WORK) e i blip del cloud AguaIOT (unavailable)."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: sensor.camino_status
+      to: 'WORK'
+      from:
+        - 'FLAME LIGHT'
+        - 'LOAD PELLET'
+        - 'CHECK UP'
+        - 'OFF'
+        - 'STAND-BY'
+      for:
+        seconds: 30
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_clima
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_clima_accensione
+      state: 'on'
+    - condition: template
+      alias: "Cooldown 45 minuti anti-ripetizione nella stessa sessione"
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 2700 }}"
+  actions:
+    - action: camera.snapshot
+      target:
+        entity_id: camera.sala
+      data:
+        filename: "/config/www/cam_snapshots/camino_sala.jpg"
+      continue_on_error: true
+    - action: script.notifica_smart
+      data:
+        titolo: "🔥 Termocamino Klover Acceso"
+        messaggio: >-
+          Il Termocamino a pellet Klover in Sala è a regime (riscaldamento termosifoni attivo in tutta casa).
+          Acqua: {{ states('sensor.camino_water_temperature') | default('?', true) }}°C | Fiamma: {{ states('sensor.camino_flame_temperature') | default('?', true) }}°C | Potenza: {{ states('sensor.camino_real_power') | default('1', true) }}/5.
+          🌡️ Zona Giorno: {{ states('sensor.temperatura_media_zona_giorno') }}°C | Zona Notte: {{ states('sensor.temperatura_media_zona_notte') }}°C ({{ 'Porta Giorno/Notte aperta' if is_state('binary_sensor.portagiorno_notte_contact', 'on') else 'Porta Giorno/Notte chiusa' }}).
+        priorita: "alta"
+        categoria: "clima"
+        immagine: "/local/cam_snapshots/camino_sala.jpg?t={{ now().timestamp() | int }}"
+        tag: "notifica_camino_stato"
+        azioni:
+          - action: "SPEGNI_CAMINO"
+            title: "🛑 Spegni Camino"
+          - action: "URI"
+            title: "🔥 Dettagli Camino"
+            uri: "/eco-home/panoramica#camino"
+
+- id: 'clima_notifica_spegnimento_camino'
+  alias: "Camino: Notifica Spegnimento Termocamino"
+  description: "Invia una sola notifica quando il termocamino completa lo spegnimento (OFF/STAND-BY dopo FINAL CLEANING/WORK), ignorando i blip cloud."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: sensor.camino_status
+      to:
+        - 'OFF'
+        - 'STAND-BY'
+      from:
+        - 'FINAL CLEANING'
+        - 'WORK'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_clima
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_clima_spegnimento
+      state: 'on'
+    - condition: template
+      alias: "Cooldown 30 minuti anti-ripetizione"
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 1800 }}"
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "⏹️ Termocamino Spento"
+        messaggio: "Il termocamino ha completato lo spegnimento e la pulizia finale. Temperatura acqua residua: {{ states('sensor.camino_water_temperature') | default('?', true) }}°C."
+        priorita: "normale"
+        categoria: "clima"
+        tag: "notifica_camino_stato"
+        azioni:
+          - action: "URI"
+            title: "🔥 Dettagli Camino"
+            uri: "/eco-home/panoramica#camino"
+
+- id: 'clima_notifica_errori_avvisi_camino'
+  alias: "Camino: Notifica Errori e Avvisi Termocamino"
+  description: "Invia una notifica di avviso/errore con snapshot da Telecamera Sala solo per allarmi reali (stato ALARM) o sovratemperatura acqua (>80°C), ignorando i codici di stato come '-' o '132' durante lo spegnimento."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: sensor.camino_status
+      to: 'ALARM'
+      not_from:
+        - 'unavailable'
+        - 'unknown'
+        - 'ALARM'
+      for:
+        seconds: 30
+      id: allarme_sensore
+    - trigger: numeric_state
+      entity_id: sensor.camino_water_temperature
+      above: 80
+      for:
+        seconds: 30
+      id: sovratemperatura_acqua
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_clima
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_clima_avvisi
+      state: 'on'
+    - condition: template
+      alias: "Cooldown 30 minuti anti-ripetizione"
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 1800 }}"
+  actions:
+    - action: camera.snapshot
+      target:
+        entity_id: camera.sala
+      data:
+        filename: "/config/www/cam_snapshots/camino_sala.jpg"
+      continue_on_error: true
+    - variables:
+        testo_allarme: >-
+          {% if trigger.id == 'sovratemperatura_acqua' %}
+            Sovratemperatura acqua circuito ({{ states('sensor.camino_water_temperature') }}°C > 80°C)! Verificare circolatore o combustione pellet.
+          {% else %}
+            Allarme segnalato dal Termocamino Klover (codice: {{ states('sensor.camino_alarm') }} · Acqua: {{ states('sensor.camino_water_temperature') }}°C). Se manca pellet, la scorta dei sacchi ({{ states('input_number.sacchi_pellet_rimanenti') | int(0) }} sacchi rimanenti) è nel locale tecnico vicino alla pompa di calore.
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Avviso Allarme Termocamino Klover"
+        messaggio: "{{ testo_allarme }}"
+        priorita: "alta"
+        categoria: "clima"
+        immagine: "/local/cam_snapshots/camino_sala.jpg?t={{ now().timestamp() | int }}"
+        tag: "allarme_camino"
+        azioni:
+          - action: "SPEGNI_CAMINO"
+            title: "🛑 Spegni Camino"
+          - action: "URI"
+            title: "🔥 Dettagli Camino"
+            uri: "/eco-home/panoramica#camino"
+
+- id: 'clima_notifica_errori_avvisi_condizionatori'
+  alias: "Clima: Notifica Disconnessione Climatizzatori"
+  description: "Invia un avviso se un climatizzatore risulta irraggiungibile per oltre 15 minuti."
+  mode: parallel
+  triggers:
+    - trigger: state
+      entity_id:
+        - climate.sala_condizionatore_sala
+        - climate.camera_condizionatore_camera
+        - climate.cameretta_condizionatore_cameretta
+      to: 'unavailable'
+      for:
+        minutes: 15
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_clima
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.notifiche_clima_avvisi
+      state: 'on'
+  actions:
+    - variables:
+        stanza: >-
+          {% if 'sala' in trigger.entity_id %}Sala{% elif 'camera' in trigger.entity_id and 'cameretta' not in trigger.entity_id %}Camera da Letto{% else %}Cameretta{% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Clima {{ stanza }} Non Raggiungibile"
+        messaggio: "Il climatizzatore in {{ stanza }} risulta disconnesso/irraggiungibile da oltre 15 minuti. Verifica l'alimentazione elettrica o la rete Wi-Fi."
+        priorita: "alta"
+        categoria: "clima"
+        tag: "clima_offline_{{ trigger.entity_id.split('.')[1] }}"
+        azioni:
+          - action: "URI"
+            title: "📱 Apri Clima"
+            uri: "/eco-home/panoramica"
+
+- id: 'clima_azioni_notifiche_smartphone'
+  alias: "Clima: Azioni da Notifiche Smartphone (Spegni Rapido)"
+  description: "Intercetta i tocchi sui pulsanti di spegnimento inviati nelle notifiche interattive per spegnere climatizzatori o camino."
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: SPEGNI_CLIMA_SALA
+      id: spegni_sala
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: SPEGNI_CLIMA_CAMERA
+      id: spegni_camera
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: SPEGNI_CLIMA_CAMERETTA
+      id: spegni_cameretta
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: SPEGNI_CAMINO
+      id: spegni_camino
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: spegni_sala
+          sequence:
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: climate.sala_condizionatore_sala
+              data:
+                hvac_mode: 'off'
+        - conditions:
+            - condition: trigger
+              id: spegni_camera
+          sequence:
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: climate.camera_condizionatore_camera
+              data:
+                hvac_mode: 'off'
+        - conditions:
+            - condition: trigger
+              id: spegni_cameretta
+          sequence:
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: climate.cameretta_condizionatore_cameretta
+              data:
+                hvac_mode: 'off'
+        - conditions:
+            - condition: trigger
+              id: spegni_camino
+          sequence:
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: climate.camino_water
+              data:
+                hvac_mode: 'off'
+
+- id: 'pompa_calore_notifica_errori_disconnessione'
+  alias: "Pompa di Calore: Notifica Avvisi e Disconnessione"
+  description: "Invia una notifica push se la Pompa di Calore Atlantic o il modulo Cozytouch risulta offline o presenta criticità."
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.vm_concept_default_cozytouch
+      to: 'off'
+      for:
+        minutes: 15
+      id: cozytouch_offline
+    - trigger: state
+      entity_id: binary_sensor.vm_concept_default_cozytouch
+      to: 'unavailable'
+      for:
+        minutes: 15
+      id: cozytouch_offline
+    - trigger: numeric_state
+      entity_id: sensor.unknown_product_2353_wifi_signal
+      below: -85
+      for:
+        minutes: 30
+      id: wifi_debole
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_pompa_calore
+      state: 'on'
+  actions:
+    - variables:
+        testo_pdc: >-
+          {% if trigger.id == 'wifi_debole' %}
+            Il segnale Wi-Fi della pompa di calore è molto debole ({{ states('sensor.unknown_product_2353_wifi_signal') }} dBm). Possibili disconnessioni.
+          {% else %}
+            Il modulo Cozytouch / Pompa di Calore Atlantic Calypso 150L non risponde da oltre 15 minuti. Verifica l'alimentazione o la connessione Wi-Fi ({{ states('sensor.unknown_product_2353_wifi_ssid') }}).
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Avviso Pompa di Calore Atlantic"
+        messaggio: "{{ testo_pdc }}"
+        priorita: "alta"
+        categoria: "pompa_calore"
+        tag: "pompa_calore_avviso"
+        azioni:
+          - action: "URI"
+            title: "💧 Dettagli Impianto"
+            uri: "/eco-home/elettrodomestici"
+
+- id: 'ospiti_sincronizza_boost_acqua_calda_pdc'
+  alias: "🚿 Acqua Calda: Sincronizza Boost Ospiti con Pompa di Calore Atlantic Calypso"
+  description: "Allinea bidirezionalmente input_boolean.pdc_boost_acqua_calda_ospiti e lo switch hardware switch.calypso_split_boost_mode sulla Pompa di Calore Atlantic Calypso 150L."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: input_boolean.pdc_boost_acqua_calda_ospiti
+      from: 'off'
+      to: 'on'
+      id: helper_on
+    - trigger: state
+      entity_id: input_boolean.pdc_boost_acqua_calda_ospiti
+      from: 'on'
+      to: 'off'
+      id: helper_off
+    - trigger: state
+      entity_id: switch.calypso_split_boost_mode
+      from: 'off'
+      to: 'on'
+      id: hw_on
+    - trigger: state
+      entity_id: switch.calypso_split_boost_mode
+      from: 'on'
+      to: 'off'
+      id: hw_off
+  conditions: []
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: helper_on
+          sequence:
+            - action: switch.turn_off
+              target:
+                entity_id:
+                  - switch.unknown_product_2353_away_mode
+                  - switch.calypso_split_away_mode
+              continue_on_error: true
+            - action: switch.turn_on
+              target:
+                entity_id:
+                  - switch.calypso_split_domestic_hot_water
+                  - switch.calypso_split_boost_mode
+              continue_on_error: true
+        - conditions:
+            - condition: trigger
+              id: helper_off
+          sequence:
+            - action: switch.turn_off
+              target:
+                entity_id: switch.calypso_split_boost_mode
+              continue_on_error: true
+        - conditions:
+            - condition: trigger
+              id: hw_on
+          sequence:
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.pdc_boost_acqua_calda_ospiti
+              continue_on_error: true
+        - conditions:
+            - condition: trigger
+              id: hw_off
+          sequence:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.pdc_boost_acqua_calda_ospiti
+              continue_on_error: true
+
+- id: 'camino_notifica_pranzo_utente_1_1250'
+  alias: "🔥 Camino: Chiedi a Utente 1 alle 12:50 se Accendere per Pranzo (Se a Lavoro)"
+  description: "Alle 12:49:30 aggiorna la posizione GPS di Utente 1 e alle 12:50:00, se Utente 1 è a lavoro (Sede Lavoro) e il camino è spento, invia solo sul suo telefono la notifica interattiva per accendere subito il camino o posticipare di 10/15/20 minuti."
+  mode: single
+  triggers:
+    - trigger: time
+      at: "12:49:30"
+      id: aggiorna_gps
+    - trigger: time
+      at: "12:50:00"
+      id: invia_notifica
+  conditions:
+    - condition: time
+      weekday:
+        - mon
+        - tue
+        - wed
+        - thu
+        - fri
+        - sat
+    - condition: state
+      entity_id: input_boolean.notifiche_clima
+      state: 'on'
+    - condition: template
+      alias: "Il Termocamino è attualmente spento"
+      value_template: "{{ is_state('binary_sensor.camino_in_funzione', 'off') and not is_state('climate.camino_water', 'heat') }}"
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: aggiorna_gps
+            - condition: state
+              entity_id: binary_sensor.utente_1_a_casa
+              state: 'off'
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                message: "request_location_update"
+              continue_on_error: true
+        - conditions:
+            - condition: trigger
+              id: invia_notifica
+            - condition: state
+              entity_id: binary_sensor.utente_1_a_casa
+              state: 'off'
+            - condition: template
+              alias: "Utente 1 è a Lavoro (Sede Lavoro - Via del Lavoro / Zona Lavoro)"
+              value_template: >-
+                {% set p = states('person.utente_1') | lower %}
+                {% set smart = states('sensor.utente_1_luogo_smart') | lower %}
+                {% set geo = states('sensor.smartphone_utente_1_geocoded_location') | lower %}
+                {{ p == 'lavoro utente_1' or 'lavoro utente_1' in smart or 'via del lavoro' in geo or 'Zona Lavoro' in geo }}
+          sequence:
+            - action: script.camino_notifica_pranzo_utente_1
+
+- id: 'camino_pranzo_azioni_notifica_utente_1'
+  alias: "🔥 Camino Pranzo: Azioni Interattive da Notifica Smartphone Utente 1 (Accendi / Posticipa 10-15-20m)"
+  description: "Intercetta la risposta di Utente 1 alla notifica delle 12:50 per accendere subito il Termocamino Klover, aprire il selettore 10/15/20 minuti, avviare il posticipo o annullare."
+  mode: restart
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_ACCENDI_ORA
+      id: accendi_ora
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_SCEGLI_POSTICIPO
+      id: scegli_posticipo
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_POSTICIPA_10
+      id: posticipa_10
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_POSTICIPA_15
+      id: posticipa_15
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_POSTICIPA_20
+      id: posticipa_20
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_AUTO_10
+      id: auto_10
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_AUTO_15
+      id: auto_15
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_AUTO_20
+      id: auto_20
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: CAMINO_PRANZO_IGNORA
+      id: ignora
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: accendi_ora
+          sequence:
+            - action: script.turn_off
+              target:
+                entity_id: script.camino_pranzo_gestisci_posticipo
+              continue_on_error: true
+            - action: climate.set_hvac_mode
+              target:
+                entity_id: climate.camino_water
+              data:
+                hvac_mode: "heat"
+            - action: script.notifica_smart
+              data:
+                titolo: "🔥 Camino in Accensione per Pranzo!"
+                messaggio: >-
+                  Comando inviato: il Termocamino Klover si sta avviando ora e sarà a regime per le {{ (now() + timedelta(minutes=20)).strftime('%H:%M') }} circa. Buon rientro a casa!
+                canale: "utente_1"
+                priorita: "normale"
+                categoria: "clima"
+                tag: "camino_pranzo_utente_1"
+                azioni:
+                  - action: "SPEGNI_CAMINO"
+                    title: "🛑 Annulla e Spegni"
+                  - action: "URI"
+                    title: "🔥 Apri Camino"
+                    uri: "/eco-home/panoramica#camino"
+        - conditions:
+            - condition: trigger
+              id: scegli_posticipo
+          sequence:
+            - action: script.turn_off
+              target:
+                entity_id: script.camino_pranzo_gestisci_posticipo
+              continue_on_error: true
+            - action: script.notifica_smart
+              data:
+                titolo: "⏱️ Posticipa Camino Pranzo: Scegli Minuti"
+                messaggio: "Di quanti minuti vuoi posticipare l'avviso / accensione del Termocamino Klover?"
+                canale: "utente_1"
+                priorita: "alta"
+                categoria: "clima"
+                tag: "camino_pranzo_utente_1"
+                azioni:
+                  - action: "CAMINO_PRANZO_POSTICIPA_10"
+                    title: "⏳ +10 Minuti"
+                  - action: "CAMINO_PRANZO_POSTICIPA_15"
+                    title: "⏳ +15 Minuti"
+                  - action: "CAMINO_PRANZO_POSTICIPA_20"
+                    title: "⏳ +20 Minuti"
+        - conditions:
+            - condition: trigger
+              id: posticipa_10
+          sequence:
+            - action: script.camino_pranzo_gestisci_posticipo
+              data:
+                minuti: 10
+                auto_accendi: false
+        - conditions:
+            - condition: trigger
+              id: posticipa_15
+          sequence:
+            - action: script.camino_pranzo_gestisci_posticipo
+              data:
+                minuti: 15
+                auto_accendi: false
+        - conditions:
+            - condition: trigger
+              id: posticipa_20
+          sequence:
+            - action: script.camino_pranzo_gestisci_posticipo
+              data:
+                minuti: 20
+                auto_accendi: false
+        - conditions:
+            - condition: trigger
+              id: auto_10
+          sequence:
+            - action: script.camino_pranzo_gestisci_posticipo
+              data:
+                minuti: 10
+                auto_accendi: true
+        - conditions:
+            - condition: trigger
+              id: auto_15
+          sequence:
+            - action: script.camino_pranzo_gestisci_posticipo
+              data:
+                minuti: 15
+                auto_accendi: true
+        - conditions:
+            - condition: trigger
+              id: auto_20
+          sequence:
+            - action: script.camino_pranzo_gestisci_posticipo
+              data:
+                minuti: 20
+                auto_accendi: true
+        - conditions:
+            - condition: trigger
+              id: ignora
+          sequence:
+            - action: script.turn_off
+              target:
+                entity_id: script.camino_pranzo_gestisci_posticipo
+              continue_on_error: true
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                message: "clear_notification"
+                data:
+                  tag: "camino_pranzo_utente_1"
+              continue_on_error: true
+

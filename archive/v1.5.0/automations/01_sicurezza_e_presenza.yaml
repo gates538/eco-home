@@ -1,0 +1,1400 @@
+# ==============================================================================
+# 01 — SICUREZZA, ALLARME, PRESENZA, GEOFENCING, OSPITI & PTZ
+# ==============================================================================
+
+- id: 'annuncio_rientro_presenza_ai'
+  alias: 'Presenza: Annunci Vocali AI e Notifiche Incrociate Rientro'
+  description: >-
+    Rileva il rientro di Utente 1, Utente 2 o entrambi in coppia (finestra di 30 secondi),
+    scatta foto da telecamera SALA 2, invia notifica incrociata allo smartphone dell'altro con screenshot,
+    e riproduce un annuncio vocale sarcastico, dolce e personalizzato tramite Google Gemini su Nest Hub.
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.porta_ingresso_contact
+      to: 'on'
+      not_from:
+        - 'unknown'
+        - 'unavailable'
+      id: porta_ingresso
+    - trigger: state
+      entity_id: person.utente_1
+      to: 'home'
+      not_from:
+        - 'home'
+        - 'unknown'
+        - 'unavailable'
+      id: gps_stefano
+    - trigger: state
+      entity_id: person.utente_2
+      to: 'home'
+      not_from:
+        - 'home'
+        - 'unknown'
+        - 'unavailable'
+      id: gps_laura
+    - trigger: state
+      entity_id: sensor.smartphone_utente_1_wi_fi_connection
+      to: 'HOME_WIFI_SSID'
+      not_from:
+        - 'HOME_WIFI_SSID'
+        - 'unknown'
+        - 'unavailable'
+      id: wifi_stefano
+    - trigger: state
+      entity_id: sensor.smartphone_utente_2_wi_fi_connection
+      to: 'HOME_WIFI_SSID'
+      not_from:
+        - 'HOME_WIFI_SSID'
+        - 'unknown'
+        - 'unavailable'
+      id: wifi_laura
+  condition:
+    # 1. Antirimbalzo immediato e nessun ospite one-shot in attesa
+    - condition: template
+      value_template: >-
+        {{ (this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 60)
+           and is_state('input_select.accoglienza_ospite_one_shot', 'Nessuno') }}
+    # 2. Controllo assenza, rientro effettivo e anti-uscita:
+    # - Se il trigger è GPS/Wi-Fi: la persona appena rientrata deve aver superato il cooldown di 25 min.
+    # - Se il trigger è l'apertura della porta: deve esserci una persona appena rientrata negli ultimi 10 min (600s)
+    #   OPPURE almeno una persona attualmente fuori casa (che sta entrando prima che il telefono agganci il Wi-Fi).
+    #   Se entrambi sono già in casa da più di 10 minuti, stanno USCENDO o aprendo dall'interno -> BLOCCA!
+    - condition: template
+      value_template: >-
+        {% set now_ts = now().timestamp() %}
+        {% set s_is_home = is_state('person.utente_1', 'home') or is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID') %}
+        {% set l_is_home = is_state('person.utente_2', 'home') or is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID') %}
+        {% set s_person_age = (now_ts - states.person.utente_1.last_changed.timestamp()) if (states.person.utente_1 is not none and is_state('person.utente_1', 'home')) else 999999 %}
+        {% set s_wifi_age = (now_ts - states.sensor.smartphone_utente_1_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_1_wi_fi_connection is not none and is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+        {% set s_home_age = [s_person_age, s_wifi_age] | min %}
+        {% set l_person_age = (now_ts - states.person.utente_2.last_changed.timestamp()) if (states.person.utente_2 is not none and is_state('person.utente_2', 'home')) else 999999 %}
+        {% set l_wifi_age = (now_ts - states.sensor.smartphone_utente_2_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_2_wi_fi_connection is not none and is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+        {% set l_home_age = [l_person_age, l_wifi_age] | min %}
+        {% set last_s = state_attr('input_datetime.ultimo_annuncio_rientro_utente_1', 'timestamp') %}
+        {% set s_cooldown = (now_ts - last_s) if last_s is not none else 999999 %}
+        {% set last_l = state_attr('input_datetime.ultimo_annuncio_rientro_utente_2', 'timestamp') %}
+        {% set l_cooldown = (now_ts - last_l) if last_l is not none else 999999 %}
+        {% set s_just_arrived = s_is_home and (s_home_age <= 600) and (s_cooldown >= 1500) %}
+        {% set l_just_arrived = l_is_home and (l_home_age <= 600) and (l_cooldown >= 1500) %}
+        {% set s_outside_ready = (not s_is_home) and (s_cooldown >= 1500) %}
+        {% set l_outside_ready = (not l_is_home) and (l_cooldown >= 1500) %}
+        {{ s_just_arrived or l_just_arrived or (trigger.id == 'porta_ingresso' and (s_outside_ready or l_outside_ready)) }}
+  action:
+    # CASO A: Se il trigger è GPS o Wi-Fi (avvicinamento all'esterno) e la porta è ancora chiusa,
+    # attendiamo tassativamente che la porta d'ingresso si apra (fino a 5 minuti).
+    - if:
+        - condition: template
+          value_template: "{{ trigger.id != 'porta_ingresso' and is_state('binary_sensor.porta_ingresso_contact', 'off') }}"
+      then:
+        - wait_for_trigger:
+            - trigger: state
+              entity_id: binary_sensor.porta_ingresso_contact
+              to: 'on'
+          timeout: "00:05:00"
+          continue_on_timeout: false
+
+    # ACCENSIONE LUCE AMBIENTE SE FUORI È BUIO (sole sotto l'orizzonte o crepuscolo)
+    # Accesa immediatamente per garantire illuminazione perfetta allo scatto
+    - if:
+        - condition: template
+          value_template: >-
+            {{ is_state('sun.sun', 'below_horizon') or (state_attr('sun.sun', 'elevation') | float(90) < 4) }}
+      then:
+        - action: light.turn_on
+          target:
+            entity_id: light.luce_ambiente_sala
+          continue_on_error: true
+
+    # Scatto fotogramma Scale immediato all'apertura porta (pianerottolo/scale)
+    - action: camera.snapshot
+      target:
+        entity_id: camera.scale
+      data:
+        filename: /config/www/cam_snapshots/scale.jpg
+      continue_on_error: true
+
+    # PAUSA INTELLIGENTE PER L'INGRESSO NELLA VISUALE DELLA TELECAMERA SALA 2:
+    # Se la porta d'ingresso è appena stata aperta (on), attendiamo 5 secondi affinché la persona
+    # varchi la soglia, entri in sala e si trovi al centro dell'inquadratura (evitando scatti a vuoto troppo in anticipo a 2s).
+    # Se invece la porta è già chiusa, bastano 2 secondi.
+    - delay:
+        seconds: >-
+          {{ 5 if is_state('binary_sensor.porta_ingresso_contact', 'on') else 2 }}
+
+    # Scatto immediato snapshot SALA 2 congelando l'ingresso con la persona al centro dell'inquadratura
+    - action: camera.snapshot
+      target:
+        entity_id: camera.sala_2
+      data:
+        filename: /config/www/cam_snapshots/sala_2.jpg
+      continue_on_error: true
+
+    # CASO B: Se la porta è stata aperta PRIMA che lo smartphone agganciasse il Wi-Fi o il GPS,
+    # attendiamo fino a 45 secondi che almeno una persona risulti effettivamente rientrata da poco (<= 10 min).
+    # Se nessuno è rientrato da poco (es. una persona era già in casa da ore e ha aperto la porta mentre l'altro è al lavoro),
+    # il timeout interrompe l'automazione senza pronunciare alcun falso bentornato.
+    - if:
+        - condition: template
+          value_template: >-
+            {% set now_ts = now().timestamp() %}
+            {% set s_is_home = is_state('person.utente_1', 'home') or is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID') %}
+            {% set l_is_home = is_state('person.utente_2', 'home') or is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID') %}
+            {% set s_person_age = (now_ts - states.person.utente_1.last_changed.timestamp()) if (states.person.utente_1 is not none and is_state('person.utente_1', 'home')) else 999999 %}
+            {% set s_wifi_age = (now_ts - states.sensor.smartphone_utente_1_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_1_wi_fi_connection is not none and is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+            {% set s_home_age = [s_person_age, s_wifi_age] | min %}
+            {% set l_person_age = (now_ts - states.person.utente_2.last_changed.timestamp()) if (states.person.utente_2 is not none and is_state('person.utente_2', 'home')) else 999999 %}
+            {% set l_wifi_age = (now_ts - states.sensor.smartphone_utente_2_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_2_wi_fi_connection is not none and is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+            {% set l_home_age = [l_person_age, l_wifi_age] | min %}
+            {% set last_s = state_attr('input_datetime.ultimo_annuncio_rientro_utente_1', 'timestamp') %}
+            {% set s_cooldown = (now_ts - last_s) if last_s is not none else 999999 %}
+            {% set last_l = state_attr('input_datetime.ultimo_annuncio_rientro_utente_2', 'timestamp') %}
+            {% set l_cooldown = (now_ts - last_l) if last_l is not none else 999999 %}
+            {% set s_just_arrived = s_is_home and (s_home_age <= 600) and (s_cooldown >= 1500) %}
+            {% set l_just_arrived = l_is_home and (l_home_age <= 600) and (l_cooldown >= 1500) %}
+            {{ not (s_just_arrived or l_just_arrived) }}
+      then:
+        - wait_template: >-
+            {% set now_ts = now().timestamp() %}
+            {% set s_is_home = is_state('person.utente_1', 'home') or is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID') %}
+            {% set l_is_home = is_state('person.utente_2', 'home') or is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID') %}
+            {% set s_person_age = (now_ts - states.person.utente_1.last_changed.timestamp()) if (states.person.utente_1 is not none and is_state('person.utente_1', 'home')) else 999999 %}
+            {% set s_wifi_age = (now_ts - states.sensor.smartphone_utente_1_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_1_wi_fi_connection is not none and is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+            {% set s_home_age = [s_person_age, s_wifi_age] | min %}
+            {% set l_person_age = (now_ts - states.person.utente_2.last_changed.timestamp()) if (states.person.utente_2 is not none and is_state('person.utente_2', 'home')) else 999999 %}
+            {% set l_wifi_age = (now_ts - states.sensor.smartphone_utente_2_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_2_wi_fi_connection is not none and is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+            {% set l_home_age = [l_person_age, l_wifi_age] | min %}
+            {% set last_s = state_attr('input_datetime.ultimo_annuncio_rientro_utente_1', 'timestamp') %}
+            {% set s_cooldown = (now_ts - last_s) if last_s is not none else 999999 %}
+            {% set last_l = state_attr('input_datetime.ultimo_annuncio_rientro_utente_2', 'timestamp') %}
+            {% set l_cooldown = (now_ts - last_l) if last_l is not none else 999999 %}
+            {% set s_just_arrived = s_is_home and (s_home_age <= 600) and (s_cooldown >= 1500) %}
+            {% set l_just_arrived = l_is_home and (l_home_age <= 600) and (l_cooldown >= 1500) %}
+            {{ s_just_arrived or l_just_arrived }}
+          timeout: "00:00:45"
+          continue_on_timeout: false
+
+    # FINESTRA RIENTRO DI COPPIA:
+    # Attendi solo se ENTRAMBI sono appena arrivati nelle vicinanze di casa (<= 10 min)
+    # ma solo uno dei due si è già collegato al Wi-Fi (es. uno parcheggia l'auto e l'altro sale).
+    # Se l'altra persona è già in casa da tempo o è al lavoro, NON attendere inutilmente.
+    - if:
+        - condition: template
+          value_template: >-
+            {% set now_ts = now().timestamp() %}
+            {% set s_is_home = is_state('person.utente_1', 'home') or is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID') %}
+            {% set l_is_home = is_state('person.utente_2', 'home') or is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID') %}
+            {% set s_person_age = (now_ts - states.person.utente_1.last_changed.timestamp()) if (states.person.utente_1 is not none and is_state('person.utente_1', 'home')) else 999999 %}
+            {% set s_wifi_age = (now_ts - states.sensor.smartphone_utente_1_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_1_wi_fi_connection is not none and is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+            {% set s_home_age = [s_person_age, s_wifi_age] | min %}
+            {% set l_person_age = (now_ts - states.person.utente_2.last_changed.timestamp()) if (states.person.utente_2 is not none and is_state('person.utente_2', 'home')) else 999999 %}
+            {% set l_wifi_age = (now_ts - states.sensor.smartphone_utente_2_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_2_wi_fi_connection is not none and is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+            {% set l_home_age = [l_person_age, l_wifi_age] | min %}
+            {{ (s_is_home and s_home_age <= 600) and (l_is_home and l_home_age <= 600) and not (is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID') and is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID')) }}
+      then:
+        - wait_template: >-
+            {{ is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID') and is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID') }}
+          timeout: "00:00:10"
+          continue_on_timeout: true
+
+    # CALCOLO PROFILO RIENTRO (Utente 1, Utente 2 o Coppia)
+    # Solo chi è effettivamente rientrato negli ultimi 10 minuti (<= 600s) e ha superato il cooldown di 25 min viene incluso!
+    - variables:
+        profilo_rilevato: >-
+          {% set now_ts = now().timestamp() %}
+          {% set s_is_home = is_state('person.utente_1', 'home') or is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID') %}
+          {% set l_is_home = is_state('person.utente_2', 'home') or is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID') %}
+          {% set s_person_age = (now_ts - states.person.utente_1.last_changed.timestamp()) if (states.person.utente_1 is not none and is_state('person.utente_1', 'home')) else 999999 %}
+          {% set s_wifi_age = (now_ts - states.sensor.smartphone_utente_1_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_1_wi_fi_connection is not none and is_state('sensor.smartphone_utente_1_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+          {% set s_home_age = [s_person_age, s_wifi_age] | min %}
+          {% set l_person_age = (now_ts - states.person.utente_2.last_changed.timestamp()) if (states.person.utente_2 is not none and is_state('person.utente_2', 'home')) else 999999 %}
+          {% set l_wifi_age = (now_ts - states.sensor.smartphone_utente_2_wi_fi_connection.last_changed.timestamp()) if (states.sensor.smartphone_utente_2_wi_fi_connection is not none and is_state('sensor.smartphone_utente_2_wi_fi_connection', 'HOME_WIFI_SSID')) else 999999 %}
+          {% set l_home_age = [l_person_age, l_wifi_age] | min %}
+          {% set last_s = state_attr('input_datetime.ultimo_annuncio_rientro_utente_1', 'timestamp') %}
+          {% set s_cooldown = (now_ts - last_s) if last_s is not none else 999999 %}
+          {% set last_l = state_attr('input_datetime.ultimo_annuncio_rientro_utente_2', 'timestamp') %}
+          {% set l_cooldown = (now_ts - last_l) if last_l is not none else 999999 %}
+          {% set s_recent = s_is_home and (s_home_age <= 600) and (s_cooldown >= 1500) %}
+          {% set l_recent = l_is_home and (l_home_age <= 600) and (l_cooldown >= 1500) %}
+          {% if s_recent and l_recent %}
+            Coppia
+          {% elif s_recent %}
+            Utente 1
+          {% elif l_recent %}
+            Utente 2
+          {% else %}
+            none
+          {% endif %}
+
+    # AGGIORNAMENTO TIMESTAMP ULTIMO ANNUNCIO (per evitare ripetizioni scarico spesa)
+    - if:
+        - condition: template
+          value_template: "{{ profilo_rilevato in ['Utente 1', 'Coppia'] }}"
+      then:
+        - action: input_datetime.set_datetime
+          target:
+            entity_id: input_datetime.ultimo_annuncio_rientro_utente_1
+          data:
+            timestamp: "{{ now().timestamp() }}"
+          continue_on_error: true
+    - if:
+        - condition: template
+          value_template: "{{ profilo_rilevato in ['Utente 2', 'Coppia'] }}"
+      then:
+        - action: input_datetime.set_datetime
+          target:
+            entity_id: input_datetime.ultimo_annuncio_rientro_utente_2
+          data:
+            timestamp: "{{ now().timestamp() }}"
+          continue_on_error: true
+
+    # ESECUZIONE NOTIFICA INCROCIATA CON FOTO E ANNUNCIO VOCALE AI (NESSUN ANNUNCIO DOPO LE 23:00)
+    - if:
+        - condition: template
+          value_template: "{{ profilo_rilevato in ['Utente 1', 'Utente 2', 'Coppia'] }}"
+      then:
+        - action: script.annuncio_rientro_ai
+          data:
+            profilo: "{{ profilo_rilevato }}"
+            invia_notifica_foto: true
+            riproduci_voce: "{{ not (now().hour >= 23 or now().hour < 7) }}"
+
+- id: 'annuncio_accoglienza_ospite_one_shot'
+  alias: 'Presenza: Accoglienza Ospiti One-Shot (Toni Dolci)'
+  description: >-
+    Quando viene aperto il portoncino d'ingresso e il sistema è stato armato manualmente
+    per attendere un ospite speciale (Zia (Piano Superiore), Mamma, Familiare 2, Familiare 4), scatta una foto,
+    invia notifica e riproduce un annuncio di benvenuto dolcissimo e personalizzato su Nest Hub.
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.porta_ingresso_contact
+      to: 'on'
+  condition:
+    - condition: template
+      value_template: >-
+        {{ (not is_state('input_text.ospite_in_attesa', 'Nessuno') and states('input_text.ospite_in_attesa') | trim != '') or (not is_state('input_select.accoglienza_ospite_one_shot', 'Nessuno')) }}
+  action:
+    - variables:
+        ospite_raw: >-
+          {% set text_val = states('input_text.ospite_in_attesa') | trim %}
+          {% if text_val != '' and text_val != 'Nessuno' %}
+            {{ text_val }}
+          {% else %}
+            {{ states('input_select.accoglienza_ospite_one_shot') | trim }}
+          {% endif %}
+        ospite_nome: >-
+          {% set parts = ospite_raw.split() %}
+          {% if parts | length == 0 %}
+            Ospite
+          {% elif parts[0] | lower in ['zia', 'zio', 'nonna', 'nonno'] and parts | length >= 2 %}
+            {{ parts[0] ~ ' ' ~ parts[1] }}
+          {% else %}
+            {{ parts[0] }}
+          {% endif %}
+
+    # 1. Reset immediato della modalità One-Shot (consumo singolo) e cancellazione timer
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.ospite_in_attesa
+      data:
+        value: "Nessuno"
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.ospite_personalizzato_nome
+      data:
+        value: ""
+      continue_on_error: true
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.accoglienza_ospite_one_shot
+      data:
+        option: "Nessuno"
+      continue_on_error: true
+    - action: timer.cancel
+      target:
+        entity_id: timer.accoglienza_ospite_timeout
+      continue_on_error: true
+
+    # 2. Accensione luce sala/ambiente se fuori è buio o crepuscolo
+    - if:
+        - condition: template
+          value_template: >-
+            {{ is_state('sun.sun', 'below_horizon') or (state_attr('sun.sun', 'elevation') | float(90) < 4) }}
+      then:
+        - action: light.turn_on
+          target:
+            entity_id: light.luce_ambiente_sala
+          continue_on_error: true
+
+    # 3. Notifica immediata a Utente 1 e Utente 2 sullo smartphone
+    - action: script.notifica_smart
+      data:
+        titolo: "👋 Benvenuta/o a Eco Home!"
+        messaggio: "È appena entrata/o {{ ospite_nome }}! Benvenuto dolce riprodotto su Nest Hub."
+        categoria: generale
+        priorita: normale
+        canale: tutti
+        tag: accoglienza_ospite
+
+    # 4. Breve attesa per permettere all'ospite di varcare la soglia verso la sala
+    - delay:
+        seconds: 2
+
+    # 5. Esecuzione annuncio vocale dolce tramite Gemini AI
+    - action: script.annuncio_ospite_ai
+      data:
+        ospite: "{{ ospite_nome }}"
+
+- id: 'accoglienza_ospite_timeout_reset'
+  alias: 'Presenza: Timeout Attesa Ospite One-Shot'
+  description: 'Se dopo 2 ore dall''attivazione manuale la porta non viene aperta, resetta l''attesa a Nessuno.'
+  mode: restart
+  trigger:
+    - trigger: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.accoglienza_ospite_timeout
+  action:
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.ospite_in_attesa
+      data:
+        value: "Nessuno"
+      continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.ospite_personalizzato_nome
+      data:
+        value: ""
+      continue_on_error: true
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.accoglienza_ospite_one_shot
+      data:
+        option: "Nessuno"
+
+- id: 'sicurezza_auto_attiva_casa_vuota'
+  alias: 'Sicurezza: Attivazione Automatica a Casa Vuota'
+  description: 'Quando tutti escono da casa (Utente 1 e Utente 2 fuori per oltre 2 minuti), inserisce automaticamente la modalità Casa Vuota se non ci sono sospensioni attive.'
+  mode: restart
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.casa_occupata
+      to: 'off'
+      for: '00:02:00'
+  condition:
+    - condition: state
+      entity_id: input_boolean.sicurezza_auto_inserimento_uscita
+      state: 'on'
+    - condition: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      state: 'disarmed'
+    - condition: state
+      entity_id: binary_sensor.sicurezza_sospensione_attiva
+      state: 'off'
+  action:
+    - action: script.sicurezza_attiva_casa_vuota
+
+- id: 'sicurezza_auto_disattiva_rientro_casa'
+  alias: 'Sicurezza: Disattivazione Automatica al Rientro a Casa'
+  description: 'Quando Utente 1 o Utente 2 tornano a casa, disarma automaticamente il sistema di sicurezza e resetta eventuali sospensioni.'
+  mode: restart
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.casa_occupata
+      to: 'on'
+    - trigger: state
+      entity_id:
+        - person.utente_1
+        - person.utente_2
+      to: 'home'
+  condition:
+    - condition: template
+      value_template: "{{ states('alarm_control_panel.sicurezza_eco_home') in ['armed_away', 'triggered'] }}"
+  action:
+    - if:
+        - condition: state
+          entity_id: input_boolean.modalita_ospiti_cameretta
+          state: 'off'
+      then:
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.sicurezza_sospensione_manuale
+          continue_on_error: true
+    - action: timer.cancel
+      target:
+        entity_id: timer.sicurezza_sospensione
+      continue_on_error: true
+    - action: script.sicurezza_disattiva
+
+- id: 'sicurezza_fine_timer_sospensione'
+  alias: 'Sicurezza: Fine Timer Sospensione Allarme'
+  description: 'Allo scadere del timer di sospensione temporizzata per ospiti, se la casa è ancora vuota riarma automaticamente la sicurezza.'
+  mode: restart
+  trigger:
+    - trigger: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.sicurezza_sospensione
+  condition:
+    - condition: state
+      entity_id: binary_sensor.casa_occupata
+      state: 'off'
+    - condition: state
+      entity_id: input_boolean.sicurezza_sospensione_manuale
+      state: 'off'
+  action:
+    - action: script.sicurezza_attiva_casa_vuota
+
+- id: 'sicurezza_auto_attiva_notte_buonanotte'
+  alias: 'Sicurezza: Attivazione Automatica Notte alla Buonanotte'
+  description: 'Attiva la modalità Notte (allarme perimetrale esterno) solo in fascia notturna (dalle 21:30 alle 06:30) all''attivazione dello scenario notte.'
+  mode: restart
+  trigger:
+    - trigger: state
+      entity_id:
+        - scene.scenario_notte
+        - scene.buonanotte
+      not_from:
+        - unavailable
+        - unknown
+      not_to:
+        - unavailable
+        - unknown
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.from_state is defined and trigger.to_state is defined and
+           trigger.from_state.state not in ['unavailable', 'unknown'] and
+           trigger.to_state.state not in ['unavailable', 'unknown'] and
+           trigger.from_state.state != trigger.to_state.state and
+           states('alarm_control_panel.sicurezza_eco_home') != 'armed_away' and
+           (now().hour >= 22 or (now().hour == 21 and now().minute >= 30) or now().hour < 6 or (now().hour == 6 and now().minute <= 30)) }}
+  action:
+    - action: script.sicurezza_attiva_notte
+
+- id: 'sicurezza_auto_disattiva_notte_buongiorno'
+  alias: 'Sicurezza: Disattivazione Automatica Notte al Buongiorno'
+  description: 'Disarma automaticamente la modalità Notte tutte le mattine alle 07:00 (o all''orario impostato) e all''avvio degli script buongiorno, purché almeno uno tra Utente 1 e Utente 2 sia a casa.'
+  mode: restart
+  trigger:
+    - trigger: time
+      at: input_datetime.buongiorno_orario
+      id: feriale_orario
+    - trigger: time
+      at: input_datetime.sicurezza_disattivazione_weekend
+      id: weekend_orario
+    - trigger: event
+      event_type: call_service
+      event_data:
+        domain: script
+        service: buongiorno_weekend_ai
+      id: buongiorno_script_weekend
+    - trigger: event
+      event_type: call_service
+      event_data:
+        domain: script
+        service: annuncio_buongiorno_ai
+      id: buongiorno_script_feriale
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      state: 'armed_night'
+    - condition: template
+      value_template: >-
+        {{ is_state('binary_sensor.casa_occupata', 'on') or
+           is_state('binary_sensor.utente_1_a_casa', 'on') or
+           is_state('binary_sensor.utente_2_a_casa', 'on') or
+           is_state('person.utente_1', 'home') or
+           is_state('person.utente_2', 'home') }}
+    - condition: template
+      value_template: >-
+        {% if trigger.id == 'weekend_orario' %}
+          {{ now().weekday() in [5, 6] }}
+        {% elif trigger.id == 'feriale_orario' %}
+          {{ now().weekday() < 5 }}
+        {% else %}
+          true
+        {% endif %}
+  action:
+    - action: script.sicurezza_disattiva
+
+- id: 'sicurezza_monitoraggio_casa_vuota_telecamere'
+  alias: 'Sicurezza: Rilevamento Intrusione Telecamere (Casa Vuota)'
+  description: 'A casa vuota, qualsiasi movimento o persona rilevata dalle telecamere fa scattare l''allarme e notifica immediata.'
+  mode: queued
+  max: 10
+  trigger:
+    - trigger: state
+      entity_id:
+        - binary_sensor.sala_motion
+        - binary_sensor.sala_2_motion
+        - binary_sensor.camera_motion
+        - binary_sensor.cameretta_motion
+        - binary_sensor.scale_motion
+        - binary_sensor.terrazza_motion
+        - binary_sensor.terrazza_2_motion
+        - binary_sensor.terrazzo_3_motion
+        - binary_sensor.balcone_sala_motion
+        - binary_sensor.balcone_camera_motion
+        - binary_sensor.sala_person_occupancy
+        - binary_sensor.sala_2_person_occupancy
+        - binary_sensor.camera_person_occupancy
+        - binary_sensor.cameretta_person_occupancy
+        - binary_sensor.scale_person_occupancy
+        - binary_sensor.terrazza_person_occupancy
+        - binary_sensor.terrazza_2_person_occupancy
+        - binary_sensor.terrazzo_3_person_occupancy
+        - binary_sensor.balcone_sala_person_occupancy
+        - binary_sensor.balcone_camera_person_occupancy
+      from: 'off'
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      state: 'armed_away'
+    - condition: template
+      value_template: >-
+        {% if is_state('input_boolean.sicurezza_filtro_persone_antigatto', 'on') %}
+          {{ 'person_occupancy' in trigger.entity_id }}
+        {% else %}
+          true
+        {% endif %}
+  action:
+    - action: alarm_control_panel.alarm_trigger
+      target:
+        entity_id: alarm_control_panel.sicurezza_eco_home
+    - action: script.notifica_smart
+      data:
+        titolo: "🚨 Allarme Intrusione: Movimento Rilevato!"
+        messaggio: "Movimento o persona rilevata su {{ trigger.to_state.name }} mentre la casa è vuota! Verificare immediatamente le telecamere live."
+        categoria: sicurezza
+        priorita: critica
+        canale: tutti_telefoni
+        tag: allarme_intrusione_telecamere
+        azioni:
+          - action: URI
+            title: "📹 Guarda Telecamere Live"
+            uri: /eco-home/sicurezza
+            url: /eco-home/sicurezza
+
+- id: 'sicurezza_monitoraggio_casa_vuota_luci'
+  alias: 'Sicurezza: Rilevamento Luci Accese (Casa Vuota)'
+  description: 'A casa vuota, se viene accesa una qualsiasi luce (passaggio da off a on) fa scattare l''allarme e notifica immediata.'
+  mode: queued
+  max: 10
+  trigger:
+    - trigger: state
+      entity_id:
+        - light.luce_ambiente_sala
+        - light.faretto_cucina_1
+        - light.faretto_cucina_2
+        - light.faretto_cucina_3
+        - light.faretto_cucina_4
+        - light.faretto_cucina_5
+        - light.faretto_cucina_6
+        - light.luce_mensole_camino
+        - light.luce_mobiletto_camino
+        - light.luce_balcone_cameretta
+        - light.luce_bagno
+        - light.luce_specchio_bagno
+        - light.luce_cameretta
+        - light.luce_specchio_camera
+        - light.luce_balcone_cucina
+        - light.luce_corridoio
+        - light.luce_sala_2
+        - light.luce_cucina
+        - light.luce_applique
+        - light.luce_porta_terrazzo
+        - light.luce_balcone_sala
+        - light.luce_balcone_camera
+        - light.luce_bagnetto
+        - light.luce_comodino_1_camera
+        - light.luce_comodino_2_camera
+        - light.luce_specchio_bagnetto
+        - light.luce_camera
+        - light.luce_terrazzo
+        - light.luce_locale_tecnico
+        - light.cucina_forno_light
+      from: 'off'
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      state: 'armed_away'
+    - condition: template
+      value_template: "{{ trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state == 'off' and trigger.to_state.state == 'on' }}"
+  action:
+    - action: alarm_control_panel.alarm_trigger
+      target:
+        entity_id: alarm_control_panel.sicurezza_eco_home
+    - action: script.notifica_smart
+      data:
+        titolo: "🚨 Allarme Intrusione: Luce Accesa a Casa Vuota!"
+        messaggio: >-
+          È stata accesa {{ trigger.to_state.name }} mentre la casa è vuota!
+          Luci attive: {{ state_attr('sensor.numero_luci_accese', 'luci_accese') | join(', ') if state_attr('sensor.numero_luci_accese', 'luci_accese') is not none else trigger.to_state.name }}.
+        categoria: sicurezza
+        priorita: critica
+        canale: tutti_telefoni
+        tag: allarme_intrusione_luci
+        azioni:
+          - action: URI
+            title: "📹 Guarda Telecamere Live"
+            uri: /eco-home/sicurezza
+            url: /eco-home/sicurezza
+
+- id: 'sicurezza_monitoraggio_casa_vuota_infissi'
+  alias: 'Sicurezza: Rilevamento Cambio Stato Infissi (Casa Vuota)'
+  description: 'A casa vuota, se una finestra o una porta cambia stato (aperta o chiusa) rispetto a come era stata lasciata, scatta gli snapshot dalle telecamere esterna e interna associate e invia allarme immediato.'
+  mode: queued
+  max: 10
+  trigger:
+    - trigger: state
+      entity_id:
+        - binary_sensor.porta_ingresso_contact
+        - binary_sensor.porta_terrazzo_contact
+        - binary_sensor.portagiorno_notte_contact
+        - binary_sensor.portacamera_contact
+        - binary_sensor.finestra_sala_contact
+        - binary_sensor.finestra_cucina_contact
+        - binary_sensor.finestra_camera_contact
+        - binary_sensor.finestra_cameretta_contact
+        - binary_sensor.finestra_bagno_contact
+        - binary_sensor.finestra_bagnetto_contact
+      from:
+        - 'on'
+        - 'off'
+      to:
+        - 'on'
+        - 'off'
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      state: 'armed_away'
+    - condition: template
+      value_template: "{{ trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state in ['on', 'off'] and trigger.to_state.state in ['on', 'off'] and trigger.from_state.state != trigger.to_state.state }}"
+  action:
+    - variables:
+        ent: "{{ trigger.entity_id }}"
+        cam_primaria: >-
+          {% if ent == 'binary_sensor.finestra_camera_contact' %}camera.balcone_camera
+          {% elif ent == 'binary_sensor.finestra_cameretta_contact' %}camera.balcone_camera
+          {% elif ent == 'binary_sensor.finestra_bagnetto_contact' %}camera.balcone_camera
+          {% elif ent == 'binary_sensor.finestra_bagno_contact' %}camera.balcone_camera
+          {% elif ent == 'binary_sensor.finestra_sala_contact' %}camera.balcone_sala
+          {% elif ent == 'binary_sensor.finestra_cucina_contact' %}camera.balcone_sala
+          {% elif ent == 'binary_sensor.porta_terrazzo_contact' %}camera.terrazza_2
+          {% elif ent == 'binary_sensor.porta_ingresso_contact' %}camera.scale
+          {% elif ent == 'binary_sensor.portagiorno_notte_contact' %}camera.sala
+          {% elif ent == 'binary_sensor.portacamera_contact' %}camera.camera
+          {% else %}camera.sala{% endif %}
+        cam_secondaria: >-
+          {% if ent == 'binary_sensor.finestra_camera_contact' %}camera.camera
+          {% elif ent == 'binary_sensor.finestra_cameretta_contact' %}camera.cameretta
+          {% elif ent == 'binary_sensor.finestra_bagnetto_contact' %}camera.camera
+          {% elif ent == 'binary_sensor.finestra_bagno_contact' %}{{ 'camera.sala' if is_state('binary_sensor.portagiorno_notte_contact', 'on') else 'camera.camera' }}
+          {% elif ent == 'binary_sensor.finestra_sala_contact' %}camera.sala
+          {% elif ent == 'binary_sensor.finestra_cucina_contact' %}camera.sala
+          {% elif ent == 'binary_sensor.porta_terrazzo_contact' %}camera.sala_2
+          {% elif ent == 'binary_sensor.porta_ingresso_contact' %}camera.sala
+          {% elif ent == 'binary_sensor.portagiorno_notte_contact' %}camera.camera
+          {% elif ent == 'binary_sensor.portacamera_contact' %}camera.cameretta
+          {% else %}camera.sala_2{% endif %}
+        descrizione_telecamere: >-
+          {% if ent == 'binary_sensor.finestra_camera_contact' %}Esterna: Balcone Camera | Interna: Camera
+          {% elif ent == 'binary_sensor.finestra_cameretta_contact' %}Esterna: Balcone Camera | Interna: Cameretta
+          {% elif ent == 'binary_sensor.finestra_bagnetto_contact' %}Esterna: Balcone Camera | Interna: Camera
+          {% elif ent == 'binary_sensor.finestra_bagno_contact' %}Esterna: Balcone Camera | Interna: {{ 'Sala (Porta Giorno/Notte aperta)' if is_state('binary_sensor.portagiorno_notte_contact', 'on') else 'Zona Notte / Camera (Porta Giorno/Notte chiusa)' }}
+          {% elif ent == 'binary_sensor.finestra_sala_contact' %}Esterna: Balcone Sala | Interna: Sala
+          {% elif ent == 'binary_sensor.finestra_cucina_contact' %}Esterna: Balcone Sala | Interna: Sala
+          {% elif ent == 'binary_sensor.porta_terrazzo_contact' %}Lato Terrazza: Terrazza 2 | Interna: Sala e Sala 2
+          {% elif ent == 'binary_sensor.porta_ingresso_contact' %}Lato Scale: Scale | Interna: Sala
+          {% elif ent == 'binary_sensor.portagiorno_notte_contact' %}Zona Giorno: Sala | Zona Notte: Camera e Cameretta
+          {% elif ent == 'binary_sensor.portacamera_contact' %}Interna: Camera e Cameretta
+          {% else %}Telecamera Sala{% endif %}
+        snap_primaria: "/config/www/cam_snapshots/allarme_{{ cam_primaria | replace('camera.', '') }}.jpg"
+        snap_secondaria: "/config/www/cam_snapshots/allarme_{{ cam_secondaria | replace('camera.', '') }}.jpg"
+        url_snap_primaria: "/local/cam_snapshots/allarme_{{ cam_primaria | replace('camera.', '') }}.jpg"
+    - action: alarm_control_panel.alarm_trigger
+      target:
+        entity_id: alarm_control_panel.sicurezza_eco_home
+    - parallel:
+        - action: camera.snapshot
+          target:
+            entity_id: "{{ cam_primaria }}"
+          data:
+            filename: "{{ snap_primaria }}"
+          continue_on_error: true
+        - action: camera.snapshot
+          target:
+            entity_id: "{{ cam_secondaria }}"
+          data:
+            filename: "{{ snap_secondaria }}"
+          continue_on_error: true
+    - action: script.notifica_smart
+      data:
+        titolo: "🚨 Allarme Infissi: {{ trigger.to_state.name }}"
+        messaggio: >-
+          {{ trigger.to_state.name }} ha cambiato stato da {{ 'Aperto' if trigger.from_state.state == 'on' else 'Chiuso' }} a {{ 'Aperto' if trigger.to_state.state == 'on' else 'Chiuso' }}!
+          📹 Telecamere varco ({{ descrizione_telecamere }}).
+        categoria: sicurezza
+        priorita: critica
+        canale: tutti_telefoni
+        immagine: "{{ url_snap_primaria }}"
+        tag: allarme_intrusione_infissi
+        azioni:
+          - action: URI
+            title: "📹 Guarda Telecamere Live"
+            uri: /eco-home/sicurezza
+            url: /eco-home/sicurezza
+
+- id: 'sicurezza_monitoraggio_notte_telecamere_esterne'
+  alias: 'Sicurezza: Rilevamento Movimento Esterno Notturno'
+  description: 'In modalità Notte, il movimento sulle telecamere esterne o infissi perimetrali fa scattare l''annuncio vocale a volume 50% su Nest Hub Camera e notifica smartphone con snapshot.'
+  mode: queued
+  max: 10
+  trigger:
+    - trigger: state
+      entity_id:
+        - binary_sensor.terrazza_motion
+        - binary_sensor.terrazza_2_motion
+        - binary_sensor.terrazzo_3_motion
+        - binary_sensor.balcone_sala_motion
+        - binary_sensor.balcone_camera_motion
+        - binary_sensor.scale_motion
+        - binary_sensor.terrazza_person_occupancy
+        - binary_sensor.terrazza_2_person_occupancy
+        - binary_sensor.terrazzo_3_person_occupancy
+        - binary_sensor.balcone_sala_person_occupancy
+        - binary_sensor.balcone_camera_person_occupancy
+        - binary_sensor.scale_person_occupancy
+        - binary_sensor.porta_ingresso_contact
+        - binary_sensor.porta_terrazzo_contact
+        - binary_sensor.finestra_camera_contact
+        - binary_sensor.finestra_cameretta_contact
+        - binary_sensor.finestra_bagnetto_contact
+        - binary_sensor.finestra_bagno_contact
+        - binary_sensor.finestra_sala_contact
+        - binary_sensor.finestra_cucina_contact
+        - light.luce_terrazzo
+        - light.luce_porta_terrazzo
+        - light.luce_locale_tecnico
+        - binary_sensor.sensore_movimento_locale_tecnico_occupancy
+      from: 'off'
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      state: 'armed_night'
+    - condition: template
+      value_template: >-
+        {{ not (trigger.entity_id == 'binary_sensor.sensore_movimento_locale_tecnico_occupancy' and 5 <= now().hour < 12) }}
+    - condition: template
+      value_template: >-
+        {% if is_state('input_boolean.sicurezza_filtro_persone_antigatto', 'on') %}
+          {{ 'person_occupancy' in trigger.entity_id or 'contact' in trigger.entity_id or 'light.' in trigger.entity_id or 'locale_tecnico' in trigger.entity_id }}
+        {% else %}
+          true
+        {% endif %}
+  action:
+    - variables:
+        ent: "{{ trigger.entity_id }}"
+        cam_notte: >-
+          {% if 'porta_ingresso' in ent or 'scale' in ent or 'locale_tecnico' in ent %}camera.scale
+          {% elif 'porta_terrazzo' in ent or 'terrazza_2' in ent or 'luce_terrazzo' in ent or 'luce_porta_terrazzo' in ent %}camera.terrazza_2
+          {% elif 'terrazzo_3' in ent %}camera.terrazzo_3
+          {% elif 'terrazza' in ent %}camera.terrazza
+          {% elif 'balcone_sala' in ent or 'finestra_sala' in ent or 'finestra_cucina' in ent %}camera.balcone_sala
+          {% elif 'balcone_camera' in ent or 'finestra_camera' in ent or 'finestra_cameretta' in ent or 'finestra_bagno' in ent or 'finestra_bagnetto' in ent %}camera.balcone_camera
+          {% else %}camera.terrazza{% endif %}
+        info_varchi_notte: >-
+          {% if ent == 'binary_sensor.finestra_camera_contact' %}Esterna: Balcone Camera | Interna: Camera
+          {% elif ent == 'binary_sensor.finestra_cameretta_contact' %}Esterna: Balcone Camera | Interna: Cameretta
+          {% elif ent == 'binary_sensor.finestra_bagnetto_contact' %}Esterna: Balcone Camera | Interna: Camera
+          {% elif ent == 'binary_sensor.finestra_bagno_contact' %}Esterna: Balcone Camera | Interna: Sala
+          {% elif ent == 'binary_sensor.finestra_sala_contact' %}Esterna: Balcone Sala | Interna: Sala
+          {% elif ent == 'binary_sensor.finestra_cucina_contact' %}Esterna: Balcone Sala | Interna: Sala
+          {% elif ent == 'binary_sensor.porta_terrazzo_contact' %}Esterna: Terrazza 2 | Interna: Sala e Sala 2
+          {% elif ent == 'binary_sensor.porta_ingresso_contact' %}Esterna: Scale | Interna: Sala
+          {% elif 'locale_tecnico' in ent %}Esterna: Scale (Sottoscala Locale Tecnico fuori Portone Ingresso)
+          {% elif ent == 'light.luce_terrazzo' %}Esterna: Terrazza 2 (2 plafoniere terrazzo)
+          {% else %}Telecamera: {{ cam_notte | replace('camera.', '') }}{% endif %}
+        zona_notte: >-
+          {% if 'locale_tecnico' in ent %}Locale Tecnico
+          {% elif 'porta_ingresso' in ent %}Porta Ingresso
+          {% elif 'scale' in ent %}Scale
+          {% elif 'porta_terrazzo' in ent and 'luce_' not in ent %}Porta Terrazzo
+          {% elif 'finestra_camera' in ent %}Finestra Camera
+          {% elif 'finestra_cameretta' in ent %}Finestra Cameretta
+          {% elif 'finestra_bagnetto' in ent %}Finestra Bagnetto
+          {% elif 'finestra_bagno' in ent %}Finestra Bagno
+          {% elif 'finestra_sala' in ent %}Finestra Sala
+          {% elif 'finestra_cucina' in ent %}Finestra Cucina
+          {% elif 'balcone_sala' in ent %}Balcone Sala
+          {% elif 'balcone_camera' in ent %}Balcone Camera
+          {% elif 'terrazz' in ent %}Terrazza
+          {% else %}{{ trigger.to_state.name }}{% endif %}
+        snap_notte_file: "/config/www/cam_snapshots/notte_{{ cam_notte | replace('camera.', '') }}.jpg"
+        snap_notte_url: "/local/cam_snapshots/notte_{{ cam_notte | replace('camera.', '') }}.jpg"
+    - action: alarm_control_panel.alarm_trigger
+      target:
+        entity_id: alarm_control_panel.sicurezza_eco_home
+    - action: camera.snapshot
+      target:
+        entity_id: "{{ cam_notte }}"
+      data:
+        filename: "{{ snap_notte_file }}"
+      continue_on_error: true
+    - action: script.turn_on
+      target:
+        entity_id: script.sicurezza_allarme_notte_annuncio_vocale
+      data:
+        variables:
+          zona: "{{ zona_notte }}"
+          telecamera: "{{ cam_notte }}"
+          immagine: "{{ snap_notte_url }}"
+          telecamere_associate: "{{ info_varchi_notte }}"
+
+- id: 'sicurezza_notifica_cambio_stato_allarme'
+  alias: 'Sicurezza: Notifiche Push Attivazione e Disattivazione Allarme'
+  description: 'Invia notifica smartphone istantanea a Utente 1 e Utente 2 ogni volta che il sistema di sicurezza viene armato o disarmato.'
+  mode: restart
+  trigger:
+    - trigger: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.from_state is not none and trigger.to_state is not none and
+           trigger.from_state.state not in ['unavailable', 'unknown'] and
+           trigger.from_state.state != trigger.to_state.state }}
+    - condition: template
+      value_template: >-
+        {{ trigger.to_state.state in ['armed_away', 'armed_night', 'disarmed'] }}
+    - condition: state
+      entity_id: input_boolean.notifiche_sicurezza
+      state: 'on'
+  action:
+    - choose:
+        # 1. ATTIVAZIONE CASA VUOTA
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.to_state.state == 'armed_away' and trigger.from_state.state != 'triggered' }}"
+          sequence:
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.sicurezza_snapshot_infissi
+              data:
+                value: >-
+                  {% set aperti = state_attr('binary_sensor.sicurezza_infissi_aperti', 'elenco_aperti') %}
+                  {{ (aperti | join(', ')) if aperti and aperti | length > 0 else 'Tutti Chiusi' }}
+              continue_on_error: true
+            - action: script.notifica_smart
+              data:
+                titolo: "🛡️ Allarme Attivato (Casa Vuota)"
+                messaggio: >-
+                  Sistema di sicurezza Eco Home armato. Monitoraggio volumetrico, telecamere e perimetro attivi.
+                  {% set aperti = state_attr('binary_sensor.sicurezza_infissi_aperti', 'elenco_aperti') %}
+                  {% if aperti and aperti | length > 0 %}
+                  ⚠️ Infissi lasciati aperti: {{ aperti | join(', ') }}.
+                  {% else %}
+                  Tutti gli infissi risultano chiusi.
+                  {% endif %}
+                categoria: sicurezza
+                priorita: alta
+                canale: tutti_telefoni
+                tag: sicurezza_stato
+                azioni:
+                  - action: URI
+                    title: "📹 Guarda Telecamere Live"
+                    uri: /eco-home/sicurezza
+                    url: /eco-home/sicurezza
+
+        # 2. ATTIVAZIONE NOTTURNA
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.to_state.state == 'armed_night' and trigger.from_state.state != 'triggered' }}"
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: "🌙 Allarme Notturno Attivato"
+                messaggio: "Modalità Notte inserita: monitoraggio perimetrale esterno attivo (terrazze, balconi, scale e luci perimetrali). Buon riposo!"
+                categoria: sicurezza
+                priorita: bassa
+                canale: tutti_telefoni
+                tag: sicurezza_stato
+                azioni:
+                  - action: URI
+                    title: "📹 Guarda Telecamere Live"
+                    uri: /eco-home/sicurezza
+                    url: /eco-home/sicurezza
+
+        # 3. DISATTIVAZIONE DA MODALITÀ NOTTE (Mattina / Buongiorno)
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.to_state.state == 'disarmed' and trigger.from_state.state == 'armed_night' }}"
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: "☀️ Modalità Notte Disattivata"
+                messaggio: "Protezione perimetrale notturna disattivata. Buona giornata!"
+                categoria: sicurezza
+                priorita: normale
+                canale: tutti_telefoni
+                tag: sicurezza_stato
+
+        # 4. DISATTIVAZIONE DA TRIGGERED (Tacitazione Allarme)
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.to_state.state == 'disarmed' and trigger.from_state.state == 'triggered' }}"
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: "✅ Allarme Tacitato e Disarmato"
+                messaggio: "Lo stato di allarme intrusione è stato tacitato e il sistema è ora disarmato."
+                categoria: sicurezza
+                priorita: alta
+                canale: tutti_telefoni
+                tag: sicurezza_stato
+
+        # 5. DISATTIVAZIONE DA CASA VUOTA (Rientro a Casa o Disarmo Manuale)
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.to_state.state == 'disarmed' and not is_state('binary_sensor.sicurezza_sospensione_attiva', 'on') }}"
+          sequence:
+            - if:
+                - condition: state
+                  entity_id: input_boolean.sicurezza_dissuasione_in_corso
+                  state: 'on'
+              then:
+                - action: script.sicurezza_ripristina_stato_pre_dissuasione
+                  continue_on_error: true
+            - action: script.notifica_smart
+              data:
+                titolo: "🔓 Allarme Disattivato"
+                messaggio: "Il sistema di sicurezza Eco Home è stato disarmato. Bentornati a casa!"
+                categoria: sicurezza
+                priorita: normale
+                canale: tutti_telefoni
+                tag: sicurezza_stato
+
+- id: 'sicurezza_dissuasione_notturna_intrusione'
+  alias: 'Sicurezza: Dissuasione Visiva Notturna a Casa Vuota (Luci & Tapparelle)'
+  description: 'Quando non ci siamo ed è buio, se scatta l allarme accende a random le luci e se il pluviometro non rileva pioggia alza a random le tapparelle per 5 minuti, poi torna allo stato precedente.'
+  mode: restart
+  trigger:
+    - trigger: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      to: 'triggered'
+  condition:
+    # 1. Quando non ci siamo (casa vuota)
+    - condition: state
+      entity_id: binary_sensor.casa_occupata
+      state: 'off'
+    # 2. Ed è buio (sole sotto l'orizzonte)
+    - condition: state
+      entity_id: sun.sun
+      state: 'below_horizon'
+    # 3. Funzione abilitata
+    - condition: state
+      entity_id: input_boolean.sicurezza_dissuasione_luci_tapparelle_attiva
+      state: 'on'
+  action:
+    - action: script.sicurezza_dissuasione_notturna_allarme
+
+- id: 'sicurezza_azioni_notifiche_smartphone'
+  alias: 'Sicurezza: Gestione Azioni Notifiche Smartphone'
+  description: 'Esegue i comandi inviati dai pulsanti interattivi delle notifiche push (Riarma, Disarma, Attiva Casa Vuota, Tacita).'
+  mode: queued
+  max: 10
+  trigger:
+    - trigger: event
+      event_type: mobile_app_notification_action
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.event.data.action in ['RIARMA_SICUREZZA', 'DISARMA_SICUREZZA', 'ATTIVA_CASA_VUOTA', 'TACITA_ALLARME'] }}
+  action:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.action == 'RIARMA_SICUREZZA' }}"
+          sequence:
+            - action: script.sicurezza_ripristina_protezione
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.action == 'DISARMA_SICUREZZA' }}"
+          sequence:
+            - action: script.sicurezza_disattiva
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.action == 'ATTIVA_CASA_VUOTA' }}"
+          sequence:
+            - action: script.sicurezza_attiva_casa_vuota
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.action == 'TACITA_ALLARME' }}"
+          sequence:
+            - action: alarm_control_panel.alarm_disarm
+              target:
+                entity_id: alarm_control_panel.sicurezza_eco_home
+
+- id: 'notifica_utente_1_utente_2_arrivata_luogo_conosciuto'
+  alias: "Posizione: Utente 2 Arrivata in un Luogo Conosciuto (Solo Utente 1)"
+  description: "Invia una notifica push mirata solo allo smartphone di Utente 1 quando Utente 2 arriva in un luogo conosciuto/zona censita (escluso Casa). Include antirimbalzo e deduplicazione per evitare notifiche multiple."
+  mode: single
+  max_exceeded: silent
+  triggers:
+    - trigger: state
+      entity_id: person.utente_2
+      not_from:
+        - unknown
+        - unavailable
+      for:
+        seconds: 45
+  conditions:
+    - condition: template
+      value_template: >-
+        {% set dest = trigger.to_state.state %}
+        {% set known_zones = states.zone | rejectattr('entity_id', 'eq', 'zone.home') | map(attribute='name') | list %}
+        {% set last_zone = states('input_text.utente_2_ultima_zona_notificata') %}
+        {% set last_ts = state_attr('input_datetime.laura_ultimo_orario_zona_notificata', 'timestamp') | default(0, true) %}
+        {% set cooldown_ok = (now().timestamp() - (last_ts | float(0))) > 14400 %}
+        {{ dest != 'home' and dest != 'not_home' and dest in known_zones and (dest != last_zone or cooldown_ok) }}
+  actions:
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.utente_2_ultima_zona_notificata
+      data:
+        value: "{{ trigger.to_state.state }}"
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.laura_ultimo_orario_zona_notificata
+      data:
+        timestamp: "{{ now().timestamp() }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "📍 Utente 2 è arrivata a {{ trigger.to_state.state }}"
+        messaggio: "Utente 2 è appena arrivata presso {{ trigger.to_state.state }} ({{ now().strftime('%H:%M') }})."
+        canale: "utente_1"
+        priorita: "normale"
+        categoria: "sicurezza"
+        tag: "posizione_laura_arrivo"
+        azioni:
+          - action: "URI"
+            title: "🗺️ Vedi Spostamenti"
+            uri: "/eco-home/spostamenti"
+
+- id: 'reset_utente_2_ultima_zona_al_rientro'
+  alias: "Posizione: Reset Ultima Zona Notificata Utente 2 al Rientro a Casa"
+  description: "Reimposta l'ultima zona notificata a Casa quando Utente 2 rientra, garantendo la notifica immediata alla prossima uscita."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: person.utente_2
+      to: 'home'
+  actions:
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.utente_2_ultima_zona_notificata
+      data:
+        value: "Casa"
+
+- id: 'ptz_terrazzo_3_ritorno_home_inattivita'
+  alias: 'PTZ Terrazzo 3: Ritorno Automatico a Home dopo Inattività'
+  description: 'Se la telecamera motorizzata è stata spostata su un preset diverso da Home, dopo 3 minuti di inattività viene riposizionata automaticamente sulla posizione di guardia Home'
+  mode: restart
+  trigger:
+    - trigger: event
+      event_type: timer.finished
+      event_data:
+        entity_id: timer.ptz_terrazzo_3_inattivita
+    - trigger: state
+      entity_id: input_select.ptz_terrazzo_3_preset
+      for:
+        minutes: 3
+  condition:
+    - condition: state
+      entity_id: input_boolean.ptz_terrazzo_3_ritorno_home_automatico
+      state: 'on'
+    - condition: template
+      value_template: "{{ states('input_select.ptz_terrazzo_3_preset') != 'Home (Guardia Centro)' }}"
+  action:
+    - action: script.ptz_terrazzo_3_home
+
+- id: 'ptz_terrazzo_3_allineamento_allarme_notte'
+  alias: 'PTZ Terrazzo 3: Allineamento Guardia ad Attivazione Allarme'
+  description: 'Riporta immediatamente la telecamera PTZ sulla posizione predefinita di guardia (Home) ogni volta che viene inserito l allarme notturno o fuori casa'
+  mode: restart
+  trigger:
+    - trigger: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      to:
+        - 'armed_night'
+        - 'armed_away'
+  condition:
+    - condition: template
+      value_template: "{{ states('input_select.ptz_terrazzo_3_preset') != 'Home (Guardia Centro)' }}"
+  action:
+    - action: script.ptz_terrazzo_3_home
+
+- id: sicurezza_notifica_tentativi_accesso_falliti_e_ip_ban
+  alias: "Sicurezza — Notifica Push Allarme Tentativi di Accesso e IP Bannati"
+  description: "Invia immediatamente una notifica push interattiva con tasto di blocco all'app Home Assistant su smartphone quando viene rilevato un tentativo di login non autorizzato o quando un IP viene bannato."
+  triggers:
+    - trigger: persistent_notification
+      update_type:
+        - added
+        - updated
+      notification_id: http_login
+      id: http_login
+    - trigger: persistent_notification
+      update_type:
+        - added
+        - updated
+      notification_id: ip_ban
+      id: ip_ban
+  conditions: []
+  actions:
+    - variables:
+        notif_msg: "{{ trigger.notification.message if (trigger.notification is defined and trigger.notification.message is defined) else 'Tentativo di accesso non autorizzato rilevato.' }}"
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: ip_ban
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "⛔ ALLARME SICUREZZA: IP Bannato!"
+                message: "{{ notif_msg }}"
+                data:
+                  channel: "Sicurezza"
+                  importance: "high"
+                  priority: "high"
+                  ttl: 0
+                  color: "#E53935"
+                  notification_icon: "mdi:shield-lock"
+                  tag: "security_alert"
+                  clickAction: "/config/users"
+        - conditions:
+            - condition: trigger
+              id: http_login
+          sequence:
+            - variables:
+                extracted_ip: >-
+                  {{ (notif_msg | regex_findall('\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b') | first) | default('', true) }}
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.ultimo_ip_sospetto
+              data:
+                value: "{{ extracted_ip }}"
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "🚨 ALLARME: Tentativo di Accesso Fallito!"
+                message: >-
+                  {% if extracted_ip != '' %}
+                    Rilevato tentativo non autorizzato dall'IP {{ extracted_ip }}. Vuoi bannarlo immediatamente?
+                  {% else %}
+                    {{ notif_msg }}
+                  {% endif %}
+                data:
+                  channel: "Sicurezza"
+                  importance: "high"
+                  priority: "high"
+                  ttl: 0
+                  color: "#E53935"
+                  notification_icon: "mdi:shield-alert"
+                  tag: "security_alert"
+                  clickAction: "/config/users"
+                  actions:
+                    - action: "BAN_IP_IMMEDIATO"
+                      title: "⛔ BANNA IP SUBITO"
+                      destructive: true
+                    - action: "DISMISS_ALERT"
+                      title: "Ignora"
+  mode: queued
+  max: 10
+
+- id: sicurezza_conferma_ban_ip_da_notifica
+  alias: "Sicurezza — Esecuzione Ban Immediato IP da Notifica Push"
+  description: "Esegue il ban immediato dell'IP sospetto quando l'utente tocca 'BANNA IP SUBITO' sulla notifica push."
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: "BAN_IP_IMMEDIATO"
+  conditions:
+    - condition: template
+      value_template: "{{ states('input_text.ultimo_ip_sospetto') != '' }}"
+  actions:
+    - variables:
+        target_ip: "{{ states('input_text.ultimo_ip_sospetto') }}"
+    - action: shell_command.banna_ip
+      data:
+        ip: "{{ target_ip }}"
+    - action: persistent_notification.dismiss
+      data:
+        notification_id: "http_login"
+    - action: notify.mobile_app_smartphone_utente_1
+      data:
+        title: "🛡️ IP Neutralizzato"
+        message: "L'indirizzo IP {{ target_ip }} è stato aggiunto alla blacklist permanente."
+        data:
+          channel: "Sicurezza"
+          notification_icon: "mdi:shield-check"
+          tag: "security_alert"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.ultimo_ip_sospetto
+      data:
+        value: ""
+  mode: single
+
+- id: sicurezza_ignora_notifica_accesso
+  alias: "Sicurezza — Ignora Notifica Accesso Fallito"
+  description: "Chiude l'allarme e pulisce lo stato quando l'utente tocca 'Ignora' sulla notifica push."
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: "DISMISS_ALERT"
+  actions:
+    - action: persistent_notification.dismiss
+      data:
+        notification_id: "http_login"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.ultimo_ip_sospetto
+      data:
+        value: ""
+  mode: single
+
+- id: 'sicurezza_visita_familiari_casa_vuota'
+  alias: "🐾 Casa Vuota: Accoglienza e Notifica Visita Mamma / Familiare 2 o Ospiti"
+  description: "Quando Utente 1 e Utente 2 sono fuori casa e la Sospensione Allarme Ospiti è attiva, all'apertura della porta d'ingresso scatta uno snapshot da Telecamera Scale, rassicura Utente 1 e Utente 2 su smartphone e accoglie con dolcezza Mamma, Familiare 2 o gli ospiti."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.porta_ingresso_contact
+      from: 'off'
+      to: 'on'
+  conditions:
+    - condition: state
+      entity_id: binary_sensor.casa_occupata
+      state: 'off'
+    - condition: state
+      entity_id: binary_sensor.sicurezza_sospensione_attiva
+      state: 'on'
+  actions:
+    - action: camera.snapshot
+      target:
+        entity_id: camera.scale
+      data:
+        filename: "/config/www/cam_snapshots/visita_familiare_scale.jpg"
+      continue_on_error: true
+    - variables:
+        ospiti_pernottamento: "{{ is_state('input_boolean.modalita_ospiti_cameretta', 'on') }}"
+        ospite_selezionato: "{{ states('input_text.ospite_in_attesa') }}"
+        nome_visitatore: >-
+          {% if ospiti_pernottamento %}
+            Gruppo Ospiti Famiglia (Ospiti Cameretta)
+          {% elif ospite_selezionato not in ['Nessuno', 'unknown', 'unavailable', ''] %}
+            {{ ospite_selezionato }}
+          {% else %}
+            Mamma / Familiare 2
+          {% endif %}
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ ospiti_pernottamento }}"
+          sequence:
+            - action: script.notifica_smart
+              data:
+                titolo: "🏠 Movimento Porta Ingresso (Gruppo Ospiti Famiglia)"
+                messaggio: >-
+                  Porta d'ingresso aperta mentre siete fuori con Modalità Ospiti Pernottamento attiva (Gruppo Ospiti Famiglia). Gatto 1: {{ 'In Casa' if is_state('binary_sensor.gatto_1', 'on') else 'Fuori' }} | Gatto 2: {{ 'In Casa' if is_state('binary_sensor.gatto_2', 'on') else 'Fuori' }}.
+                priorita: "normale"
+                categoria: "sicurezza"
+                immagine: "/local/cam_snapshots/visita_familiare_scale.jpg?t={{ now().timestamp() | int }}"
+                tag: "visita_familiare_casa_vuota"
+      default:
+        - action: script.notifica_smart
+          data:
+            titolo: "🐾 Visita Familiare a Casa ({{ nome_visitatore }})"
+            messaggio: >-
+              Porta d'ingresso aperta con Sospensione Allarme attiva mentre siete fuori: {{ nome_visitatore }} è appena entrato/a per dare un'occhiata a casa, a Gatto 1 ({{ 'In Casa' if is_state('binary_sensor.gatto_1', 'on') else 'Fuori' }}), a Gatto 2 ({{ 'In Casa' if is_state('binary_sensor.gatto_2', 'on') else 'Fuori' }}) e ai 16 pesciolini dell'acquario!
+            priorita: "alta"
+            categoria: "sicurezza"
+            immagine: "/local/cam_snapshots/visita_familiare_scale.jpg?t={{ now().timestamp() | int }}"
+            tag: "visita_familiare_casa_vuota"
+        - if:
+            - condition: template
+              value_template: "{{ ospite_selezionato in ['Nessuno', 'unknown', 'unavailable', ''] }}"
+          then:
+            - delay:
+                seconds: 4
+            - action: script.annuncio_ospite_ai
+              data:
+                ospite: "Mamma"
+              continue_on_error: true
+
+- id: 'ospiti_sincronizza_modalita_pernottamento_cameretta'
+  alias: "🛏️ Ospiti: Sincronizza Modalità Pernottamento Cameretta (Privacy, Allarme & Dobby)"
+  description: "Quando viene attivato o disattivato input_boolean.modalita_ospiti_cameretta, allinea automaticamente la sospensione allarme, i sensori motion/AI di camera.cameretta per la privacy degli ospiti e invia conferma."
+  mode: restart
+  triggers:
+    - trigger: state
+      entity_id: input_boolean.modalita_ospiti_cameretta
+      from: 'off'
+      to: 'on'
+      id: attivata
+    - trigger: state
+      entity_id: input_boolean.modalita_ospiti_cameretta
+      from: 'on'
+      to: 'off'
+      id: disattivata
+  conditions: []
+  actions:
+    - choose:
+        - conditions:
+            - condition: trigger
+              id: attivata
+          sequence:
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.sicurezza_sospensione_manuale
+              continue_on_error: true
+            - action: switch.turn_off
+              target:
+                entity_id:
+                  - switch.cameretta_detect
+                  - switch.cameretta_motion
+                  - switch.cameretta_recordings
+                  - switch.cameretta_snapshots
+              continue_on_error: true
+            - if:
+                - condition: template
+                  value_template: "{{ states('alarm_control_panel.sicurezza_eco_home') in ['armed_away', 'triggered'] }}"
+              then:
+                - action: script.sicurezza_disattiva
+                  continue_on_error: true
+        - conditions:
+            - condition: trigger
+              id: disattivata
+          sequence:
+            - action: input_boolean.turn_off
+              target:
+                entity_id:
+                  - input_boolean.sicurezza_sospensione_manuale
+                  - input_boolean.sveglia_cameretta_attiva
+              continue_on_error: true
+            - action: switch.turn_on
+              target:
+                entity_id:
+                  - switch.cameretta_detect
+                  - switch.cameretta_motion
+              continue_on_error: true
+

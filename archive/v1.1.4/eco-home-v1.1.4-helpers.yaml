@@ -38,8 +38,8 @@ input_select:
     icon: mdi:test-tube
     options:
       - Percorso audio
-      - Rientro Stefano
-      - Rientro Laura
+      - Rientro Utente 1
+      - Rientro Utente 2
       - Rientro di coppia
       - Modalità notte
       - Promemoria asciugatrice

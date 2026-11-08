@@ -48,10 +48,10 @@ cards:
     title: Persone e dispositivi
     show_header_toggle: false
     entities:
-      - entity: person.stefano
-        name: Stefano
-      - entity: person.laura
-        name: Laura
+      - entity: person.utente_1
+        name: Utente 1
+      - entity: person.utente_2
+        name: Utente 2
       - entity: binary_sensor.porta_contact
         name: Portone
         icon: mdi:door

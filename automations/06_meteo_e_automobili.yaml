@@ -1,670 +1,452 @@
 # ==============================================================================
-# METEO AMBIENTALE NETATMO & MANUTENZIONE VEICOLI — CASA MANCINI
-# ==============================================================================
-# Pluviometro ed anemometro Netatmo, protezione infissi da pioggia/vento, allerte gelo, terremoti INGV e promemoria manutenzione auto Discovery e Punto.
-# Automazioni incluse in questo modulo: 19
+# 06 — METEO NETATMO, ALLERTE PROTEZIONE CIVILE DPC & TRAFFICO PENDOLARI
 # ==============================================================================
 
-- id: eco_home_meteo_vento_pioggia_terrazza
-  alias: Eco Home - Allerta Vento Forte e Pioggia (Netatmo Terrazza)
-  description: Annuncio vocale sarcastico quando scattano pioggia o vento forte in terrazza di giorno
-  triggers:
-    - trigger: numeric_state
-      entity_id: sensor.sala_anemometro_gust_strength
-      above: 15
-      id: vento_forte
+- id: 'meteo_tracciamento_pioggia_notturna'
+  alias: 'Meteo: Monitoraggio Pioggia Notturna per Buongiorno'
+  description: >-
+    Registra se piove durante la notte (dalle 23:00 alle 07:00) tramite pluviometro e sensori pioggia,
+    conservando lo storico per l'annuncio del mattino (feriale e weekend fino alle 12:00).
+  mode: single
+  trigger:
+    - trigger: time
+      at: '23:00:00'
+      id: reset_sera
+    - trigger: state
+      entity_id: binary_sensor.meteo_piove_ora
+      to: 'on'
+      id: pioggia_rilevata
     - trigger: numeric_state
       entity_id: sensor.terrazza_pulvirometro_precipitazione
-      above: 0.01
-      id: inizio_pioggia
-  conditions:
-    - condition: template
-      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
-    - condition: template
-      value_template: '{{ is_state(''input_boolean.eco_home_attivo'', ''on'') or is_state(''input_boolean.eco_home_attivo'',
-        ''on'') or states(''input_boolean.eco_home_attivo'') in [''unknown'', ''unavailable''] }}'
-    - condition: template
-      value_template: '{{ not is_state(''input_boolean.eco_home_silenzioso'', ''on'') and not is_state(''input_boolean.eco_home_silenzioso'',
-        ''on'') }}'
-    - condition: template
-      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
-        > 3600 }}'
-  actions:
+      above: 0.05
+      id: pioggia_pluviometro
+    - trigger: numeric_state
+      entity_id: sensor.meteo_pioggia_attuale_effettiva
+      above: 0.05
+      id: pioggia_effettiva
+    - trigger: numeric_state
+      entity_id: sensor.sala_pulvirometro_precipitazioni_ultima_ora
+      above: 0.05
+      id: pioggia_ultima_ora
+    - trigger: state
+      entity_id: sensor.terrazza_pulvirometro_precipitazioni_oggi
+      id: pioggia_accumulo_oggi
+    - trigger: homeassistant
+      event: start
+      id: ha_start
+    - trigger: time
+      at: '12:00:00'
+      id: reset_mattina
+  action:
     - choose:
         - conditions:
             - condition: template
-              value_template: '{{ trigger.id == ''vento_forte'' }}'
+              value_template: "{{ trigger.id == 'reset_mattina' }}"
           sequence:
-            - action: tts.speak
+            - action: input_boolean.turn_off
               target:
-                entity_id: tts.google_translate_it_lt
-              data:
-                media_player_entity_id: media_player.nest_hub_sala
-                language: it
-                options:
-                  tld: it
-                message: "{{ [\n  \"Attenzione! Vento sopra i quindici chilometri orari in terrazza: occhio a stendini e tende!\"\
-                  ,\n  \"Allarme raffiche in terrazza! Ritirate gli oggetti leggeri prima che volino in paese!\",\n  \"Vento\
-                  \ forte in terrazza! Controllate stendini e piante all'esterno!\"\n] | random }}"
+                entity_id: input_boolean.meteo_pioggia_notturna_rilevata
         - conditions:
             - condition: template
-              value_template: '{{ trigger.id == ''inizio_pioggia'' }}'
+              value_template: "{{ trigger.id == 'reset_sera' }}"
           sequence:
-            - variables:
-                finestre_aperte: '{% set ns = namespace(doors=[]) %} {% if is_state(''binary_sensor.finestrasala_contact'',
-                  ''on'') %}{% set ns.doors = ns.doors + [''Sala''] %}{% endif %} {% if is_state(''binary_sensor.finestracamera_contact'',
-                  ''on'') %}{% set ns.doors = ns.doors + [''Camera''] %}{% endif %} {% if is_state(''binary_sensor.finestracameretta_contact'',
-                  ''on'') %}{% set ns.doors = ns.doors + [''Cameretta''] %}{% endif %} {% if is_state(''binary_sensor.finestrabagno_contact'',
-                  ''on'') %}{% set ns.doors = ns.doors + [''Bagno''] %}{% endif %} {% if is_state(''binary_sensor.finestrabagnetto_contact'',
-                  ''on'') %}{% set ns.doors = ns.doors + [''Bagnetto''] %}{% endif %} {% if is_state(''binary_sensor.finestracucina_contact'',
-                  ''on'') %}{% set ns.doors = ns.doors + [''Cucina''] %}{% endif %} {% if is_state(''binary_sensor.portaterrazzo_contact'',
-                  ''on'') %}{% set ns.doors = ns.doors + [''Porta Terrazzo''] %}{% endif %} {{ ns.doors }}'
-            - action: tts.speak
+            - if:
+                - condition: template
+                  value_template: >-
+                    {{ is_state('binary_sensor.meteo_piove_ora', 'on') or
+                       (states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.05) or
+                       (states('sensor.sala_pulvirometro_precipitazioni_ultima_ora') | float(0) > 0.05) }}
+              then:
+                - action: input_boolean.turn_on
+                  target:
+                    entity_id: input_boolean.meteo_pioggia_notturna_rilevata
+              else:
+                - action: input_boolean.turn_off
+                  target:
+                    entity_id: input_boolean.meteo_pioggia_notturna_rilevata
+        - conditions:
+            - condition: template
+              value_template: >-
+                {{ (trigger.id in ['pioggia_rilevata', 'pioggia_pluviometro', 'pioggia_effettiva', 'pioggia_ultima_ora'] and (now().hour >= 23 or now().hour < 7)) or
+                   (trigger.id in ['pioggia_accumulo_oggi', 'ha_start'] and now().hour < 9 and (states('sensor.terrazza_pulvirometro_precipitazioni_oggi') | float(0) > 0.1 or states('sensor.sala_pulvirometro_precipitazioni_ultima_ora') | float(0) > 0.05)) }}
+          sequence:
+            - action: input_boolean.turn_on
               target:
-                entity_id: tts.google_translate_it_lt
-              data:
-                media_player_entity_id: media_player.nest_hub_sala
-                language: it
-                options:
-                  tld: it
-                message: "{% if finestre_aperte | length > 0 %}\n  Allarme pioggia in terrazza! Attenzione, ci sono finestre\
-                  \ aperte in: {{ finestre_aperte | join(', ') }}. Chiudetele subito per evitare infiltrazioni!\n{% else %}\n\
-                  \  Attenzione, pioggia rilevata dal pluviometro! Tutte le finestre sono chiuse, ritirate solo il bucato\
-                  \ steso se presente!\n{% endif %}"
-    - action: input_text.set_value
+                entity_id: input_boolean.meteo_pioggia_notturna_rilevata
+
+- id: 'traffico_utente_2_aggiornamento_0720_camera'
+  alias: 'Traffico: Aggiornamento Ore 07:20 Nest Hub Camera (Utente 2)'
+  description: >-
+    Se e solo se al buongiorno feriale è stato segnalato traffico per il lavoro di Utente 2,
+    alle 07:20 fornisce un aggiornamento vocale su Nest Hub Camera (evitando l'autostrada).
+  mode: single
+  trigger:
+    - trigger: time
+      at: '07:20:00'
+  condition:
+    - condition: template
+      value_template: "{{ now().weekday() in [0, 1, 2, 3, 4] }}"
+    - condition: state
+      entity_id: input_boolean.buongiorno_traffico_segnalato
+      state: 'on'
+    - condition: state
+      entity_id: binary_sensor.utente_2_a_casa
+      state: 'on'
+  action:
+    - action: script.aggiornamento_traffico_utente_2_camera
+
+- id: 'traffico_utente_2_aggiornamento_0740_sala'
+  alias: 'Traffico: Aggiornamento Ore 07:40 Nest Hub Sala (Utente 2)'
+  description: >-
+    Se e solo se al buongiorno feriale è stato segnalato traffico per il lavoro di Utente 2,
+    alle 07:40 fornisce l'aggiornamento vocale su Nest Hub Sala prima di uscire (evitando l'autostrada).
+  mode: single
+  trigger:
+    - trigger: time
+      at: '07:40:00'
+  condition:
+    - condition: template
+      value_template: "{{ now().weekday() in [0, 1, 2, 3, 4] }}"
+    - condition: state
+      entity_id: input_boolean.buongiorno_traffico_segnalato
+      state: 'on'
+    - condition: state
+      entity_id: binary_sensor.utente_2_a_casa
+      state: 'on'
+  action:
+    - action: script.aggiornamento_traffico_utente_2_sala
+
+- id: 'traffico_utente_2_reset_giornaliero'
+  alias: 'Traffico: Reset Flag Segnalazione Giornaliera'
+  description: 'Azzera il flag buongiorno_traffico_segnalato ogni mattina alle 08:30 e a mezzanotte.'
+  mode: single
+  trigger:
+    - trigger: time
+      at: '08:30:00'
+    - trigger: time
+      at: '00:00:00'
+  action:
+    - action: input_boolean.turn_off
       target:
-        entity_id: input_text.eco_home_ultimo_messaggio
-      data:
-        value: 'Meteo Alert: Vento/Pioggia in terrazza'
+        entity_id: input_boolean.buongiorno_traffico_segnalato
       continue_on_error: true
-  mode: single
-- id: eco_home_salva_bucato_terrazza_vento_pioggia
-  alias: Eco Home - Salva-Bucato in Terrazza (Vento Forte & Pioggia con Asciugatrice Pronta)
-  description: Avviso vocale tempestivo se l asciugatrice ha finito e in terrazza scatta pioggia o vento forte prima che i
-    panni volino via
-  triggers:
-    - trigger: numeric_state
-      entity_id: sensor.sala_anemometro_gust_strength
-      above: 25
-    - trigger: numeric_state
-      entity_id: sensor.terrazza_pulvirometro_precipitazione
-      above: 0.01
-    - trigger: state
-      entity_id: weather.casa
-      to:
-        - rainy
-        - pouring
-        - lightning
-        - hail
-  conditions:
-    - condition: template
-      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
-    - condition: state
-      entity_id: input_boolean.eco_home_attivo
-      state: 'on'
-    - condition: state
-      entity_id: input_boolean.eco_home_silenzioso
-      state: 'off'
-    - condition: template
-      value_template: '{{ is_state(''input_boolean.eco_home_asciugatrice_da_annunciare'', ''on'') or states(''sensor.esterno_asciugatrice_machine_state'')
-        in [''complete'', ''completed'', ''finish'', ''finished'', ''end'', ''ended''] }}'
-    - condition: template
-      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
-    - condition: template
-      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
-        > 3600 }}'
-  actions:
-    - action: tts.speak
-      target:
-        entity_id: tts.google_translate_it_lt
-      data:
-        media_player_entity_id: media_player.nest_hub_sala
-        language: it
-        options:
-          tld: it
-        message: "{{ [\n  \"Allarme bucato in terrazza! Asciugatrice terminata e vento forte: ritirate i panni prima che decollino!\"\
-          ,\n  \"Attenzione bucato! Prime gocce di pioggia in terrazza con asciugatrice terminata: salvate i vestiti!\",\n\
-          \  \"Allerta meteo terrazza: raffiche di vento con bucato fuori, andate a scaricare l'asciugatrice!\"\n] | random\
-          \ }}"
-    - action: input_text.set_value
-      target:
-        entity_id: input_text.eco_home_ultimo_messaggio
-      data:
-        value: 'Asciugatrice Alert: Vento/Pioggia con bucato in terrazza'
-  mode: single
-- id: eco_home_allerta_raffiche_vento_porte_sbattute
-  alias: Eco Home - Allerta Raffiche Vento Forte & Porte Sbattute (> 30 km/h)
-  description: Avviso vocale su Nest Hub se l anemometro in terrazza rileva raffiche sopra 30 km/h per prevenire colpi d aria
-  triggers:
-    - trigger: numeric_state
-      entity_id: sensor.sala_anemometro_gust_strength
-      above: 30
-  conditions:
-    - condition: template
-      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
-    - condition: state
-      entity_id: input_boolean.eco_home_attivo
-      state: 'on'
-    - condition: state
-      entity_id: input_boolean.eco_home_silenzioso
-      state: 'off'
-    - condition: template
-      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
-    - condition: template
-      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
-        > 7200 }}'
-  actions:
-    - action: tts.speak
-      target:
-        entity_id: tts.google_translate_it_lt
-      data:
-        media_player_entity_id: media_player.nest_hub_sala
-        language: it
-        options:
-          tld: it
-        message: "{{ [\n  \"Attenzione: raffiche di vento sopra i trenta chilometri orari in terrazza! Occhio alle porte che\
-          \ sbattono!\",\n  \"Allerta vento in paese! Raffiche sostenute: controllate porte e finestre per evitare correnti\
-          \ d'aria!\",\n  \"Vento forte in terrazza! Verificate le aperture di casa per evitare colpi d'aria e spaventi alle\
-          \ micie!\"\n] | random }}"
-    - action: input_text.set_value
-      target:
-        entity_id: input_text.eco_home_ultimo_messaggio
-      data:
-        value: 'Meteo Alert: Raffiche vento > 30 km/h in terrazza'
-  mode: single
-- id: eco_home_allerta_gelo_parabrezza_auto
-  alias: Eco Home - Allerta Gelo Parabrezza Serale (Netatmo Esterna)
-  description: Notifica WhatsApp alle 22:00 se la temperatura esterna scende sotto i 3°C per preparare la Discovery al mattino
-  triggers:
-    - trigger: time
-      at: '22:00:00'
-  conditions:
-    - condition: numeric_state
-      entity_id: sensor.temperatura_media_esterna
-      below: 3
-    - condition: state
-      entity_id: input_boolean.eco_home_attivo
-      state: 'on'
-  actions:
-    - action: rest_command.whatsapp_group_notify
-      data:
-        message: "{{ [\n  \"❄️ Attenzione! Temperatura esterna di \" ~ states('sensor.temperatura_media_esterna') ~ \"°C:\
-          \ domani possibile parabrezza gelato per la Discovery!\",\n  \"\U0001F976 Allerta Gelo! Fuori ci sono \" ~ states('sensor.temperatura_media_esterna')\
-          \ ~ \"°C: preparare il raschietto per l'auto!\"\n] | random }}"
-    - action: input_text.set_value
-      target:
-        entity_id: input_text.eco_home_ultimo_messaggio
-      data:
-        value: 'Meteo Alert: Possibile gelo parabrezza auto'
-  mode: single
-- id: eco_home_promemoria_auto_domenica
-  alias: Eco Home - Promemoria Carburante Auto (Drivvo & Discovery)
-  description: Promemoria domenica sera per verificare rifornimento e consumi della Discovery
-  triggers:
-    - trigger: time
-      at: '20:30:00'
-  conditions:
-    - condition: time
-      weekday:
-        - sun
-    - condition: state
-      entity_id: input_boolean.eco_home_attivo
-      state: 'on'
-    - condition: state
-      entity_id: input_boolean.eco_home_silenzioso
-      state: 'off'
-  actions:
-    - action: tts.speak
-      target:
-        entity_id: tts.google_translate_it_lt
-      data:
-        media_player_entity_id: media_player.nest_hub_sala
-        language: it
-        options:
-          tld: it
-        message: "{{ [\n  \"Stefano, promemoria Discovery: verifica carburante e autonomia prima di domani mattina!\",\n \
-          \ \"Attenzione Stefano: check serbatoio per la Discovery prima della nuova settimana!\",\n  \"Promemoria domenica:\
-          \ controlla il livello carburante della Discovery!\"\n] | random }}"
-    - action: input_text.set_value
-      target:
-        entity_id: input_text.eco_home_ultimo_messaggio
-      data:
-        value: 'Promemoria Auto: Verifica carburante Discovery'
-  mode: single
-- id: eco_home_meteo_flash_mattutino
-  alias: Eco Home - Meteo Flash Pre-Uscita Mattutina (Ore 07:40, Discovery)
-  description: Avviso vocale 10 minuti prima dell uscita lavorativa solo se piove in terrazza o c è gelo (esclude weekend,
-    festività e modalità ferie)
-  triggers:
-    - trigger: time
-      at: 07:40:00
-  conditions:
-    - condition: template
-      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
-    - condition: template
-      value_template: '{{ now().weekday() < 5 }}'
-    - condition: state
-      entity_id: input_boolean.eco_home_attivo
-      state: 'on'
-    - condition: state
-      entity_id: input_boolean.eco_home_silenzioso
-      state: 'off'
-    - condition: template
-      value_template: '{{ not is_state(''input_boolean.eco_home_modalita_ferie'', ''on'') }}'
-    - condition: template
-      value_template: "{% set m = now().month %} {% set d = now().day %} {% set is_holiday = (\n  (m == 1 and d in [1, 6])\
-        \ or\n  (m == 4 and d == 25) or\n  (m == 5 and d == 1) or\n  (m == 6 and d == 2) or\n  (m == 8 and d == 15) or\n \
-        \ (m == 11 and d == 1) or\n  (m == 12 and d in [8, 25, 26])\n) %} {{ not is_holiday }}"
-    - condition: template
-      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
-    - condition: template
-      value_template: '{% set rain_active = states(''sensor.terrazza_pulvirometro_precipitazione'') | float(0) > 0.01 or states(''weather.casa'')
-        in [''rainy'', ''pouring'', ''lightning'', ''hail''] %} {% set frost_active = states(''sensor.temperatura_media_esterna'')
-        | float(10) <= 2 %} {{ rain_active or frost_active }}'
-  actions:
-    - action: tts.speak
-      target:
-        entity_id: tts.google_translate_it_lt
-      data:
-        media_player_entity_id: media_player.nest_hub_sala
-        language: it
-        options:
-          tld: it
-        message: "{% set rain_active = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.01 or states('weather.casa')\
-          \ in ['rainy', 'pouring', 'lightning', 'hail'] %} {% set frost_active = states('sensor.temperatura_media_esterna')\
-          \ | float(10) <= 2 %} {% if rain_active %}\n  {{ [\n    \"Attenzione Stefano e Laura: piove in terrazza! Ricordatevi\
-          \ gli ombrelli prima di salire sulla Discovery!\",\n    \"Meteo flash: pioggia in corso all'esterno! Non dimenticate\
-          \ gli ombrelli!\",\n    \"Avviso partenza: fuori piove, ombrelli a portata di mano!\"\n  ] | random }}\n{% elif\
-          \ frost_active %}\n  {{ [\n    \"Attenzione prima di uscire: fuori ci sono solo \" ~ states('sensor.temperatura_media_esterna')\
-          \ ~ \" gradi! Il parabrezza della Discovery potrebbe essere gelato!\",\n    \"Meteo flash: mattinata con ghiaccio\
-          \ all'esterno, occhio ai vetri dell'auto!\"\n  ] | random }}\n{% endif %}"
-    - action: input_text.set_value
-      target:
-        entity_id: input_text.eco_home_ultimo_messaggio
-      data:
-        value: 'Meteo Flash: Avviso pioggia/gelo pre-partenza Discovery'
-  mode: single
-- id: eco_home_controllo_batteria_smartphone_mattina
-  alias: Eco Home - Salva-Batteria Smartphone Pre-Partenza (Ore 07:30, Discovery & Punto Blu)
-  description: Avviso vocale prima di uscire alle 07:30 se lo smartphone di Stefano o Laura è sotto il 20%
-  triggers:
-    - trigger: time
-      at: 07:30:00
-  conditions:
-    - condition: template
-      value_template: '{{ not (now().hour >= 23 or now().hour < 7) }}'
-    - condition: template
-      value_template: '{{ now().weekday() < 5 }}'
-    - condition: state
-      entity_id: input_boolean.eco_home_attivo
-      state: 'on'
-    - condition: state
-      entity_id: input_boolean.eco_home_silenzioso
-      state: 'off'
-    - condition: template
-      value_template: '{{ not is_state(''input_boolean.eco_home_modalita_ferie'', ''on'') }}'
-    - condition: template
-      value_template: "{% set m = now().month %} {% set d = now().day %} {% set is_holiday = (\n  (m == 1 and d in [1, 6])\
-        \ or\n  (m == 4 and d == 25) or\n  (m == 5 and d == 1) or\n  (m == 6 and d == 2) or\n  (m == 8 and d == 15) or\n \
-        \ (m == 11 and d == 1) or\n  (m == 12 and d in [8, 25, 26])\n) %} {{ not is_holiday }}"
-    - condition: template
-      value_template: '{{ is_state(''person.stefano'', ''home'') or is_state(''person.laura'', ''home'') }}'
-  actions:
-    - variables:
-        stefano_phones: '{% set s_list = states.sensor | selectattr(''entity_id'', ''search'', ''stefano.*(battery|batteria)|(battery|batteria).*stefano'')
-          | rejectattr(''entity_id'', ''search'', ''watch|orologio|tablet|ipad|tag|tile|fitbit'') | map(attribute=''state'')
-          | select(''is_number'') | map(''int'') | list %} {{ s_list | min | default(100) }}'
-        laura_phones: '{% set l_list = states.sensor | selectattr(''entity_id'', ''search'', ''laura.*(battery|batteria)|(battery|batteria).*laura'')
-          | rejectattr(''entity_id'', ''search'', ''watch|orologio|tablet|ipad|tag|tile|fitbit'') | map(attribute=''state'')
-          | select(''is_number'') | map(''int'') | list %} {{ l_list | min | default(100) }}'
-        stefano_low: '{{ stefano_phones < 20 and is_state(''person.stefano'', ''home'') }}'
-        laura_low: '{{ laura_phones < 20 and is_state(''person.laura'', ''home'') }}'
-    - choose:
-        - conditions:
-            - condition: template
-              value_template: '{{ stefano_low and laura_low }}'
-          sequence:
-            - action: tts.speak
-              target:
-                entity_id: tts.google_translate_it_lt
-              data:
-                media_player_entity_id: media_player.nest_hub_sala
-                language: it
-                options:
-                  tld: it
-                message: "{{ [\n  \"Attenzione ragazzi: avete entrambi i telefoni quasi scarichi! Metteteli in carica prima\
-                  \ di salire sulla Discovery e sulla Punto Blu!\",\n  \"Promemoria batterie del mattino: telefoni sotto il\
-                  \ venti percento! Una ricarica rapida al volo prima della partenza!\"\n] | random }}"
-        - conditions:
-            - condition: template
-              value_template: '{{ stefano_low }}'
-          sequence:
-            - action: tts.speak
-              target:
-                entity_id: tts.google_translate_it_lt
-              data:
-                media_player_entity_id: media_player.nest_hub_sala
-                language: it
-                options:
-                  tld: it
-                message: "{{ [\n  \"Stefano, promemoria batteria: il telefono è quasi scarico! Mettilo in carica prima di\
-                  \ salire sulla Discovery!\",\n  \"Capitano Stefano, attenzione al telefono: batteria sotto il venti percento\
-                  \ prima di partire con la Discovery!\"\n] | random }}"
-        - conditions:
-            - condition: template
-              value_template: '{{ laura_low }}'
-          sequence:
-            - action: tts.speak
-              target:
-                entity_id: tts.google_translate_it_lt
-              data:
-                media_player_entity_id: media_player.nest_hub_sala
-                language: it
-                options:
-                  tld: it
-                message: "{{ [\n  \"Laura, promemoria batteria: il telefono è quasi scarico! Attaccalo alla ricarica prima\
-                  \ di salire sulla Punto Blu!\",\n  \"Attenzione Laura: batteria del telefono sotto il venti percento prima\
-                  \ di partire con la Punto Blu!\"\n] | random }}"
-    - action: input_text.set_value
-      target:
-        entity_id: input_text.eco_home_ultimo_messaggio
-      data:
-        value: 'Batteria Alert: Controllo smartphone pre-uscita 07:30'
-  mode: single
-- id: manutenzione_tagliando_discovery
-  alias: Automobili - Promemoria Tagliando Discovery
-  description: Invia una notifica quando mancano meno di 1000 km al tagliando della Discovery
-  triggers:
-    - trigger: state
-      entity_id: binary_sensor.discovery_allerta_tagliando
-      from: 'off'
-      to: 'on'
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: 🔧 Tagliando Land Rover Discovery
-        messaggio: 'Mancano meno di 1.000 km al tagliando per Land Rover Discovery Sport! (Km attuali: {{ states(''sensor.discovery_refuelling_odometer'')
-          }} km).'
-        categoria: generale
-        priorita: normale
-        tag: tagliando_discovery
-  mode: single
-- id: manutenzione_tagliando_punto
-  alias: Automobili - Promemoria Tagliando Punto
-  description: Invia una notifica quando mancano meno di 1000 km al tagliando della Punto
-  triggers:
-    - trigger: state
-      entity_id: binary_sensor.punto_allerta_tagliando
-      from: 'off'
-      to: 'on'
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: 🔧 Tagliando Fiat Punto
-        messaggio: 'Mancano meno di 1.000 km al tagliando per Fiat Punto! (Km attuali: {{ states(''sensor.punto_odometer_value'')
-          }} km).'
-        categoria: generale
-        priorita: normale
-        tag: tagliando_punto
-  mode: single
-- id: manutenzione_gomme_discovery
-  alias: Automobili - Promemoria Inversione Gomme Discovery
-  description: Invia una notifica quando mancano meno di 500 km all'inversione gomme della Discovery
-  triggers:
-    - trigger: state
-      entity_id: binary_sensor.discovery_allerta_inversione_gomme
-      from: 'off'
-      to: 'on'
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: 🛞 Inversione Gomme Discovery Sport
-        messaggio: 'È tempo di invertire le gomme sulla Discovery Sport (Intervallo 10.000 km raggiunto - Km attuali: {{ states(''sensor.discovery_refuelling_odometer'')
-          }} km).'
-        categoria: generale
-        priorita: normale
-        tag: gomme_discovery
-  mode: single
-- id: manutenzione_gomme_punto
-  alias: Automobili - Promemoria Inversione Gomme Punto
-  description: Invia una notifica quando mancano meno di 500 km all'inversione gomme della Punto
-  triggers:
-    - trigger: state
-      entity_id: binary_sensor.punto_allerta_inversione_gomme
-      from: 'off'
-      to: 'on'
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: 🛞 Inversione Gomme Fiat Punto
-        messaggio: 'È tempo di invertire le gomme sulla Fiat Punto (Intervallo 10.000 km raggiunto - Km attuali: {{ states(''sensor.punto_odometer_value'')
-          }} km).'
-        categoria: generale
-        priorita: normale
-        tag: gomme_punto
-  mode: single
-- id: manutenzione_revisione_discovery
-  alias: Automobili - Promemoria Revisione Discovery
-  description: Invia una notifica quando mancano meno di 30 giorni alla revisione della Discovery
-  triggers:
-    - trigger: state
-      entity_id: binary_sensor.discovery_allerta_revisione
-      from: 'off'
-      to: 'on'
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: 📋 Revisione Discovery Sport
-        messaggio: 'La revisione ministeriale biennale per Discovery Sport scade tra meno di 30 giorni! (Scadenza: {{ states(''input_datetime.discovery_scadenza_revisione'')
-          }}).'
-        categoria: generale
-        priorita: normale
-        tag: revisione_discovery
-  mode: single
-- id: manutenzione_revisione_punto
-  alias: Automobili - Promemoria Revisione Punto
-  description: Invia una notifica quando mancano meno di 30 giorni alla revisione della Punto
-  triggers:
-    - trigger: state
-      entity_id: binary_sensor.punto_allerta_revisione
-      from: 'off'
-      to: 'on'
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: 📋 Revisione Fiat Punto
-        messaggio: 'La revisione ministeriale biennale per Fiat Punto scade tra meno di 30 giorni! (Scadenza: {{ states(''input_datetime.punto_scadenza_revisione'')
-          }}).'
-        categoria: generale
-        priorita: normale
-        tag: revisione_punto
-  mode: single
-- id: notifica_smart_terremoto_ingv
-  alias: 🌍 Notifica Smart - Allerta Terremoto INGV
-  description: Invia notifica push su smartphone per eventi sismici con Magnitudo >= 2.0 entro 50 km oppure Magnitudo >= 3.5
-    entro 100 km da Casa Mancini
-  triggers:
-    - trigger: state
-      entity_id: sensor.ingv_earthquakes_casa_status
-  conditions:
-    - condition: template
-      value_template: "{% set status = states('sensor.ingv_earthquakes_casa_status') | int(0) %} {% set quakes = states.geo_location\
-        \ | selectattr('attributes.source', 'defined') | selectattr('attributes.source', 'eq', 'ingv_centro_nazionale_terremoti')\
-        \ | list %} {% set ns = namespace(found=false) %} {% for q in quakes %}\n  {% set dist = q.state | float(999) %}\n\
-        \  {% set mag = q.attributes.magnitude | float(0) %}\n  {% if (dist <= 50 and mag >= 2.0) or (dist <= 100 and mag\
-        \ >= 3.5) %}\n    {% set ns.found = true %}\n  {% endif %}\n{% endfor %} {{ status > 0 and (trigger.to_state.state\
-        \ != trigger.from_state.state or trigger.from_state.state == '0') and ns.found }}\n"
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: 🌍 Allerta Terremoto INGV
-        messaggio: "{% set quakes = states.geo_location | selectattr('attributes.source', 'defined') | selectattr('attributes.source',\
-          \ 'eq', 'ingv_centro_nazionale_terremoti') | list %} {% set details = [] %} {% for q in quakes %}\n  {% set dist\
-          \ = q.state | float(999) %}\n  {% set mag = q.attributes.magnitude | float(0) %}\n  {% if (dist <= 50 and mag >=\
-          \ 2.0) or (dist <= 100 and mag >= 3.5) %}\n    {% set item = \"Scossa Magnitudo \" ~ mag ~ \" a circa \" ~ (dist\
-          \ | round(1)) ~ \" km da Casa Mancini (Zona: \" ~ q.attributes.region | default('N/D') ~ \", prof. \" ~ q.attributes.depth\
-          \ | default('N/D') ~ \" km).\" %}\n    {% set details = details + [item] %}\n  {% endif %}\n{% endfor %} {% if details\
-          \ | count > 0 %}\n  {{ details | join('\\n') }}\n{% else %}\n  Rilevata attività sismica nell'area monitorata da\
-          \ Casa Mancini.\n{% endif %}\n"
-        categoria: sicurezza
-        priorita: alta
-        canale: tutti_telefoni
-        tag: allerta_sisma_ingv
-  mode: queued
-  max: 5
-- id: notifica_smart_fulmini_ravvicinati_blitzortung
-  alias: ⚡ Notifica Smart - Allerta Fulmini entro 15 km
-  description: Invia notifica push su smartphone se Blitzortung rileva scariche elettriche entro 15 km da Casa Mancini con
-    tasto rapido Protezione Temporale
-  triggers:
-    - trigger: numeric_state
-      entity_id: sensor.casa_lightning_distance
-      below: 15.1
-      id: fulmine_vicino
-    - trigger: state
-      entity_id: sensor.casa_lightning_counter
-      id: counter_scariche
-  conditions:
-    - condition: template
-      value_template: '{% set counter = states(''sensor.casa_lightning_counter'') | int(0) %} {% set dist = states(''sensor.casa_lightning_distance'')
-        %} {{ counter > 0 and dist not in [''unknown'', ''unavailable'', ''None'', ''''] and (dist | float(999)) <= 15.0 }}
 
-        '
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: '⚡ Allerta Temporale: Fulmini entro 15 km!'
-        messaggio: 'Rilevata attività elettrica a circa {{ states(''sensor.casa_lightning_distance'') }} km da Casa Mancini
-          (direzione {{ states(''sensor.casa_lightning_azimuth'') }}°, {{ states(''sensor.casa_lightning_counter'') }} scariche
-          nell''ultima ora).
-
-          '
-        categoria: meteo
-        priorita: alta
-        canale: tutti_telefoni
-        tag: allerta_fulmini_15km
-        azioni:
-          - action: ATTIVA_TEMPORALE
-            title: ⛈️ Protezione Temporale
-          - action: IGNORA
-            title: Ignora
-    - delay: 00:15:00
+- id: 'traffico_utente_2_rientro_1740_lavoro'
+  alias: 'Traffico: Avviso Rientro Ore 17:40 Smartphone Utente 2'
+  description: >-
+    Se Utente 2 si trova a lavoro alle 17:40 (feriale) e Google Maps rileva traffico anomalo
+    per tornare a casa senza fare l'autostrada (ritardo >= 5 min), invia una notifica di avviso sul suo smartphone.
   mode: single
-- id: notifica_meteo_vento_forte
-  alias: 💨 Notifica Smart - Raffiche di Vento Forte
-  description: Invia allerta con tasto abbassa tapparelle se il vento supera i 20 km/h (max 1 ogni 2h)
-  triggers:
-    - trigger: numeric_state
-      entity_id: sensor.sala_anemometro_gust_strength
-      above: 20
-  conditions:
+  trigger:
+    - trigger: time
+      at: '17:40:00'
+  condition:
+    # 1. Solo giorni feriali (Lunedì - Venerdì)
     - condition: template
-      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
-        > 7200 }}'
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: 💨 Vento Forte Rilevato
-        messaggio: Raffiche a {{ states('sensor.sala_anemometro_gust_strength') }} km/h registrate in terrazza. Verificare
-          tende e balconi.
-        categoria: meteo
-        priorita: alta
-        tag: meteo_vento
-        azioni:
-          - action: ABBASSA_TAPPARELLE
-            title: 🪟 Abbassa Tapparelle
-          - action: IGNORA
-            title: Tutto a posto
-  mode: single
-- id: notifica_meteo_inizio_pioggia
-  alias: 🌧️ Notifica Smart - Inizio Pioggia & Controllo Finestre
-  description: Invia avviso quando il pluviometro in terrazza rileva la pioggia, verificando se ci sono finestre aperte e
-    quali (max 1 ogni ora)
-  triggers:
-    - trigger: numeric_state
-      entity_id: sensor.terrazza_pulvirometro_precipitazione
-      above: 0.1
-  conditions:
+      value_template: "{{ now().weekday() in [0, 1, 2, 3, 4] }}"
+    # 2. Utente 2 si trova nella zona lavoro
     - condition: template
-      value_template: '{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds()
-        > 3600 }}'
-  actions:
+      value_template: >-
+        {{ is_state('person.utente_2', 'Lavoro Utente 2') or
+           is_state('device_tracker.laura_presenza', 'Lavoro Utente 2') or
+           is_state('device_tracker.smartphone_utente_2_2', 'Lavoro Utente 2') or
+           'Lavoro Utente 2' in (state_attr('person.utente_2', 'in_zones') | default([])) or
+           'Lavoro Utente 2' in (state_attr('device_tracker.smartphone_utente_2_2', 'in_zones') | default([])) or
+           'via ufficio centrale' in states('sensor.utente_2_luogo_smart') }}
+  action:
+    # 1. Calcola tempo reale di rientro senza pedaggi/autostrada da Via Ufficio Centrale a casa
+    - action: homeassistant.update_entity
+      target:
+        entity_id: sensor.tempo_viaggio_laura_rientro_no_autostrada
+      continue_on_error: true
+    - delay:
+        seconds: 3
     - variables:
-        finestre_aperte: '{% set ns = namespace(doors=[]) %} {% if is_state(''binary_sensor.finestrasala_contact'', ''on'')
-          %}{% set ns.doors = ns.doors + [''Finestra Sala''] %}{% endif %} {% if is_state(''binary_sensor.finestracamera_contact'',
-          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Camera''] %}{% endif %} {% if is_state(''binary_sensor.finestracameretta_contact'',
-          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Cameretta''] %}{% endif %} {% if is_state(''binary_sensor.finestrabagno_contact'',
-          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Bagno''] %}{% endif %} {% if is_state(''binary_sensor.finestrabagnetto_contact'',
-          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Bagnetto''] %}{% endif %} {% if is_state(''binary_sensor.finestracucina_contact'',
-          ''on'') %}{% set ns.doors = ns.doors + [''Finestra Cucina''] %}{% endif %} {% if is_state(''binary_sensor.portaterrazzo_contact'',
-          ''on'') %}{% set ns.doors = ns.doors + [''Porta Terrazzo''] %}{% endif %} {{ ns.doors }}'
-        ci_sono_finestre_aperte: '{{ finestre_aperte | length > 0 }}'
+        dur_raw: "{{ states('sensor.tempo_viaggio_laura_rientro_no_autostrada') | float(0) | round(0) }}"
+        dur_std: 48
+        minuti_stimati: "{{ dur_raw if dur_raw > 25 else 50 }}"
+        diff_ritardo: "{{ minuti_stimati - dur_std }}"
+        traffico_anomalo: "{{ diff_ritardo >= 5 }}"
     - if:
         - condition: template
-          value_template: '{{ ci_sono_finestre_aperte }}'
+          value_template: "{{ traffico_anomalo }}"
       then:
-        - action: script.notifica_smart
+        - action: notify.mobile_app_smartphone_utente_2
           data:
-            titolo: 🌧️ Allerta Pioggia — Finestre Aperte!
-            messaggio: 'Sta piovendo a Casa Mancini! Attenzione: ci sono infissi APERTI: {{ finestre_aperte | join('', '')
-              }}. Chiudili subito per evitare infiltrazioni!'
-            categoria: meteo
-            priorita: alta
-            tag: meteo_pioggia
-            azioni:
-              - action: ABBASSA_TAPPARELLE
-                title: 🪟 Abbassa Tapparelle
-      else:
-        - action: script.notifica_smart
-          data:
-            titolo: 🌧️ Inizio Pioggia Rilevato
-            messaggio: Sta iniziando a piovere a Casa Mancini. Tutte le finestre sono chiuse e sigillate, nessun rischio.
-            categoria: meteo
-            priorita: normale
-            tag: meteo_pioggia
-            azioni:
-              - action: ABBASSA_TAPPARELLE
-                title: 🪟 Abbassa Tapparelle
-  mode: single
-- id: notifica_meteo_gelo_auto
-  alias: ❄️ Notifica Smart - Allerta Gelo Notturno Auto
-  description: Avvisa alle 06:45 se la temperatura esterna è sotto i -1°C per riscaldamento auto/parabrezza
-  triggers:
-    - trigger: time
-      at: 06:45:00
-  conditions:
-    - condition: numeric_state
-      entity_id: sensor.temperatura_media_esterna
-      below: 0
-  actions:
-    - action: script.notifica_smart
-      data:
-        titolo: ❄️ Allerta Gelo Parabrezza
-        messaggio: Temperatura esterna a {{ states('sensor.temperatura_media_esterna') }}°C. Parabrezza delle auto (Discovery
-          e Punto) probabilmente ghiacciati.
-        categoria: meteo
-        priorita: normale
-        tag: meteo_gelo
-  mode: single
-- id: notifica_allerta_ghiaccio_parabrezza_auto
-  alias: ❄️ Notifica Smart - Possibile Ghiaccio Parabrezza (07:00)
-  description: Avvisa la mattina prima di partire se la temperatura notturna è scesa sotto 1°C
-  triggers:
-    - trigger: time
-      at: 07:00:00
-  conditions:
-    - condition: template
-      value_template: '{{ states(''sensor.temperatura_media_esterna'') | float(10) <= 1.0 }}
+            title: "🚗 Traffico Rientro a Casa (No Autostrada)"
+            message: >-
+              Utente 2, verso casa (evitando l'autostrada) c'è più traffico del solito: previsti circa {{ minuti_stimati }} minuti (+{{ diff_ritardo }} min rispetto al solito).
+            data:
+              channel: "Traffico"
+              priority: high
+              importance: high
+              tag: "traffico_rientro_laura"
+              ttl: 0
+              notification_icon: "mdi:car-alert"
+          continue_on_error: true
 
-        '
-  actions:
+- id: 'meteo_notifica_vento_forte'
+  alias: 'Meteo: Notifica Vento Forte (Raffiche >15 / Vento >8 km/h)'
+  description: Notifica push se l'anemometro rileva raffiche oltre 15 km/h o vento oltre 8 km/h (max 1 ogni ora).
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.meteo_vento_forte
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: input_boolean.notifiche_meteo_vento
+      state: 'on'
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  action:
     - action: script.notifica_smart
       data:
-        titolo: ❄️ Attenzione Ghiaccio Parabrezza
-        messaggio: Temperatura notturna molto rigida ({{ states('sensor.temperatura_media_esterna') }}°C). Possibile presenza
-          di brina o ghiaccio sui parabrezza di Discovery e Punto prima di partire.
+        titolo: "💨 Vento Forte in Terrazza"
+        messaggio: >-
+          Vento {{ state_attr('binary_sensor.meteo_vento_forte','velocita_kmh') }} km/h, raffiche {{ state_attr('binary_sensor.meteo_vento_forte','raffica_kmh') }} km/h. Occhio a stendini e piante!
         categoria: meteo
         priorita: normale
-        canale: stefano
-        tag: ghiaccio_auto_mattina
+        tag: meteo_vento
+
+- id: 'meteo_notifica_inizio_pioggia'
+  alias: 'Meteo: Notifica Inizio Pioggia'
+  description: Notifica push quando inizia a piovere (pluviometro, fallback previsioni).
   mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.meteo_piove_ora
+      from: 'off'
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: input_boolean.notifiche_meteo_pioggia
+      state: 'on'
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  action:
+    - action: script.notifica_smart
+      data:
+        titolo: "🌧️ Ha iniziato a piovere"
+        messaggio: >-
+          Pioggia rilevata ({{ state_attr('binary_sensor.meteo_piove_ora','fonte') }}).{% if states('sensor.numero_finestre_aperte')|int(0) > 0 %} Attenzione: {{ states('sensor.numero_finestre_aperte') }} finestre aperte!{% endif %}
+        categoria: meteo
+        priorita: normale
+        tag: meteo_pioggia
+
+- id: 'meteo_notifica_temporale'
+  alias: 'Meteo: Allerta Temporale (Vento + Pioggia)'
+  description: Notifica interattiva con pulsante per attivare lo Scenario Temporale (tapparelle chiuse 100%).
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.meteo_temporale_rilevato
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: input_boolean.notifiche_meteo_temporale
+      state: 'on'
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  action:
+    - action: script.notifica_smart
+      data:
+        titolo: "⛈️ Allerta Temporale"
+        messaggio: "Pioggia e vento forte in corso. Vuoi chiudere tutte le tapparelle al 100%?"
+        categoria: meteo
+        priorita: alta
+        tag: meteo_temporale
+        azioni:
+          - action: ATTIVA_SCENARIO_TEMPORALE
+            title: "Chiudi tapparelle"
+          - action: IGNORA_TEMPORALE
+            title: "Ignora"
+
+- id: 'meteo_azione_scenario_temporale'
+  alias: 'Meteo: Azione Notifica Scenario Temporale'
+  mode: single
+  trigger:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ATTIVA_SCENARIO_TEMPORALE
+  action:
+    - action: script.scenario_temporale
+
+- id: 'meteo_allerta_dpc_zona_casa'
+  alias: 'Allerte DPC: Nuova Allerta Diramata per Zona Casa'
+  description: 'Invia notifica push prioritaria su smartphone quando la Protezione Civile dirama un allerta Gialla, Arancione o Rossa per Eco Home (Bacino Medio Tevere).'
+  mode: single
+  trigger:
+    - trigger: numeric_state
+      entity_id: sensor.dipartimento_protezione_civile_alert
+      above: 1
+      id: alert_livello
+    - trigger: state
+      entity_id:
+        - binary_sensor.42_152875_12_678384_idrogeologico_oggi
+        - binary_sensor.42_152875_12_678384_temporali_oggi
+        - binary_sensor.42_152875_12_678384_idraulico_oggi
+      to: 'on'
+      id: rischio_attivo
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.dipartimento_protezione_civile_alert') | int(0) >= 2 }}"
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  action:
+    - variables:
+        lvl: "{{ states('sensor.dipartimento_protezione_civile_alert') | int(0) }}"
+        lvl_nome: "{{ 'GIALLA' if lvl == 2 else ('ARANCIONE' if lvl == 3 else 'ROSSA') }}"
+        rischi: >-
+          {% set r = [] %}
+          {% if is_state('binary_sensor.42_152875_12_678384_idrogeologico_oggi', 'on') %}{% set r = r + ['Idrogeologico'] %}{% endif %}
+          {% if is_state('binary_sensor.42_152875_12_678384_temporali_oggi', 'on') %}{% set r = r + ['Temporali'] %}{% endif %}
+          {% if is_state('binary_sensor.42_152875_12_678384_idraulico_oggi', 'on') %}{% set r = r + ['Idraulico'] %}{% endif %}
+          {{ r | join(', ') if r | length > 0 else 'Ordinaria' }}
+        zona: "{{ state_attr('sensor.dipartimento_protezione_civile_alert', 'zone_name') | default('Bacino Medio Tevere') }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Allerta DPC {{ lvl_nome }}: Zona Casa"
+        messaggio: "Diramata ALLERTA {{ lvl_nome }} per {{ zona }}. Criticità attive per oggi: {{ rischi }}. Prestare attenzione e verificare infissi e terrazze."
+        categoria: meteo
+        priorita: "{{ 'critica' if lvl >= 3 else 'alta' }}"
+        canale: tutti_telefoni
+        tag: allerta_dpc_casa
+        azioni:
+          - action: ATTIVA_SCENARIO_TEMPORALE
+            title: "⛈️ Scenario Temporale"
+          - action: URI
+            title: "🌐 Apri Plancia Eventi"
+            uri: /eco-home/meteo
+            url: /eco-home/meteo
+
+- id: 'meteo_allerta_dpc_zona_roma_lavoro'
+  alias: 'Allerte DPC: Nuova Allerta Diramata per Roma e Lavoro Utente 2'
+  description: 'Invia notifica push prioritaria quando la Protezione Civile dirama un allerta per Roma e zona lavoro Utente 2 (Bacini di Roma).'
+  mode: single
+  trigger:
+    - trigger: numeric_state
+      entity_id: sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert
+      above: 1
+      id: alert_livello_roma
+    - trigger: state
+      entity_id:
+        - binary_sensor.41_933617_12_510125_idrogeologico_oggi
+        - binary_sensor.41_933617_12_510125_temporali_oggi
+        - binary_sensor.41_933617_12_510125_idraulico_oggi
+      to: 'on'
+      id: rischio_attivo_roma
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert') | int(0) >= 2 }}"
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  action:
+    - variables:
+        lvl: "{{ states('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert') | int(0) }}"
+        lvl_nome: "{{ 'GIALLA' if lvl == 2 else ('ARANCIONE' if lvl == 3 else 'ROSSA') }}"
+        rischi: >-
+          {% set r = [] %}
+          {% if is_state('binary_sensor.41_933617_12_510125_idrogeologico_oggi', 'on') %}{% set r = r + ['Idrogeologico'] %}{% endif %}
+          {% if is_state('binary_sensor.41_933617_12_510125_temporali_oggi', 'on') %}{% set r = r + ['Temporali'] %}{% endif %}
+          {% if is_state('binary_sensor.41_933617_12_510125_idraulico_oggi', 'on') %}{% set r = r + ['Idraulico'] %}{% endif %}
+          {{ r | join(', ') if r | length > 0 else 'Ordinaria' }}
+        zona: "{{ state_attr('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert', 'zone_name') | default('Bacini di Roma') }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Allerta DPC {{ lvl_nome }}: Roma e Lavoro"
+        messaggio: "Diramata ALLERTA {{ lvl_nome }} per {{ zona }}. Rischi per oggi: {{ rischi }}. Prestare massima attenzione negli spostamenti casa-lavoro e su strada."
+        categoria: meteo
+        priorita: "{{ 'critica' if lvl >= 3 else 'alta' }}"
+        canale: tutti_telefoni
+        tag: allerta_dpc_roma
+        azioni:
+          - action: URI
+            title: "🌐 Apri Plancia Eventi"
+            uri: /eco-home/meteo
+            url: /eco-home/meteo
+
+- id: 'meteo_allerta_dpc_bollettino_domani'
+  alias: 'Allerte DPC: Bollettino Pomeridiano Previsione Domani (16:30)'
+  description: 'Controlla alle 16:30 l avvenuta pubblicazione del bollettino DPC per domani e avvisa se sono previste allerte meteo per Casa o Roma.'
+  mode: single
+  trigger:
+    - trigger: time
+      at: '16:30:00'
+  condition:
+    - condition: template
+      value_template: >-
+        {{ is_state('binary_sensor.42_152875_12_678384_idrogeologico_domani', 'on')
+           or is_state('binary_sensor.42_152875_12_678384_temporali_domani', 'on')
+           or is_state('binary_sensor.42_152875_12_678384_idraulico_domani', 'on')
+           or is_state('binary_sensor.41_933617_12_510125_idrogeologico_domani', 'on')
+           or is_state('binary_sensor.41_933617_12_510125_temporali_domani', 'on')
+           or is_state('binary_sensor.41_933617_12_510125_idraulico_domani', 'on') }}
+  action:
+    - variables:
+        casa_alert: >-
+          {% set r = [] %}
+          {% if is_state('binary_sensor.42_152875_12_678384_idrogeologico_domani', 'on') %}{% set r = r + ['Idrogeologico'] %}{% endif %}
+          {% if is_state('binary_sensor.42_152875_12_678384_temporali_domani', 'on') %}{% set r = r + ['Temporali'] %}{% endif %}
+          {% if is_state('binary_sensor.42_152875_12_678384_idraulico_domani', 'on') %}{% set r = r + ['Idraulico'] %}{% endif %}
+          {{ r | join(', ') }}
+        roma_alert: >-
+          {% set r = [] %}
+          {% if is_state('binary_sensor.41_933617_12_510125_idrogeologico_domani', 'on') %}{% set r = r + ['Idrogeologico'] %}{% endif %}
+          {% if is_state('binary_sensor.41_933617_12_510125_temporali_domani', 'on') %}{% set r = r + ['Temporali'] %}{% endif %}
+          {% if is_state('binary_sensor.41_933617_12_510125_idraulico_domani', 'on') %}{% set r = r + ['Idraulico'] %}{% endif %}
+          {{ r | join(', ') }}
+    - action: script.notifica_smart
+      data:
+        titolo: "📋 Bollettino DPC: Allerta Meteo Prevista per Domani"
+        messaggio: >-
+          La Protezione Civile ha diramato un'allerta per domani:
+          {% if casa_alert | length > 0 %}• Casa (Medio Tevere): Allerta {{ casa_alert }}.{% endif %}
+          {% if roma_alert | length > 0 %}• Roma (Zona Lavoro): Allerta {{ roma_alert }}.{% endif %}
+          Organizzare con anticipo uscite e spostamenti.
+        categoria: meteo
+        priorita: alta
+        canale: tutti_telefoni
+        tag: allerta_dpc_domani
+        azioni:
+          - action: URI
+            title: "🌐 Apri Plancia Eventi"
+            uri: /eco-home/meteo
+            url: /eco-home/meteo
+
+- id: 'meteo_allerta_dpc_arrivo_in_zona_allertata'
+  alias: 'Allerte DPC: Avviso all Arrivo in Zona con Allerta Attiva'
+  description: 'Quando Utente 1 o Utente 2 arrivano in una zona monitorata (es. Lavoro a Roma), se in quella zona è attiva un allerta meteo viene inviato un promemoria push mirato.'
+  mode: queued
+  trigger:
+    - trigger: state
+      entity_id:
+        - person.utente_1
+        - person.utente_2
+      to:
+        - Lavoro Utente 2
+        - Casa Familiare 6
+        - Casa Nonni Utente 2
+        - Roma
+      id: ingresso_zona_roma
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert') | int(0) >= 2 }}"
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  action:
+    - variables:
+        lvl: "{{ states('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert') | int(0) }}"
+        lvl_nome: "{{ 'GIALLA' if lvl == 2 else ('ARANCIONE' if lvl == 3 else 'ROSSA') }}"
+        persona_nome: "{{ 'Utente 1' if trigger.entity_id == 'person.utente_1' else 'Utente 2' }}"
+        canale_dest: "{{ 'utente_1' if trigger.entity_id == 'person.utente_1' else 'utente_2' }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Attenzione: Sei arrivato in Zona in Allerta"
+        messaggio: "{{ persona_nome }}, sei a {{ trigger.to_state.state }}. In questa zona è attualmente attiva un'Allerta {{ lvl_nome }} della Protezione Civile. Prestare prudenza negli spostamenti."
+        categoria: meteo
+        priorita: alta
+        canale: "{{ canale_dest }}"
+        tag: allerta_ingresso_zona
+

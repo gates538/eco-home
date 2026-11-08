@@ -1,115 +1,929 @@
 # ==============================================================================
-# TELECAMERE DI SICUREZZA & TABLET A PARETE — CASA MANCINI
-# ==============================================================================
-# Snapshot live telecamere per plancia Lovelace e standby display tablet.
-# Script inclusi in questo modulo: 2
+# 04 — TELECAMERE PTZ, SNAPSHOT & ANALISI AI MULTIMODALE (GEMINI VISION)
 # ==============================================================================
 
-aggiorna_anteprima_telecamera:
-  alias: 📸 Aggiorna Anteprima Telecamera
-  description: Cattura fotogrammi live e aggiorna le immagini snapshot in plancia
-  mode: parallel
-  max: 10
+analizza_telecamera_ai:
+  alias: "👁️ Analizza Telecamera con Gemini Vision"
+  icon: "mdi:eye-check"
+  description: "Cattura l'immagine live reale da una telecamera e la fa analizzare visivamente da Gemini 3.8 / 3.5 Flash"
+  mode: queued
+  max: 5
   fields:
-    target_camera:
-      description: Entità telecamera da aggiornare (opzionale, default tutte)
-      example: camera.scale
+    camera:
+      description: "Nome della telecamera (es. sala, balcone_sala, balcone_camera, terrazza, terrazza_2, scale)"
+      example: "balcone_camera"
+      required: true
+    domanda:
+      description: "Cosa cercare o verificare nell'inquadratura"
+      example: "Ci sono auto parcheggiate?"
+      default: "Cosa vedi in questa inquadratura?"
+  sequence:
+    - action: gemini_vision.analizza_telecamera
+      data:
+        camera: "{{ camera | default('scale') | lower | replace('camera.', '') }}"
+        question: "{{ domanda | default('Cosa vedi in questa inquadratura?') }}"
+      response_variable: vision_result
+    - stop: "Analisi completata"
+      response_variable: vision_result
+
+ptz_terrazzo_3_vai_a_preset:
+  alias: "PTZ Terrazzo 3: Vai a Preset"
+  icon: "mdi:camera-control"
+  description: "Orienta la telecamera motorizzata Terrazzo 3 verso uno dei preset memorizzati o alla posizione di guardia predefinita Home"
+  mode: restart
+  fields:
+    preset:
+      description: "Nome del preset da raggiungere"
+      example: "Home (Guardia Centro)"
+      required: true
+      selector:
+        select:
+          options:
+            - "Home (Guardia Centro)"
+            - "Parcheggio Destra (Auto)"
+            - "Strada Sinistra"
+            - "Panoramica Terrazza (Alto)"
+            - "Ingresso Basso"
   sequence:
     - choose:
+        # PRESET: HOME (GUARDIA CENTRO)
         - conditions:
             - condition: template
-              value_template: '{{ target_camera is defined and target_camera not in ['''', none] }}'
+              value_template: "{{ preset == 'Home (Guardia Centro)' }}"
           sequence:
             - variables:
-                cam_slug: '{{ target_camera | replace(''camera.'', '''') }}'
-            - action: camera.snapshot
+                current_preset: "{{ states('input_select.ptz_terrazzo_3_preset') }}"
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ 'Destra' in current_preset }}"
+                  sequence:
+                    - repeat:
+                        count: 3
+                        sequence:
+                          - action: button.press
+                            target:
+                              entity_id: button.terrazzo_3_ptz_sinistra
+                          - delay:
+                              milliseconds: 350
+                - conditions:
+                    - condition: template
+                      value_template: "{{ 'Sinistra' in current_preset }}"
+                  sequence:
+                    - repeat:
+                        count: 3
+                        sequence:
+                          - action: button.press
+                            target:
+                              entity_id: button.terrazzo_3_ptz_destra
+                          - delay:
+                              milliseconds: 350
+                - conditions:
+                    - condition: template
+                      value_template: "{{ 'Alto' in current_preset }}"
+                  sequence:
+                    - repeat:
+                        count: 2
+                        sequence:
+                          - action: button.press
+                            target:
+                              entity_id: button.terrazzo_3_ptz_giu
+                          - delay:
+                              milliseconds: 350
+                - conditions:
+                    - condition: template
+                      value_template: "{{ 'Basso' in current_preset }}"
+                  sequence:
+                    - repeat:
+                        count: 2
+                        sequence:
+                          - action: button.press
+                            target:
+                              entity_id: button.terrazzo_3_ptz_su
+                          - delay:
+                              milliseconds: 350
+            - action: input_select.select_option
               target:
-                entity_id: '{{ target_camera }}'
+                entity_id: input_select.ptz_terrazzo_3_preset
               data:
-                filename: /config/www/cam_snapshots/{{ cam_slug }}.jpg
-              continue_on_error: true
-      default:
-        - parallel:
-            - action: camera.snapshot
+                option: "Home (Guardia Centro)"
+            - action: timer.cancel
               target:
-                entity_id: camera.scale
-              data:
-                filename: /config/www/cam_snapshots/scale.jpg
-              continue_on_error: true
-            - action: camera.snapshot
+                entity_id: timer.ptz_terrazzo_3_inattivita
+
+        # PRESET: PARCHEGGIO DESTRA (AUTO)
+        - conditions:
+            - condition: template
+              value_template: "{{ preset == 'Parcheggio Destra (Auto)' }}"
+          sequence:
+            - variables:
+                current_preset: "{{ states('input_select.ptz_terrazzo_3_preset') }}"
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ 'Sinistra' in current_preset }}"
+                  sequence:
+                    - repeat:
+                        count: 6
+                        sequence:
+                          - action: button.press
+                            target:
+                              entity_id: button.terrazzo_3_ptz_destra
+                          - delay:
+                              milliseconds: 350
+              default:
+                - repeat:
+                    count: 3
+                    sequence:
+                      - action: button.press
+                        target:
+                          entity_id: button.terrazzo_3_ptz_destra
+                      - delay:
+                          milliseconds: 350
+            - action: input_select.select_option
               target:
-                entity_id: camera.sala
+                entity_id: input_select.ptz_terrazzo_3_preset
               data:
-                filename: /config/www/cam_snapshots/sala.jpg
-              continue_on_error: true
-            - action: camera.snapshot
+                option: "Parcheggio Destra (Auto)"
+            - action: timer.start
               target:
-                entity_id: camera.sala_2
-              data:
-                filename: /config/www/cam_snapshots/sala_2.jpg
-              continue_on_error: true
-            - action: camera.snapshot
+                entity_id: timer.ptz_terrazzo_3_inattivita
+
+        # PRESET: STRADA SINISTRA
+        - conditions:
+            - condition: template
+              value_template: "{{ preset == 'Strada Sinistra' }}"
+          sequence:
+            - variables:
+                current_preset: "{{ states('input_select.ptz_terrazzo_3_preset') }}"
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ 'Destra' in current_preset }}"
+                  sequence:
+                    - repeat:
+                        count: 6
+                        sequence:
+                          - action: button.press
+                            target:
+                              entity_id: button.terrazzo_3_ptz_sinistra
+                          - delay:
+                              milliseconds: 350
+              default:
+                - repeat:
+                    count: 3
+                    sequence:
+                      - action: button.press
+                        target:
+                          entity_id: button.terrazzo_3_ptz_sinistra
+                      - delay:
+                          milliseconds: 350
+            - action: input_select.select_option
               target:
-                entity_id: camera.camera
+                entity_id: input_select.ptz_terrazzo_3_preset
               data:
-                filename: /config/www/cam_snapshots/camera.jpg
-              continue_on_error: true
-            - action: camera.snapshot
+                option: "Strada Sinistra"
+            - action: timer.start
               target:
-                entity_id: camera.cameretta
-              data:
-                filename: /config/www/cam_snapshots/cameretta.jpg
-              continue_on_error: true
-            - action: camera.snapshot
+                entity_id: timer.ptz_terrazzo_3_inattivita
+
+        # PRESET: PANORAMICA TERRAZZA (ALTO)
+        - conditions:
+            - condition: template
+              value_template: "{{ preset == 'Panoramica Terrazza (Alto)' }}"
+          sequence:
+            - repeat:
+                count: 2
+                sequence:
+                  - action: button.press
+                    target:
+                      entity_id: button.terrazzo_3_ptz_su
+                  - delay:
+                      milliseconds: 350
+            - action: input_select.select_option
               target:
-                entity_id: camera.balcone_sala
+                entity_id: input_select.ptz_terrazzo_3_preset
               data:
-                filename: /config/www/cam_snapshots/balcone_sala.jpg
-              continue_on_error: true
-            - action: camera.snapshot
+                option: "Panoramica Terrazza (Alto)"
+            - action: timer.start
               target:
-                entity_id: camera.balcone_camera
-              data:
-                filename: /config/www/cam_snapshots/balcone_camera.jpg
-              continue_on_error: true
-            - action: camera.snapshot
+                entity_id: timer.ptz_terrazzo_3_inattivita
+
+        # PRESET: INGRESSO BASSO
+        - conditions:
+            - condition: template
+              value_template: "{{ preset == 'Ingresso Basso' }}"
+          sequence:
+            - repeat:
+                count: 2
+                sequence:
+                  - action: button.press
+                    target:
+                      entity_id: button.terrazzo_3_ptz_giu
+                  - delay:
+                      milliseconds: 350
+            - action: input_select.select_option
               target:
-                entity_id: camera.terrazza
+                entity_id: input_select.ptz_terrazzo_3_preset
               data:
-                filename: /config/www/cam_snapshots/terrazza.jpg
-              continue_on_error: true
-            - action: camera.snapshot
+                option: "Ingresso Basso"
+            - action: timer.start
               target:
-                entity_id: camera.terrazza_2
-              data:
-                filename: /config/www/cam_snapshots/terrazza_2.jpg
-              continue_on_error: true
-            - action: camera.snapshot
-              target:
-                entity_id: camera.terrazzo_3_2
-              data:
-                filename: /config/www/cam_snapshots/terrazzo_3_2.jpg
-              continue_on_error: true
-    - action: input_datetime.set_datetime
-      target:
-        entity_id: input_datetime.ultimo_aggiornamento_telecamere
+                entity_id: timer.ptz_terrazzo_3_inattivita
+    - delay:
+        milliseconds: 800
+    - action: script.aggiorna_anteprima_telecamera
       data:
-        datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
-standby_tablet:
-  alias: 📱 Standby Tablet (Spegni Schermo)
-  description: Invia il comando di spegnimento schermo al Tablet Samsung Galaxy Tab S5e
-  icon: mdi:tablet-cellphone
+        target_camera: camera.terrazzo_3
+      continue_on_error: true
+
+ptz_terrazzo_3_home:
+  alias: "PTZ Terrazzo 3: Posizione Predefinita (Home)"
+  icon: "mdi:home-cctv"
+  description: "Riporta immediatamente la telecamera PTZ del Terrazzo 3 alla posizione di guardia centrale predefinita"
+  mode: restart
+  sequence:
+    - action: script.ptz_terrazzo_3_vai_a_preset
+      data:
+        preset: "Home (Guardia Centro)"
+
+ptz_terrazzo_3_calibra_home:
+  alias: "PTZ Terrazzo 3: Calibra / Imposta Posizione Corrente come Home"
+  icon: "mdi:crosshairs-gps"
+  description: "Registra l'inquadratura corrente come nuova Posizione Predefinita (Home) senza muovere i motori"
   mode: single
   sequence:
-    - action: notify.mobile_app_tablet
-      data:
-        message: command_screen_off
-      continue_on_error: true
-    - action: notify.send_message
+    - action: input_select.select_option
       target:
-        entity_id:
-          - notify.tablet
-          - notify.sm_t725
+        entity_id: input_select.ptz_terrazzo_3_preset
       data:
-        message: command_screen_off
+        option: "Home (Guardia Centro)"
+    - action: timer.cancel
+      target:
+        entity_id: timer.ptz_terrazzo_3_inattivita
+    - action: script.aggiorna_anteprima_telecamera
+      data:
+        target_camera: camera.terrazzo_3
       continue_on_error: true
+
+aggiorna_anteprima_telecamera:
+  alias: "Telecamere: Aggiorna Anteprima Snapshot"
+  icon: "mdi:camera-iris"
+  description: "Salva uno snapshot aggiornato della telecamera specificata in /config/www/cam_snapshots/"
+  mode: parallel
+  max: 5
+  fields:
+    target_camera:
+      description: "Entità camera di cui salvare lo snapshot"
+      example: "camera.terrazzo_3"
+  sequence:
+    - variables:
+        cam_entity: "{{ target_camera | default('camera.terrazzo_3') }}"
+        cam_slug: "{{ cam_entity | replace('camera.', '') }}"
+    - action: camera.snapshot
+      target:
+        entity_id: "{{ cam_entity }}"
+      data:
+        filename: "/config/www/cam_snapshots/{{ cam_slug }}.jpg"
+      continue_on_error: true
+
+ptz_terrazzo_3_passo:
+  alias: "PTZ Terrazzo 3: Movimento a Passo"
+  icon: "mdi:gamepad-round"
+  description: "Muove manualmente la telecamera Terrazzo 3 nella direzione indicata per un numero di passi"
+  mode: queued
+  max: 5
+  fields:
+    direzione:
+      description: "Direzione del movimento: destra, sinistra, su, giu"
+      example: "destra"
+      required: true
+      selector:
+        select:
+          options:
+            - destra
+            - sinistra
+            - su
+            - giu
+    passi:
+      description: "Numero di impulsi (1-5)"
+      example: 1
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 5
+  sequence:
+    - repeat:
+        count: "{{ passi | default(1) | int }}"
+        sequence:
+          - action: button.press
+            target:
+              entity_id: "button.terrazzo_3_ptz_{{ direzione }}"
+          - delay:
+              milliseconds: 350
+    - action: input_select.select_option
+      target:
+        entity_id: input_select.ptz_terrazzo_3_preset
+      data:
+        option: "Manuale / Personalizzato"
+    - action: timer.start
+      target:
+        entity_id: timer.ptz_terrazzo_3_inattivita
+
+analizza_telecamera_con_vision_ai:
+  alias: "Analizza Telecamera con Vision AI"
+  icon: "mdi:camera-iris"
+  description: "Cattura l'immagine live reale da una telecamera e la fa analizzare visivamente da Gemini Vision"
+  mode: queued
+  max: 5
+  fields:
+    camera:
+      description: "Nome della telecamera (es. scale, balcone_camera, balcone_sala, terrazza, terrazza_2, terrazzo_3, sala, cameretta)"
+      example: "scale"
+      required: true
+    domanda:
+      description: "Cosa cercare o verificare nell'inquadratura"
+      example: "Ci sono auto parcheggiate?"
+      default: "Cosa vedi in questa inquadratura?"
+  sequence:
+    - action: gemini_vision.analizza_telecamera
+      data:
+        camera: "{{ camera | default('scale') | lower | replace('camera.', '') }}"
+        question: "{{ domanda | default('Cosa vedi in questa inquadratura?') }}"
+      response_variable: vision_result
+    - stop: "Analisi completata"
+      response_variable: vision_result
+
+ispeziona_terrazzi_ai:
+  alias: "Ispeziona Terrazzi alla Ricerca di Gatto 2 o Situazione"
+  icon: "mdi:home-roof"
+  description: >-
+    Ispeziona contemporaneamente i terrazzi esterni (camera.terrazza e camera.terrazza_2) per cercare la gatta Gatto 2 (nera), Gatto 1 (rossa con petto bianco), persone (Utente 2, Utente 1), oppure controllare il tavolo, il forno, la fontana o il ripostiglio con lavatrice e asciugatrice.
+    Usa questo script ogni volta che l'utente chiede di ispezionare il terrazzo, cercare Gatto 2 in terrazza o verificare i terrazzi.
+  mode: queued
+  max: 3
+  fields:
+    domanda:
+      description: "Cosa cercare o verificare sui terrazzi (es. 'Cerca Gatto 2 sui terrazzi', 'C'è qualcuno sui terrazzi?')."
+      example: "Ispeziona i terrazzi alla ricerca di Gatto 2"
+      required: false
+      selector:
+        text:
+  sequence:
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "Ispezione Terrazzi Assist"
+        instructions: >-
+          Sei l'assistente visivo intelligente di casa (in paese, a Comune Residenziale).
+          Hai a disposizione le immagini in tempo reale delle due telecamere contrapposte del terrazzo:
+          - Immagine 1 (`camera.terrazza`): posizionata sopra la porta terrazzo; inquadra il tavolo al centro, il forno a destra, la parte finale del balcone camera a sinistra, il muretto di delimitazione di fronte, la Luce Terrazzo 2 (`light.luce_terrazzo_2`, ex LuceSiepe; nota: NON c'è alcuna siepe in terrazzo!) in alto, oltre alle telecamere `terrazza_2` e `terrazzo_3` (sulla sinistra).
+          - Immagine 2 (`camera.terrazza_2`): lato opposto a `camera.terrazza` (infatti inquadra `camera.terrazza`); inquadra il tavolo della terrazza, le 2 plafoniere collegate insieme (`light.luce_terrazzo`), l'esterno della porta terrazzo (che NON ha tapparella ed è dotata della gattaiola SurePet a batteria/microchip), alla sinistra della porta terrazzo inquadra `light.luce_porta_terrazzo`, la lettiera automatica `Petkit PuraMax 2` (alimentata da `presa_terrazzo`) e — alla sinistra della lettiera — i secchi della raccolta differenziata, tra la porta terrazzo e la fontana inquadra la scatola stagna che contiene il router esterno `RT2600ac-Terrazza` (con termostato e ventola `termostato_router_esterno`), a destra la fine del balcone camera, a sinistra la fine del balcone cucina e la fontana. Inoltre inquadra il RIPOSTIGLIO IN TERRAZZO chiuso da 2 sportelli scorrevoli alla francese: quando gli sportelli sono aperti, sulla sinistra si vede la lavatrice con sopra l'asciugatrice e sulla destra uno scaffale.
+
+          MEMORIA VISIVA SOGGETTI:
+          - Persone: "Utente 2" (nomignoli: La, Utente 2 o Pi; donna con folti capelli ricci castano-dorati voluminosi alle spalle, con occhiali tartarugati oppure senza occhiali), "Utente 1" (nomignoli: Ste o Cu; uomo con capelli corti lisci castani, viso asciutto dai lineamenti definiti e barba corta).
+          - Gatta LUNA: gatta NERA a pelo corto lucido con grandi occhi VERDI, musetto affusolato e nasino nero.
+          - Gatta PICCOLA: gatta ARANCIONE / ROSSA con petto, bavaglino e mento BIANCHI.
+          - SPOSTAMENTI GATTE E DISPOSITIVI: Entrano ed escono autonomamente dalla gattaiola SurePet sulla porta terrazzo (alimentata a batteria con microchip; la porta terrazzo non ha tapparella, quindi il passaggio verso la lettiera PuraMax 2 in terrazzo è sempre libero anche a tapparelle chiuse o senza corrente). Il dispenser crocchette Petkit Gemini e la fontanella Eversweet 2 sono sotto la penisola della cucina al fianco della porta terrazzo e non sono visibili dalle telecamere di casa (la cam integrata nel dispenser inquadra la gattaiola).
+
+          Richiesta dell'utente: {{ domanda | default('Ispeziona con la massima attenzione entrambe le visuali del terrazzo e verifica se vedi persone (Utente 2, Utente 1 o estranei), la gatta Gatto 2 (nera), Gatto 1 (rossa col petto bianco), la zona della lettiera PuraMax 2 a sinistra della porta terrazzo, se i 2 sportelli scorrevoli alla francese del ripostiglio (con lavatrice/asciugatrice a sinistra e scaffale a destra) sono aperti o chiusi, o situazioni insolite.') }}
+
+          Regole di risposta:
+          - Rispondi in italiano fluido, naturale e sintetico (1-2 frasi).
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home"). Usa solo il nome proprio o il nomignolo.
+          - Indica chiaramente cosa vedi dalle due angolazioni del terrazzo.
+        attachments:
+          - media_content_id: "media-source://camera/camera.terrazza"
+            media_content_type: "image/jpeg"
+          - media_content_id: "media-source://camera/camera.terrazza_2"
+            media_content_type: "image/jpeg"
+      response_variable: risultato_terrazzi
+    - variables:
+        risposta_finale:
+          descrizione: >-
+            {% if risultato_terrazzi is defined and risultato_terrazzi is mapping and 'data' in risultato_terrazzi %}
+              {{ risultato_terrazzi.data | replace('Eco Home', 'casa') | replace('Eco Home', 'casa') | replace('Famiglia', '') | replace('Famiglia', '') | trim }}
+            {% elif risultato_terrazzi is defined and risultato_terrazzi is string %}
+              {{ risultato_terrazzi | replace('Eco Home', 'casa') | replace('Eco Home', 'casa') | replace('Famiglia', '') | replace('Famiglia', '') | trim }}
+            {% else %}
+              Non sono riuscito ad analizzare i terrazzi in questo momento.
+            {% endif %}
+    - stop: "Ispezione terrazzi completata"
+      response_variable: risposta_finale
+
+ispeziona_varco_ai:
+  alias: "Ispeziona Varco / Infisso (Esterno + Interno) con AI"
+  icon: "mdi:window-shutter-alert"
+  description: >-
+    Analizza contemporaneamente la telecamera esterna e la telecamera interna associate a una finestra o porta (Finestra Camera, Finestra Cameretta, Finestra Bagnetto, Finestra Bagno, Finestra Sala, Finestra Cucina, Porta Terrazzo, Portone Ingresso, Porta Giorno/Notte, Porta Camera, Locale Tecnico, Ripostiglio) per verificare la situazione fuori e dentro.
+  mode: queued
+  max: 5
+  fields:
+    varco:
+      description: "Nome o entity_id del varco/infisso da ispezionare"
+      example: "Finestra Camera"
+      required: true
+    domanda:
+      description: "Cosa verificare sul varco"
+      default: "Verifica cosa succede all'esterno e all'interno di questo varco, se è aperto/chiuso e se ci sono persone o anomalie."
+  sequence:
+    - variables:
+        v_raw: "{{ (varco | default('porta_ingresso') | lower) }}"
+        pgn_aperta: "{{ is_state('binary_sensor.portagiorno_notte_contact', 'on') }}"
+        pc_aperta: "{{ is_state('binary_sensor.portacamera_contact', 'on') }}"
+        cam_1: >-
+          {% if 'cameretta' in v_raw %}camera.balcone_camera
+          {% elif 'bagnetto' in v_raw %}camera.balcone_camera
+          {% elif 'bagno' in v_raw %}camera.balcone_camera
+          {% elif 'finestra_camera' in v_raw or 'finestra camera' in v_raw %}camera.balcone_camera
+          {% elif 'cucina' in v_raw %}camera.balcone_sala
+          {% elif 'ripostiglio' in v_raw %}camera.terrazza_2
+          {% elif 'locale_tecnico' in v_raw or 'locale tecnico' in v_raw %}camera.scale
+          {% elif 'terrazzo' in v_raw %}camera.terrazza_2
+          {% elif 'finestra_sala' in v_raw or 'finestra sala' in v_raw %}camera.balcone_sala
+          {% elif 'giorno' in v_raw %}camera.sala
+          {% elif 'corridoio' in v_raw %}{{ 'camera.sala_2' if pgn_aperta else 'camera.cameretta' }}
+          {% elif 'portacamera' in v_raw or 'porta camera' in v_raw %}camera.camera
+          {% else %}camera.scale{% endif %}
+        cam_2: >-
+          {% if 'cameretta' in v_raw %}camera.cameretta
+          {% elif 'bagnetto' in v_raw %}camera.camera
+          {% elif 'bagno' in v_raw %}{{ 'camera.sala' if pgn_aperta else 'camera.cameretta' }}
+          {% elif 'finestra_camera' in v_raw or 'finestra camera' in v_raw %}camera.camera
+          {% elif 'cucina' in v_raw %}camera.sala
+          {% elif 'ripostiglio' in v_raw %}camera.terrazzo_3
+          {% elif 'locale_tecnico' in v_raw or 'locale tecnico' in v_raw %}camera.sala
+          {% elif 'terrazzo' in v_raw %}camera.sala_2
+          {% elif 'finestra_sala' in v_raw or 'finestra sala' in v_raw %}camera.sala
+          {% elif 'giorno' in v_raw %}{{ 'camera.camera' if pc_aperta else 'camera.cameretta' }}
+          {% elif 'corridoio' in v_raw %}{{ 'camera.camera' if pc_aperta else 'camera.cameretta' }}
+          {% elif 'portacamera' in v_raw or 'porta camera' in v_raw %}camera.cameretta
+          {% else %}camera.sala{% endif %}
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "Ispezione Varco Doppia Telecamera"
+        instructions: >-
+          Sei l'assistente visivo intelligente di casa (in paese, a Comune Residenziale).
+          Stai ispezionando il varco "{{ varco }}" attraverso le sue due telecamere dedicate:
+          - Immagine 1 ({{ cam_1 }}): visuale lato 1.
+          - Immagine 2 ({{ cam_2 }}): visuale lato 2.
+          Nota sulle porte interne e locali:
+          - Porta Giorno/Notte (divide Zona Giorno Sala/Cucina da Zona Notte): {{ 'APERTA' if pgn_aperta else 'CHIUSA' }}.
+          - Porta Camera (isola Camera e Bagnetto dal corridoio e dal resto di casa): {{ 'APERTA' if pc_aperta else 'CHIUSA' }}.
+          - Il Locale Tecnico (con dentro, non visibili dalle telecamere, la pompa di calore per l'acqua calda e il router `RT2600ac-Entrata`) si trova fuori dal portone d'ingresso principale, nel sottoscala delle scale del 2° piano sulla destra di `camera.scale` (adiacente al muro del camino).
+          - Il Ripostiglio in terrazzo (visto da `camera.terrazza_2` e `camera.terrazzo_3`) è chiuso da 2 sportelli scorrevoli alla francese e contiene a sinistra lavatrice + asciugatrice sopra e a destra uno scaffale.
+          Richiesta: {{ domanda | default("Verifica cosa succede all'esterno e all'interno di questo varco, se vedi persone, gatte (Gatto 2 nera, Gatto 1 rossa/bianca) o anomalie.") }}
+          REGOLE TASSATIVE:
+          - Rispondi in italiano naturale e diretto (1-3 frasi) specificando sia cosa si vede in {{ cam_1 }} sia cosa si vede in {{ cam_2 }}.
+          - DIVIETO ASSOLUTO DI COGNOMI: Non dire MAI "Famiglia" né "Eco Home".
+        attachments:
+          - media_content_id: "media-source://camera/{{ cam_1 }}"
+            media_content_type: "image/jpeg"
+          - media_content_id: "media-source://camera/{{ cam_2 }}"
+            media_content_type: "image/jpeg"
+      response_variable: res_varco
+      continue_on_error: true
+    - variables:
+        risposta_finale:
+          descrizione: >-
+            {% if res_varco is defined and res_varco is mapping and 'data' in res_varco %}
+              {{ res_varco.data | replace('Eco Home', 'casa') | replace('Eco Home', 'casa') | replace('Famiglia', '') | replace('Famiglia', '') | trim }}
+            {% else %}
+              Non sono riuscito ad analizzare le telecamere del varco in questo momento.
+            {% endif %}
+          telecamera_1: "{{ cam_1 }}"
+          telecamera_2: "{{ cam_2 }}"
+    - stop: "Ispezione varco completata"
+      response_variable: risposta_finale
+
+analizza_video_movimento_ai:
+  alias: "Analizza Breve Video Telecamera con AI"
+  icon: "mdi:video-vintage"
+  description: >-
+    Registra un breve filmato video on-demand (5 secondi) da una telecamera e usa l'intelligenza artificiale per analizzare movimenti, persone, animali o veicoli.
+    Usa questo script quando l'utente chiede esplicitamente di analizzare un video, registrare un filmato o verificare movimenti in corso.
+  mode: queued
+  max: 3
+  fields:
+    camera:
+      description: "Entità della telecamera da registrare e analizzare (es. camera.terrazzo_3, camera.sala, camera.sala_2, camera.camera, camera.cameretta, camera.balcone_camera, camera.balcone_sala, camera.terrazza, camera.terrazza_2, camera.scale)."
+      example: "camera.terrazzo_3"
+      required: true
+      selector:
+        entity:
+          domain: camera
+    durata:
+      description: "Durata in secondi del filmato (da 4 a 10 secondi)."
+      example: 5
+      default: 5
+      selector:
+        number:
+          min: 3
+          max: 15
+          unit_of_measurement: "sec"
+    domanda:
+      description: "Cosa verificare o cercare nel filmato."
+      example: "Descrivi cosa vedi e se ci sono movimenti o persone"
+      required: false
+      selector:
+        text:
+  sequence:
+    - action: camera.record
+      target:
+        entity_id: "{{ camera }}"
+      data:
+        filename: "/media/video_analisi_temp.mp4"
+        duration: "{{ durata | default(5) | int }}"
+    - delay:
+        seconds: "{{ (durata | default(5) | int) + 1 }}"
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "Analisi Video Clip Assist"
+        instructions: >-
+          Sei l'assistente visivo intelligente di casa (in paese, a Comune Residenziale).
+          Guarda con attenzione questo filmato video registrato dalla telecamera {{ camera }}.
+
+          MEMORIA VISIVA SOGGETTI, OGGETTI FISSI E VARCHI:
+          - Persone: "Utente 2" (La/Utente 2/Pi; riccia), "Utente 1" (Ste/Cu; capelli corti e barba corta). Quando Utente 1 e Utente 2 sono in vacanza o via per qualche giorno, a dare un'occhiata a casa, alle gatte e all'acquario vengono in genere Mamma e/o il fratello Familiare 2.
+          - Gatte: "Gatto 2" (nera), "Gatto 1" (arancione con petto bianco) — entrano/escono dalla gattaiola SurePet sulla porta terrazzo (senza tapparella, alimentata a batteria con microchip). Spesso dormono sul letto in camera (principalmente vicino a Utente 1) o sui divani (in sala e in cameretta), e in estate Gatto 2 dorme spesso dentro il lavandino del bagnetto perché è più fresco. Dispenser Petkit Gemini e fontanella Eversweet 2 sono sotto la penisola della cucina al fianco della porta terrazzo (non visibili dalle telecamere di casa; la cam del dispenser inquadra la gattaiola). La lettiera automatica Petkit PuraMax 2 è in terrazzo a sinistra della porta terrazzo (alimentata da presa_terrazzo e visibile da terrazza_2).
+          - Auto (visibili ESCLUSIVAMENTE da terrazzo_3 e balcone_camera, MAI da scale!):
+            1) VEICOLI RESIDENTI ABITUALI DELLO STABILE: "Auto Utente 1 (SUV) di Utente 1" (parcheggiata nell'uliveto privato oltre il cancello su Via Secondaria, visibile da terrazzo_3); "Camper di zia" e "Crossover Ospite di zia" (nel parcheggio sottostante con cancello verso Via Principale, alla sinistra di balcone_camera); "Jeep di zia" (fuoristrada grigio/argento 3 porte con ruota posteriore), "Auto Ospite 1 di Familiare 4" (station wagon scura) e "Auto Utente 2 di Utente 2" (Auto Utente 2 (Utilitaria)) nei posti fissi sulla strada sotto casa Via Secondaria (inquadrata da terrazzo_3).
+            2) REGOLA TASSATIVA ANTI-FALSI POSITIVI SULLE STRADE PUBBLICHE (Via Secondaria sotto terrazzo_3 e Via Principale a sinistra di balcone_camera): sulle strade pubbliche passano e parcheggiano anche auto di estranei o vicini di modelli molto comuni. Le auto di familiari/amici non residenti ("Auto Familiare 1" di Mamma, "Auto Familiare 2" e "VW Auto Familiare 3" di Coppia Familiari 1, "Auto Familiare 4" di mamma Familiare 6/Familiare 7, "Auto Familiare 5" e "Auto Familiare 6" di Coppia Familiari 2, "Auto Familiare 7" di papà Coppia Familiari 3, "Auto Ospite" di Familiare 13, "SUV Amici" e "Berlina Amici" di Coppia Amici 1, "Berlina Amici 2" e "Utilitaria Amici" di Coppia Amici 2) NON vanno MAI attribuite con certezza se viste sulla strada pubblica: ignora le auto in semplice transito, e per quelle parcheggiate descrivi oggettivamente modello/colore citando l'eventuale compatibilità con un ospite solo come ipotesi prudente (specificando che essendo strada pubblica senza targa visibile potrebbe appartenere a un passante/vicino).
+          - Scale (`scale`): scale del 1° piano verso l'appartamento (nessuna auto nostra visibile); a destra portone d'ingresso, scale del 2° piano (dove abitano zia e Familiare 4, a cui forniamo internet tramite rete Ospiti con la loro stampante HP) e nel sottoscala (adiacente al muro del camino) il LOCALE TECNICO (dentro cui, non visibili dalle telecamere, ci sono la pompa di calore per l'acqua calda, i sacchi di pellet per il Termocamino vicino alla pompa di calore e il router RT2600ac-Entrata).
+          - Interni: `sala` (inquadra benissimo il camino Termocamino a pellet Klover che d'inverno manda tutti i termosifoni di casa — di cui si vede chiaramente anche la fiamma accesa dal vetro quando è in funzione — con sopra il Telecomando Mensole Camino, divano dove dormono spesso Gatto 1 e Gatto 2 con davanti il tavolinetto su cui c'è il Telecomando Divano, acquario con 16 pesci [7 neon, 7 rasbore e 2 Corydoras pulitori di fondo] e dietro presa_ossigenatore_acquario e fzone-bt-proxy e sotto il faretto luce_mobiletto_camino a destra del camino e a sinistra della TV sala [non alimentato], TV da 85" appesa al muro con sopra la mensola e sotto la mensola la striscia LED luce_mensole_camino che illumina la parete della TV [non alimentata], sul mobile sospeso sotto la TV la Soundbar Samsung, il cilindro Netatmo e il Nest Hub Sala e a terra sotto il mobile sospeso il Subwoofer, termostato Smarther2 tra TV e portone usato solo come monitor temperatura perché non c'è più caldaia a gas e sotto il termostato il Comando entra/esci, quadro elettrico generale dietro al portone d'ingresso con dentro Tag NFC e QR Code Ospiti, Tablet Plancia nei pressi dell'entrata alimentato da presa_entrata_sx insieme a luce_ambiente_sala, tavolo cucina, portone, porta giorno/notte, finestre sala/cucina/bagno); `sala_2` (tutta la cucina: forno, piano cottura, frigo, lavastoviglie, lavandino, i 6 Faretti Cucina Hue incassati nella veletta di cartongesso in cucina con il Telecomando Faretti Cucina attaccato in cucina, le 2 luci collegate insieme di luce_applique, tavolo, termosifone, piantana luce_ambiente_sala vicino alla porta d'ingresso alimentata da presa_entrata_sx con il Telecomando Luce Ambiente Sala proprio sotto la piantana, zona TV sala con striscia LED luce_mensole_camino sotto la mensola sopra la TV, sul mobile sospeso sotto la TV la Soundbar, il cilindro Netatmo e il Nest Hub Sala e a terra sotto il mobile sospeso il Subwoofer visibili mentre il termostato e il Comando entra/esci sono coperti dall'inclinazione della TV, porta terrazzo e il corridoio); `camera` (letto dove dormono spesso Gatto 1 e Gatto 2 principalmente vicino a Utente 1 con luci comodino luce_stefano_camera e luce_laura_camera, Nest Hub Camera vicino alla finestra camera accanto al comando tapparella, Base di Dobby, TV camera con Chromecast-Camera collegato e sopra il router RT2600ac-Camera, condizionatore camera, bagnetto nel cui lavandino in estate dorme spesso Gatto 2 perché è più fresco, corridoio, finestra camera/bagnetto, porta camera e porta giorno/notte); `cameretta` (divano dove dormono spesso Gatto 1 e Gatto 2, scrivania con sopra nell'angolo in fondo a destra il NAS Synology DS1522+ e a terra sulla destra della scrivania sotto al NAS l'UPS, presa_scrivania_cameretta CRITICA per dockstation Dell/monitor/Nest Hub Cameretta sulla scrivania non sotto UPS/UPS/NAS/switch, presa_tv_cameretta per TV, condizionatore cameretta, stampante Brother a destra della finestra nascosta tra muro e armadio non visibile, corridoio con presa_sx_corridoio per Dyson, presa_dx_corridoio per diffusore feromoni dei gatti e presa_dx_2_corridoio/presa_sx_2_corridoio libere, in bagno presa_sotto_lavandino_bagno per spazzolino Oral-B di Utente 1, Nicchia nel muro chiusa da sportello non visibile con alimentatore dell'antenna FWA [antenna esterna sul balcone di zia al piano superiore adiacente al balcone camera del 2° piano non visibile]/RT6600ax/hub gattaiola/SLZB-06Mg24U/HDHomeRun/ventolina termostato_nicchia, sensori temperatura/umidità Cucina/Corridoio/Bagnetto/Ripostiglio appoggiati ma nascosti/troppo piccoli per le visuali delle telecamere, finestra cameretta).
+          - Terrazzo e Balconi: `terrazza` (sopra porta terrazzo: tavolo, forno a legna a destra, Luce Terrazzo 2 [`light.luce_terrazzo_2`, ex LuceSiepe; nota: non c'è alcuna siepe in terrazzo], muretto, modulo esterno Netatmo in terrazzo, cam terrazza_2 e terrazzo_3 con sotto l'Anemometro Netatmo); `terrazza_2` (lato opposto: tavolo, 2 plafoniere collegate insieme di luce_terrazzo, esterno porta terrazzo, a sinistra della porta terrazzo luce_porta_terrazzo, la lettiera Petkit PuraMax 2 e — alla sinistra della lettiera — i secchi della raccolta differenziata perfettamente visibili dalla telecamera, tra porta terrazzo e lavandino in muratura la scatola stagna del router esterno RT2600ac-Terrazza con termostato e ventolina di raffreddamento, lavandino in muratura con rubinetto [fontana] a sinistra, ripostiglio chiuso da 2 sportelli scorrevoli alla francese con a sinistra lavatrice+asciugatrice sopra e a destra scaffale); `balcone_camera` (vede in fila luce balcone camera e luce balcone cameretta, e a sinistra il parcheggio di Auto Ospite 2/Camper di zia e la strada Via Principale); `balcone_sala` (vede in fila luce balcone sala e luce balcone cucina, e alla fine del balcone sala il Pluviometro Netatmo; dietro balcone_sala c'è l'unità esterna del condizionatore sala non visibile).
+
+          Richiesta dell'utente: {{ domanda | default('Descrivi cosa succede nel filmato: persone, movimenti, veicoli o animali presenti.') }}
+
+          Regole di risposta:
+          - Rispondi in italiano fluido, naturale e sintetico (1-3 frasi).
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home"). Usa solo il nome proprio o il nomignolo.
+          - Indica chiaramente se la scena è calma o se ci sono movimenti reali.
+        attachments:
+          - media_content_id: "media-source://media_source/local/video_analisi_temp.mp4"
+            media_content_type: "video/mp4"
+      response_variable: risultato_video
+    - variables:
+        risposta_finale:
+          descrizione: >-
+            {% if risultato_video is defined and risultato_video is mapping and 'data' in risultato_video %}
+              {{ risultato_video.data | replace('Eco Home', 'casa') | replace('Eco Home', 'casa') | replace('Famiglia', '') | replace('Famiglia', '') | trim }}
+            {% elif risultato_video is defined and risultato_video is string %}
+              {{ risultato_video | replace('Eco Home', 'casa') | replace('Eco Home', 'casa') | replace('Famiglia', '') | replace('Famiglia', '') | trim }}
+            {% else %}
+              Non sono riuscito ad analizzare il video in questo momento.
+            {% endif %}
+          telecamera: "{{ camera }}"
+    - stop: "Analisi video completata"
+      response_variable: risposta_finale
+
+muovi_telecamera_terrazzo_3:
+  alias: "Muovi Telecamera Terrazzo 3 e Verifica Visione"
+  icon: "mdi:camera-control"
+  description: >-
+    Ruota o muove la telecamera motorizzata PTZ del Terrazzo 3 in una direzione (destra, sinistra, su, giu) per cambiare inquadratura (Via Secondaria con Jeep/Auto Ospite 1/Auto Utente 2 dei residenti o eventuali auto compatibili con quelle di familiari e amici, cancello del parcheggio abituale di Utente 1 oltre la Auto Ospite 1 e sagoma della Auto Utente 1 (SUV) di Utente 1 nell'uliveto, parcheggio con Crossover Ospite/Camper di zia e Via Principale, balcone camera con finestre e motore dual-split condizionatore, oppure terrazzo e ripostiglio a 2 sportelli scorrevoli alla francese con lavatrice/asciugatrice e scaffale).
+    Usa questo script ogni volta che l'utente chiede di muovere, girare, ruotare la telecamera del terrazzo 3 o cercare un'altra inquadratura.
+  mode: queued
+  max: 3
+  fields:
+    direzione:
+      description: "Direzione del movimento: destra, sinistra, su, giu."
+      example: "destra"
+      required: true
+      selector:
+        select:
+          options:
+            - destra
+            - sinistra
+            - su
+            - giu
+    passi:
+      description: "Numero di impulsi/passi di movimento (da 1 a 5, predefinito 2)."
+      example: 2
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 5
+    controlla_inquadratura:
+      description: "Se impostato su true, dopo il movimento analizza la nuova inquadratura con l'IA."
+      example: true
+      default: true
+      selector:
+        boolean:
+  sequence:
+    - repeat:
+        count: "{{ passi | default(2) | int }}"
+        sequence:
+          - action: button.press
+            target:
+              entity_id: "button.terrazzo_3_ptz_{{ direzione }}"
+          - delay:
+              milliseconds: 400
+    - delay:
+        seconds: 1
+    - if:
+        - condition: template
+          value_template: "{{ controlla_inquadratura | default(true) }}"
+      then:
+        - action: gemini_vision.analizza_telecamera
+          data:
+            camera: terrazzo_3
+            question: "Descrivi cosa vedi in questa nuova inquadratura dopo il movimento della telecamera (Via Secondaria sotto casa con i veicoli residenti Jeep di zia/Auto Ospite 1 di Familiare 4/Auto Utente 2 di Utente 2, cancello del parcheggio privato di Utente 1 oltre la Auto Ospite 1 e sagoma della Auto Utente 1 (SUV) nell'uliveto, parcheggio con Crossover Ospite/Camper di zia verso Via Principale, balcone camera con finestre e unità esterna dual-split condizionatore, oppure terrazzo e ripostiglio con 2 sportelli scorrevoli alla francese; per eventuali altre auto sulla strada pubblica descrivile oggettivamente senza darle per certe come auto di ospiti)."
+          response_variable: risultato_nuova_visione
+          continue_on_error: true
+        - variables:
+            risposta_finale:
+              descrizione: >-
+                Telecamera ruotata a {{ direzione }}. {{ risultato_nuova_visione.descrizione if risultato_nuova_visione is defined and risultato_nuova_visione is mapping and 'descrizione' in risultato_nuova_visione else (risultato_nuova_visione.response if risultato_nuova_visione is defined and risultato_nuova_visione is mapping and 'response' in risultato_nuova_visione else 'Nuova inquadratura impostata.') }}
+              direzione: "{{ direzione }}"
+        - stop: "Movimento e verifica completati"
+          response_variable: risposta_finale
+      else:
+        - variables:
+            risposta_semplice:
+              descrizione: "Ho mosso la telecamera del terrazzo 3 verso {{ direzione }}."
+              direzione: "{{ direzione }}"
+        - stop: "Movimento completato"
+          response_variable: risposta_semplice
+
+cerca_auto_autonoma_ptz:
+  alias: "Cerca Auto in Completa Autonomia con Telecamera PTZ"
+  icon: "mdi:car-search"
+  description: >-
+    Scandaglia in completa autonomia Via Secondaria, l'uliveto e il parcheggio sottostante verso Via Principale con la telecamera motorizzata PTZ del Terrazzo 3 (camera.terrazzo_3) per cercare veicoli residenti (Auto Utente 1 (SUV) di Utente 1 nell'uliveto, Jeep di zia, Auto Ospite 1 di Familiare 4, Auto Utente 2 di Utente 2, Crossover Ospite di zia, Camper di zia) o verificare se sulla strada pubblica c'è un'auto compatibile con quella di un familiare/amico atteso.
+    Muove autonomamente la telecamera in diverse angolazioni (centro, destra, sinistra) analizzando ogni inquadratura con l'IA fino a trovare il veicolo o confermare che non è presente.
+  mode: single
+  fields:
+    veicolo_cercato:
+      description: "Nome o tipo del veicolo da cercare (es. 'Auto Utente 1 (SUV) di Utente 1', 'Jeep di zia', 'Auto Ospite 1 di Familiare 4', 'Auto Utente 2 di Utente 2', 'Crossover Ospite di zia', 'Camper di zia', oppure un veicolo di un ospite atteso)."
+      example: "Jeep di zia"
+      required: false
+      selector:
+        text:
+  sequence:
+    # -------------------------------------------------------------
+    # FASE 1: Controllo inquadratura attuale
+    # -------------------------------------------------------------
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "Ricerca Auto PTZ - Fase 1 Centro"
+        instructions: >-
+          Sei l'assistente visivo intelligente di casa.
+          Analizza questa inquadratura ripresa dalla telecamera PTZ Terrazzo 3.
+          Stai cercando: {{ veicolo_cercato | default('i veicoli residenti dello stabile (Auto Utente 1 (SUV) di Utente 1 nell uliveto, Jeep di zia, Auto Ospite 1 di Familiare 4, Auto Utente 2 di Utente 2, Crossover Ospite di zia, Camper di zia)') }}.
+          Ospite attualmente in attesa in domotica: {{ states('input_text.ospite_in_attesa') }}.
+
+          MEMORIA VISIVA VEICOLI E REGOLA ANTI-FALSI POSITIVI SULLE STRADE PUBBLICHE (visibili ESCLUSIVAMENTE da terrazzo_3 e balcone_camera, MAI da scale):
+          - VEICOLI RESIDENTI ABITUALI DELLO STABILE:
+            * "Auto Utente 1 (SUV) di Utente 1": fuoristrada Auto Utente 1 (SUV) parcheggiata in mezzo all'uliveto privato oltre il cancello su Via Secondaria (poco più avanti della Auto Ospite 1 di Familiare 4).
+            * "Jeep di zia": fuoristrada grigio/argento 3 porte con ruota di scorta sul portellone posteriore (su Via Secondaria).
+            * "Auto Ospite 1 di Familiare 4": station wagon scura/nera parcheggiata solitamente a fianco della Jeep su Via Secondaria.
+            * "Auto Utente 2 di Utente 2": utilitaria Auto Utente 2 (Utilitaria) su Via Secondaria.
+            * "Camper di zia" e "Crossover Ospite di zia": nel parcheggio sottostante con cancello verso Via Principale.
+          - VEICOLI DI OSPITI/FAMILIARI NON RESIDENTI SULLE STRADE PUBBLICHE (Via Secondaria e Via Principale):
+            * Auto Familiare 1 (Mamma), Auto Familiare 2 o VW Auto Familiare 3 (Coppia Familiari 1), Auto Familiare 4 (mamma Familiare 6 / Familiare 7), Auto Familiare 5 o Auto Familiare 6 (Coppia Familiari 2), Auto Familiare 7 (papà Coppia Familiari 3), Auto Ospite (Familiare 13), SUV Amici o Berlina Amici (Coppia Amici 1), Berlina Amici 2 o Utilitaria Amici (Coppia Amici 2).
+            * ATTENZIONE ANTI-FALSI POSITIVI: poiché la strada è pubblica, se vedi un'auto in strada di modello/colore comune compatibile con un ospite non residente, NON darla mai per certa al 100%, ma specifica sempre che è compatibile per modello/colore ma trovandosi su strada pubblica senza lettura targa potrebbe appartenere a un passante o vicino. Ignora le auto in semplice transito.
+
+          REGOLE DI RISPOSTA:
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home").
+          - Se vedi chiaramente il veicolo cercato, rispondi iniziando con "TROVATA:" e descrivi in italiano naturale e sintetico cosa vedi e dove si trova (applicando la prudenza anti-falsi positivi se si tratta di un'auto su strada pubblica).
+          - Se il veicolo cercato NON è presente in questa inquadratura, rispondi iniziando con "NON_PRESENTE:" e motiva brevemente.
+        attachments:
+          - media_content_id: "media-source://camera/camera.terrazzo_3"
+            media_content_type: "image/jpeg"
+      response_variable: r1
+
+    - if:
+        - condition: template
+          value_template: "{{ 'TROVAT' in (r1.data | upper) if (r1 is defined and r1 is mapping and 'data' in r1) else false }}"
+      then:
+        - variables:
+            esito_trovata_centro:
+              descrizione: >-
+                {{ r1.data | replace('TROVATA:', '') | replace('**TROVATA:**', '') | replace('TROVATA', '') | replace('Eco Home', 'casa') | replace('Eco Home', 'casa') | replace('Famiglia', '') | replace('Famiglia', '') | trim }}
+              esito: "trovata"
+              posizione: "inquadratura iniziale"
+        - stop: "Auto individuata nell'inquadratura iniziale"
+          response_variable: esito_trovata_centro
+
+    # -------------------------------------------------------------
+    # FASE 2: Scansione a destra (3 passi)
+    # -------------------------------------------------------------
+    - repeat:
+        count: 3
+        sequence:
+          - action: button.press
+            target:
+              entity_id: button.terrazzo_3_ptz_destra
+          - delay:
+              milliseconds: 350
+    - delay:
+        seconds: 1
+
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "Ricerca Auto PTZ - Fase 2 Destra"
+        instructions: >-
+          Sei l'assistente visivo intelligente di casa.
+          La telecamera Terrazzo 3 è stata appena ruotata verso DESTRA per cercare: {{ veicolo_cercato | default('i veicoli residenti dello stabile (Auto Utente 1 (SUV) di Utente 1 nell uliveto, Jeep di zia, Auto Ospite 1 di Familiare 4, Auto Utente 2 di Utente 2, Crossover Ospite di zia, Camper di zia)') }}.
+          Ospite attualmente in attesa in domotica: {{ states('input_text.ospite_in_attesa') }}.
+
+          MEMORIA VISIVA VEICOLI E REGOLA ANTI-FALSI POSITIVI:
+          - Residenti abituali: "Auto Utente 1 (SUV) di Utente 1" (nell'uliveto privato oltre il cancello su Via Secondaria), "Jeep di zia" (grigia 3 porte con ruota posteriore su Via Secondaria), "Auto Ospite 1 di Familiare 4" (station wagon scura su Via Secondaria), "Auto Utente 2 di Utente 2" (Auto Utente 2 (Utilitaria) su Via Secondaria), "Camper di zia" e "Crossover Ospite di zia" (nel parcheggio sottostante con cancello verso Via Principale).
+          - Ospiti non residenti (Auto Familiare 1 di Mamma, Auto Familiare 2 / Auto Familiare 3 di Coppia Familiari 1, Auto Familiare 4 di Familiare 6/Familiare 7, Auto Familiare 5 / Auto Familiare 6 di Coppia Familiari 2, Auto Familiare 7 di Coppia Familiari 3, Auto Ospite di Familiare 13, SUV Amici / Berlina Amici di Coppia Amici 1, Berlina Amici 2 / Utilitaria Amici di Coppia Amici 2): poiché Via Secondaria e Via Principale sono strade pubbliche, non dare mai per certa al 100% un'auto comune vista in strada, ma indicala solo come compatibile per modello/colore specificando che su strada pubblica potrebbe essere di un passante/vicino.
+
+          REGOLE DI RISPOSTA:
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home").
+          - Se vedi chiaramente il veicolo cercato, rispondi iniziando con "TROVATA:" e descrivi cosa vedi.
+          - Se il veicolo cercato NON è presente, rispondi con "NON_PRESENTE:".
+        attachments:
+          - media_content_id: "media-source://camera/camera.terrazzo_3"
+            media_content_type: "image/jpeg"
+      response_variable: r2
+
+    - if:
+        - condition: template
+          value_template: "{{ 'TROVAT' in (r2.data | upper) if (r2 is defined and r2 is mapping and 'data' in r2) else false }}"
+      then:
+        - variables:
+            esito_trovata_destra:
+              descrizione: >-
+                Ho trovato il veicolo orientando la telecamera a destra: {{ r2.data | replace('TROVATA:', '') | replace('**TROVATA:**', '') | replace('TROVATA', '') | replace('Eco Home', 'casa') | replace('Eco Home', 'casa') | replace('Famiglia', '') | replace('Famiglia', '') | trim }}
+              esito: "trovata"
+              posizione: "destra"
+        - stop: "Auto individuata verso destra"
+          response_variable: esito_trovata_destra
+
+    # -------------------------------------------------------------
+    # FASE 3: Scansione a sinistra (6 passi a sinistra per coprire l'altro lato)
+    # -------------------------------------------------------------
+    - repeat:
+        count: 6
+        sequence:
+          - action: button.press
+            target:
+              entity_id: button.terrazzo_3_ptz_sinistra
+          - delay:
+              milliseconds: 350
+    - delay:
+        seconds: 1
+
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "Ricerca Auto PTZ - Fase 3 Sinistra"
+        instructions: >-
+          Sei l'assistente visivo intelligente di casa.
+          La telecamera Terrazzo 3 è stata ruotata verso SINISTRA per cercare: {{ veicolo_cercato | default('i veicoli residenti dello stabile (Auto Utente 1 (SUV) di Utente 1 nell uliveto, Jeep di zia, Auto Ospite 1 di Familiare 4, Auto Utente 2 di Utente 2, Crossover Ospite di zia, Camper di zia)') }}.
+          Ospite attualmente in attesa in domotica: {{ states('input_text.ospite_in_attesa') }}.
+
+          MEMORIA VISIVA VEICOLI E REGOLA ANTI-FALSI POSITIVI:
+          - Residenti abituali: "Auto Utente 1 (SUV) di Utente 1" (nell'uliveto privato oltre il cancello su Via Secondaria), "Jeep di zia" (grigia 3 porte con ruota posteriore su Via Secondaria), "Auto Ospite 1 di Familiare 4" (station wagon scura su Via Secondaria), "Auto Utente 2 di Utente 2" (Auto Utente 2 (Utilitaria) su Via Secondaria), "Camper di zia" e "Crossover Ospite di zia" (nel parcheggio sottostante con cancello verso Via Principale).
+          - Ospiti non residenti (Auto Familiare 1 di Mamma, Auto Familiare 2 / Auto Familiare 3 di Coppia Familiari 1, Auto Familiare 4 di Familiare 6/Familiare 7, Auto Familiare 5 / Auto Familiare 6 di Coppia Familiari 2, Auto Familiare 7 di Coppia Familiari 3, Auto Ospite di Familiare 13, SUV Amici / Berlina Amici di Coppia Amici 1, Berlina Amici 2 / Utilitaria Amici di Coppia Amici 2): poiché Via Secondaria e Via Principale sono strade pubbliche, non dare mai per certa al 100% un'auto comune vista in strada, ma indicala solo come compatibile per modello/colore specificando che su strada pubblica potrebbe essere di un passante/vicino.
+
+          REGOLE DI RISPOSTA:
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home").
+          - Se vedi chiaramente il veicolo cercato, rispondi iniziando con "TROVATA:" e descrivi cosa vedi.
+          - Se il veicolo cercato NON è presente, rispondi con "NON_PRESENTE:".
+        attachments:
+          - media_content_id: "media-source://camera/camera.terrazzo_3"
+            media_content_type: "image/jpeg"
+      response_variable: r3
+
+    - if:
+        - condition: template
+          value_template: "{{ 'TROVAT' in (r3.data | upper) if (r3 is defined and r3 is mapping and 'data' in r3) else false }}"
+      then:
+        - variables:
+            esito_trovata_sinistra:
+              descrizione: >-
+                Ho trovato il veicolo orientando la telecamera a sinistra: {{ r3.data | replace('TROVATA:', '') | replace('**TROVATA:**', '') | replace('TROVATA', '') | replace('Eco Home', 'casa') | replace('Eco Home', 'casa') | replace('Famiglia', '') | replace('Famiglia', '') | trim }}
+              esito: "trovata"
+              posizione: "sinistra"
+        - stop: "Auto individuata verso sinistra"
+          response_variable: esito_trovata_sinistra
+
+    # -------------------------------------------------------------
+    # FASE 4: Ripristino posizione centrale se non trovata
+    # -------------------------------------------------------------
+    - repeat:
+        count: 3
+        sequence:
+          - action: button.press
+            target:
+              entity_id: button.terrazzo_3_ptz_destra
+          - delay:
+              milliseconds: 350
+    - delay:
+        milliseconds: 500
+    - variables:
+        esito_non_trovata:
+          descrizione: >-
+            Ho scandagliato la strada, l'uliveto e il parcheggio sottostanti muovendo autonomamente la telecamera tra centro, destra e sinistra, ma al momento {{ veicolo_cercato | default("il veicolo") }} non è visibile. Ho quindi riposizionato la telecamera al centro.
+          esito: "non_trovata"
+          posizione: "riportata_al_centro"
+    - stop: "Ricerca autonoma conclusa senza riscontro"
+      response_variable: esito_non_trovata
+
+verifica_fiamma_camino_ai:
+  alias: "🔥 Camino: Verifica Visiva Fiamma e Stato con AI (Zoom)"
+  description: "Acquisisce uno snapshot ad alta definizione da camera.sala con zoom diretto sul Termocamino a pellet Klover, analizza la fiamma con Gemini Vision e aggiorna la scheda del popup #camino più notifica su smartphone."
+  icon: "mdi:fireplace"
+  mode: restart
+  sequence:
+    - action: gemini_vision.analizza_telecamera
+      data:
+        camera: "camino"
+        question: >-
+          Osserva attentamente questo zoom ravvicinato sul Termocamino a pellet Klover in Sala: la fiamma dentro il vetro del braciere è visibile e accesa (viva, debole o assente)? Il vetro è pulito? C'è qualcuno o una delle gatte (Gatto 1 rossa o Gatto 2 nera) proprio davanti al camino? Rispondi in 2 frasi chiare e concise.
+      response_variable: ai_camino_res
+      continue_on_error: true
+    - variables:
+        stato_klover: "{{ states('sensor.camino_status') }}"
+        temp_fiamma: "{{ states('sensor.camino_flame_temperature') | float(0) | round(0) | int }}"
+        temp_acqua: "{{ states('sensor.camino_water_temperature') | float(0) | round(0) | int }}"
+        pellet_oggi: "{{ states('sensor.camino_pellet_consumato_oggi') }}"
+        sacchi_pellet: "{{ states('input_number.sacchi_pellet_rimanenti') | int(0) }}"
+        descrizione_visiva: >-
+          {% if ai_camino_res is defined and ai_camino_res is mapping and 'descrizione' in ai_camino_res %}
+            {{ ai_camino_res.descrizione }}
+          {% elif ai_camino_res is defined and ai_camino_res is mapping and 'response' in ai_camino_res %}
+            {{ ai_camino_res.response }}
+          {% elif states('sensor.gemini_vision_ultimo_responso') not in ['unknown', 'unavailable', ''] %}
+            {{ state_attr('sensor.gemini_vision_ultimo_responso', 'descrizione') | default(states('sensor.gemini_vision_ultimo_responso'), true) }}
+          {% else %}
+            Snapshot acquisito da Telecamera Sala.
+          {% endif %}
+    - action: persistent_notification.create
+      data:
+        notification_id: "verifica_camino_ai"
+        title: "🔥 Verifica Visiva Termocamino Klover ({{ now().strftime('%H:%M') }})"
+        message: >-
+          **👁️ AI Sala:** {{ descrizione_visiva }}
+
+          **📊 Stato:** `{{ stato_klover }}` · **Fiamma:** `{{ temp_fiamma }}°C` · **Acqua Termosifoni:** `{{ temp_acqua }}°C` · **Pellet oggi:** `{{ pellet_oggi }} kg` (Scorta: `{{ sacchi_pellet }}` sacchi)
+
+          ![Telecamera Sala](/local/cam_snapshots/camino_sala.jpg?t={{ now().timestamp() | int }})
+      continue_on_error: true
+    - action: script.notifica_smart
+      data:
+        titolo: "🔥 Verifica Visiva Termocamino Klover"
+        messaggio: >-
+          👁️ AI Sala: {{ descrizione_visiva }}
+          📊 Stato: {{ stato_klover }} | Fiamma: {{ temp_fiamma }}°C | Acqua Termosifoni: {{ temp_acqua }}°C
+          🪵 Pellet oggi: {{ pellet_oggi }} kg (Scorta: {{ sacchi_pellet }} sacchi)
+        priorita: "critica"
+        categoria: "clima"
+        immagine: "/local/cam_snapshots/camino_sala.jpg?t={{ now().timestamp() | int }}"
+        tag: "verifica_camino_ai"
+      continue_on_error: true
+
+riconosci_auto_ospiti_ai:
+  alias: "🚗 Parcheggio: Riconosci Auto Familiari e Amici con AI"
+  description: "Scatta uno snapshot da camera.terrazzo_3 e usa Gemini Vision per verificare i veicoli residenti (Auto Utente 1 nell'uliveto, Auto Utente 2, Jeep, Auto Ospite 1) ed eventuali auto parcheggiate compatibili con ospiti attesi, applicando il filtro anti-falsi positivi sulla strada pubblica."
+  icon: "mdi:car-connected"
+  mode: single
+  sequence:
+    - variables:
+        ospite_atteso: "{{ states('input_text.ospite_in_attesa') }}"
+        sospensione_ospiti: "{{ is_state('binary_sensor.sicurezza_sospensione_attiva', 'on') }}"
+    - action: camera.snapshot
+      target:
+        entity_id: camera.terrazzo_3
+      data:
+        filename: "/config/www/cam_snapshots/parcheggio_ospiti.jpg"
+      continue_on_error: true
+    - action: gemini_vision.analizza_telecamera
+      data:
+        camera: "terrazzo_3"
+        question: >-
+          Analizza i veicoli fermi/parcheggiati distinguendo rigorosamente:
+          1) VEICOLI RESIDENTI ABITUALI DELLO STABILE: Auto Utente 1 (SUV) di Utente 1 (nell'uliveto privato oltre il cancello in Via Secondaria), Auto Utente 2 (Utilitaria) di Utente 2, Jeep grigia 3 porte di Zia (Piano Superiore) (con ruota di scorta esterna) e VW Auto Ospite 1 SW scura di Familiare 4 nei posti fissi lungo Via Secondaria sotto casa (o Camper e Crossover Ospite di Zia (Piano Superiore) se inquadrato il parcheggio con cancello sul lato di Via Principale).
+          2) STRADA PUBBLICA E FILTRO ANTI-FALSI POSITIVI (Ospite attualmente in attesa: {{ ospite_atteso }}; Sospensione allarme ospiti: {{ 'attiva' if sospensione_ospiti else 'non attiva' }}): poiché Via Secondaria (inquadrata da terrazzo_3) e Via Principale (sul lato sinistro di balcone_camera) sono strade pubbliche dove passano e parcheggiano anche estranei o vicini, ignora qualsiasi auto in transito. Se vedi altre auto ferme parcheggiate lungo la strada che coincidono per modello/colore con quelle di familiari/amici non residenti (Auto Familiare 1 di Mamma, Auto Familiare 2 o Auto Familiare 3 di Coppia Familiari 1, Auto Ospite di Familiare 13, Auto Familiare 4 di Familiare 6/Familiare 7, Auto Familiare 5 o Auto Familiare 6 di Coppia Familiari 2, Auto Familiare 7 di Coppia Familiari 3, SUV Amici o Berlina Amici di Coppia Amici 1, Berlina Amici 2 o Utilitaria Amici di Coppia Amici 2), NON attribuirle MAI con certezza assoluta, ma indicale solo come "compatibili per modello/colore con..." specificando sempre che trattandosi di strada pubblica senza lettura targa potrebbe trattarsi dell'auto di un passante o vicino.
+      response_variable: ai_auto_res
+      continue_on_error: true
+    - variables:
+        descrizione_auto: >-
+          {% if ai_auto_res is defined and ai_auto_res is mapping and 'descrizione' in ai_auto_res %}
+            {{ ai_auto_res.descrizione }}
+          {% elif ai_auto_res is defined and ai_auto_res is mapping and 'response' in ai_auto_res %}
+            {{ ai_auto_res.response }}
+          {% else %}
+            Analisi completata (Stato attuale: {{ states('sensor.stato_parcheggio_auto') }}).
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "🚗 Verifica Parcheggio & Auto (Filtro Strada Pubblica)"
+        messaggio: "{{ descrizione_auto }}"
+        priorita: "normale"
+        categoria: "sicurezza"
+        immagine: "/local/cam_snapshots/parcheggio_ospiti.jpg?t={{ now().timestamp() | int }}"
+        tag: "riconosci_auto_ospiti"
+      continue_on_error: true
+

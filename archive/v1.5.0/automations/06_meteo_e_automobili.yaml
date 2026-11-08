@@ -1,0 +1,452 @@
+# ==============================================================================
+# 06 — METEO NETATMO, ALLERTE PROTEZIONE CIVILE DPC & TRAFFICO PENDOLARI
+# ==============================================================================
+
+- id: 'meteo_tracciamento_pioggia_notturna'
+  alias: 'Meteo: Monitoraggio Pioggia Notturna per Buongiorno'
+  description: >-
+    Registra se piove durante la notte (dalle 23:00 alle 07:00) tramite pluviometro e sensori pioggia,
+    conservando lo storico per l'annuncio del mattino (feriale e weekend fino alle 12:00).
+  mode: single
+  trigger:
+    - trigger: time
+      at: '23:00:00'
+      id: reset_sera
+    - trigger: state
+      entity_id: binary_sensor.meteo_piove_ora
+      to: 'on'
+      id: pioggia_rilevata
+    - trigger: numeric_state
+      entity_id: sensor.terrazza_pulvirometro_precipitazione
+      above: 0.05
+      id: pioggia_pluviometro
+    - trigger: numeric_state
+      entity_id: sensor.meteo_pioggia_attuale_effettiva
+      above: 0.05
+      id: pioggia_effettiva
+    - trigger: numeric_state
+      entity_id: sensor.sala_pulvirometro_precipitazioni_ultima_ora
+      above: 0.05
+      id: pioggia_ultima_ora
+    - trigger: state
+      entity_id: sensor.terrazza_pulvirometro_precipitazioni_oggi
+      id: pioggia_accumulo_oggi
+    - trigger: homeassistant
+      event: start
+      id: ha_start
+    - trigger: time
+      at: '12:00:00'
+      id: reset_mattina
+  action:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.id == 'reset_mattina' }}"
+          sequence:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.meteo_pioggia_notturna_rilevata
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.id == 'reset_sera' }}"
+          sequence:
+            - if:
+                - condition: template
+                  value_template: >-
+                    {{ is_state('binary_sensor.meteo_piove_ora', 'on') or
+                       (states('sensor.terrazza_pulvirometro_precipitazione') | float(0) > 0.05) or
+                       (states('sensor.sala_pulvirometro_precipitazioni_ultima_ora') | float(0) > 0.05) }}
+              then:
+                - action: input_boolean.turn_on
+                  target:
+                    entity_id: input_boolean.meteo_pioggia_notturna_rilevata
+              else:
+                - action: input_boolean.turn_off
+                  target:
+                    entity_id: input_boolean.meteo_pioggia_notturna_rilevata
+        - conditions:
+            - condition: template
+              value_template: >-
+                {{ (trigger.id in ['pioggia_rilevata', 'pioggia_pluviometro', 'pioggia_effettiva', 'pioggia_ultima_ora'] and (now().hour >= 23 or now().hour < 7)) or
+                   (trigger.id in ['pioggia_accumulo_oggi', 'ha_start'] and now().hour < 9 and (states('sensor.terrazza_pulvirometro_precipitazioni_oggi') | float(0) > 0.1 or states('sensor.sala_pulvirometro_precipitazioni_ultima_ora') | float(0) > 0.05)) }}
+          sequence:
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.meteo_pioggia_notturna_rilevata
+
+- id: 'traffico_utente_2_aggiornamento_0720_camera'
+  alias: 'Traffico: Aggiornamento Ore 07:20 Nest Hub Camera (Utente 2)'
+  description: >-
+    Se e solo se al buongiorno feriale è stato segnalato traffico per il lavoro di Utente 2,
+    alle 07:20 fornisce un aggiornamento vocale su Nest Hub Camera (evitando l'autostrada).
+  mode: single
+  trigger:
+    - trigger: time
+      at: '07:20:00'
+  condition:
+    - condition: template
+      value_template: "{{ now().weekday() in [0, 1, 2, 3, 4] }}"
+    - condition: state
+      entity_id: input_boolean.buongiorno_traffico_segnalato
+      state: 'on'
+    - condition: state
+      entity_id: binary_sensor.utente_2_a_casa
+      state: 'on'
+  action:
+    - action: script.aggiornamento_traffico_utente_2_camera
+
+- id: 'traffico_utente_2_aggiornamento_0740_sala'
+  alias: 'Traffico: Aggiornamento Ore 07:40 Nest Hub Sala (Utente 2)'
+  description: >-
+    Se e solo se al buongiorno feriale è stato segnalato traffico per il lavoro di Utente 2,
+    alle 07:40 fornisce l'aggiornamento vocale su Nest Hub Sala prima di uscire (evitando l'autostrada).
+  mode: single
+  trigger:
+    - trigger: time
+      at: '07:40:00'
+  condition:
+    - condition: template
+      value_template: "{{ now().weekday() in [0, 1, 2, 3, 4] }}"
+    - condition: state
+      entity_id: input_boolean.buongiorno_traffico_segnalato
+      state: 'on'
+    - condition: state
+      entity_id: binary_sensor.utente_2_a_casa
+      state: 'on'
+  action:
+    - action: script.aggiornamento_traffico_utente_2_sala
+
+- id: 'traffico_utente_2_reset_giornaliero'
+  alias: 'Traffico: Reset Flag Segnalazione Giornaliera'
+  description: 'Azzera il flag buongiorno_traffico_segnalato ogni mattina alle 08:30 e a mezzanotte.'
+  mode: single
+  trigger:
+    - trigger: time
+      at: '08:30:00'
+    - trigger: time
+      at: '00:00:00'
+  action:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.buongiorno_traffico_segnalato
+      continue_on_error: true
+
+- id: 'traffico_utente_2_rientro_1740_lavoro'
+  alias: 'Traffico: Avviso Rientro Ore 17:40 Smartphone Utente 2'
+  description: >-
+    Se Utente 2 si trova a lavoro alle 17:40 (feriale) e Google Maps rileva traffico anomalo
+    per tornare a casa senza fare l'autostrada (ritardo >= 5 min), invia una notifica di avviso sul suo smartphone.
+  mode: single
+  trigger:
+    - trigger: time
+      at: '17:40:00'
+  condition:
+    # 1. Solo giorni feriali (Lunedì - Venerdì)
+    - condition: template
+      value_template: "{{ now().weekday() in [0, 1, 2, 3, 4] }}"
+    # 2. Utente 2 si trova nella zona lavoro
+    - condition: template
+      value_template: >-
+        {{ is_state('person.utente_2', 'Lavoro Utente 2') or
+           is_state('device_tracker.laura_presenza', 'Lavoro Utente 2') or
+           is_state('device_tracker.smartphone_utente_2_2', 'Lavoro Utente 2') or
+           'Lavoro Utente 2' in (state_attr('person.utente_2', 'in_zones') | default([])) or
+           'Lavoro Utente 2' in (state_attr('device_tracker.smartphone_utente_2_2', 'in_zones') | default([])) or
+           'via ufficio centrale' in states('sensor.utente_2_luogo_smart') }}
+  action:
+    # 1. Calcola tempo reale di rientro senza pedaggi/autostrada da Via Ufficio Centrale a casa
+    - action: homeassistant.update_entity
+      target:
+        entity_id: sensor.tempo_viaggio_laura_rientro_no_autostrada
+      continue_on_error: true
+    - delay:
+        seconds: 3
+    - variables:
+        dur_raw: "{{ states('sensor.tempo_viaggio_laura_rientro_no_autostrada') | float(0) | round(0) }}"
+        dur_std: 48
+        minuti_stimati: "{{ dur_raw if dur_raw > 25 else 50 }}"
+        diff_ritardo: "{{ minuti_stimati - dur_std }}"
+        traffico_anomalo: "{{ diff_ritardo >= 5 }}"
+    - if:
+        - condition: template
+          value_template: "{{ traffico_anomalo }}"
+      then:
+        - action: notify.mobile_app_smartphone_utente_2
+          data:
+            title: "🚗 Traffico Rientro a Casa (No Autostrada)"
+            message: >-
+              Utente 2, verso casa (evitando l'autostrada) c'è più traffico del solito: previsti circa {{ minuti_stimati }} minuti (+{{ diff_ritardo }} min rispetto al solito).
+            data:
+              channel: "Traffico"
+              priority: high
+              importance: high
+              tag: "traffico_rientro_laura"
+              ttl: 0
+              notification_icon: "mdi:car-alert"
+          continue_on_error: true
+
+- id: 'meteo_notifica_vento_forte'
+  alias: 'Meteo: Notifica Vento Forte (Raffiche >15 / Vento >8 km/h)'
+  description: Notifica push se l'anemometro rileva raffiche oltre 15 km/h o vento oltre 8 km/h (max 1 ogni ora).
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.meteo_vento_forte
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: input_boolean.notifiche_meteo_vento
+      state: 'on'
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  action:
+    - action: script.notifica_smart
+      data:
+        titolo: "💨 Vento Forte in Terrazza"
+        messaggio: >-
+          Vento {{ state_attr('binary_sensor.meteo_vento_forte','velocita_kmh') }} km/h, raffiche {{ state_attr('binary_sensor.meteo_vento_forte','raffica_kmh') }} km/h. Occhio a stendini e piante!
+        categoria: meteo
+        priorita: normale
+        tag: meteo_vento
+
+- id: 'meteo_notifica_inizio_pioggia'
+  alias: 'Meteo: Notifica Inizio Pioggia'
+  description: Notifica push quando inizia a piovere (pluviometro, fallback previsioni).
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.meteo_piove_ora
+      from: 'off'
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: input_boolean.notifiche_meteo_pioggia
+      state: 'on'
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  action:
+    - action: script.notifica_smart
+      data:
+        titolo: "🌧️ Ha iniziato a piovere"
+        messaggio: >-
+          Pioggia rilevata ({{ state_attr('binary_sensor.meteo_piove_ora','fonte') }}).{% if states('sensor.numero_finestre_aperte')|int(0) > 0 %} Attenzione: {{ states('sensor.numero_finestre_aperte') }} finestre aperte!{% endif %}
+        categoria: meteo
+        priorita: normale
+        tag: meteo_pioggia
+
+- id: 'meteo_notifica_temporale'
+  alias: 'Meteo: Allerta Temporale (Vento + Pioggia)'
+  description: Notifica interattiva con pulsante per attivare lo Scenario Temporale (tapparelle chiuse 100%).
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.meteo_temporale_rilevato
+      to: 'on'
+  condition:
+    - condition: state
+      entity_id: input_boolean.notifiche_meteo_temporale
+      state: 'on'
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  action:
+    - action: script.notifica_smart
+      data:
+        titolo: "⛈️ Allerta Temporale"
+        messaggio: "Pioggia e vento forte in corso. Vuoi chiudere tutte le tapparelle al 100%?"
+        categoria: meteo
+        priorita: alta
+        tag: meteo_temporale
+        azioni:
+          - action: ATTIVA_SCENARIO_TEMPORALE
+            title: "Chiudi tapparelle"
+          - action: IGNORA_TEMPORALE
+            title: "Ignora"
+
+- id: 'meteo_azione_scenario_temporale'
+  alias: 'Meteo: Azione Notifica Scenario Temporale'
+  mode: single
+  trigger:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ATTIVA_SCENARIO_TEMPORALE
+  action:
+    - action: script.scenario_temporale
+
+- id: 'meteo_allerta_dpc_zona_casa'
+  alias: 'Allerte DPC: Nuova Allerta Diramata per Zona Casa'
+  description: 'Invia notifica push prioritaria su smartphone quando la Protezione Civile dirama un allerta Gialla, Arancione o Rossa per Eco Home (Bacino Medio Tevere).'
+  mode: single
+  trigger:
+    - trigger: numeric_state
+      entity_id: sensor.dipartimento_protezione_civile_alert
+      above: 1
+      id: alert_livello
+    - trigger: state
+      entity_id:
+        - binary_sensor.42_152875_12_678384_idrogeologico_oggi
+        - binary_sensor.42_152875_12_678384_temporali_oggi
+        - binary_sensor.42_152875_12_678384_idraulico_oggi
+      to: 'on'
+      id: rischio_attivo
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.dipartimento_protezione_civile_alert') | int(0) >= 2 }}"
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  action:
+    - variables:
+        lvl: "{{ states('sensor.dipartimento_protezione_civile_alert') | int(0) }}"
+        lvl_nome: "{{ 'GIALLA' if lvl == 2 else ('ARANCIONE' if lvl == 3 else 'ROSSA') }}"
+        rischi: >-
+          {% set r = [] %}
+          {% if is_state('binary_sensor.42_152875_12_678384_idrogeologico_oggi', 'on') %}{% set r = r + ['Idrogeologico'] %}{% endif %}
+          {% if is_state('binary_sensor.42_152875_12_678384_temporali_oggi', 'on') %}{% set r = r + ['Temporali'] %}{% endif %}
+          {% if is_state('binary_sensor.42_152875_12_678384_idraulico_oggi', 'on') %}{% set r = r + ['Idraulico'] %}{% endif %}
+          {{ r | join(', ') if r | length > 0 else 'Ordinaria' }}
+        zona: "{{ state_attr('sensor.dipartimento_protezione_civile_alert', 'zone_name') | default('Bacino Medio Tevere') }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Allerta DPC {{ lvl_nome }}: Zona Casa"
+        messaggio: "Diramata ALLERTA {{ lvl_nome }} per {{ zona }}. Criticità attive per oggi: {{ rischi }}. Prestare attenzione e verificare infissi e terrazze."
+        categoria: meteo
+        priorita: "{{ 'critica' if lvl >= 3 else 'alta' }}"
+        canale: tutti_telefoni
+        tag: allerta_dpc_casa
+        azioni:
+          - action: ATTIVA_SCENARIO_TEMPORALE
+            title: "⛈️ Scenario Temporale"
+          - action: URI
+            title: "🌐 Apri Plancia Eventi"
+            uri: /eco-home/meteo
+            url: /eco-home/meteo
+
+- id: 'meteo_allerta_dpc_zona_roma_lavoro'
+  alias: 'Allerte DPC: Nuova Allerta Diramata per Roma e Lavoro Utente 2'
+  description: 'Invia notifica push prioritaria quando la Protezione Civile dirama un allerta per Roma e zona lavoro Utente 2 (Bacini di Roma).'
+  mode: single
+  trigger:
+    - trigger: numeric_state
+      entity_id: sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert
+      above: 1
+      id: alert_livello_roma
+    - trigger: state
+      entity_id:
+        - binary_sensor.41_933617_12_510125_idrogeologico_oggi
+        - binary_sensor.41_933617_12_510125_temporali_oggi
+        - binary_sensor.41_933617_12_510125_idraulico_oggi
+      to: 'on'
+      id: rischio_attivo_roma
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert') | int(0) >= 2 }}"
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 3600 }}"
+  action:
+    - variables:
+        lvl: "{{ states('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert') | int(0) }}"
+        lvl_nome: "{{ 'GIALLA' if lvl == 2 else ('ARANCIONE' if lvl == 3 else 'ROSSA') }}"
+        rischi: >-
+          {% set r = [] %}
+          {% if is_state('binary_sensor.41_933617_12_510125_idrogeologico_oggi', 'on') %}{% set r = r + ['Idrogeologico'] %}{% endif %}
+          {% if is_state('binary_sensor.41_933617_12_510125_temporali_oggi', 'on') %}{% set r = r + ['Temporali'] %}{% endif %}
+          {% if is_state('binary_sensor.41_933617_12_510125_idraulico_oggi', 'on') %}{% set r = r + ['Idraulico'] %}{% endif %}
+          {{ r | join(', ') if r | length > 0 else 'Ordinaria' }}
+        zona: "{{ state_attr('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert', 'zone_name') | default('Bacini di Roma') }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Allerta DPC {{ lvl_nome }}: Roma e Lavoro"
+        messaggio: "Diramata ALLERTA {{ lvl_nome }} per {{ zona }}. Rischi per oggi: {{ rischi }}. Prestare massima attenzione negli spostamenti casa-lavoro e su strada."
+        categoria: meteo
+        priorita: "{{ 'critica' if lvl >= 3 else 'alta' }}"
+        canale: tutti_telefoni
+        tag: allerta_dpc_roma
+        azioni:
+          - action: URI
+            title: "🌐 Apri Plancia Eventi"
+            uri: /eco-home/meteo
+            url: /eco-home/meteo
+
+- id: 'meteo_allerta_dpc_bollettino_domani'
+  alias: 'Allerte DPC: Bollettino Pomeridiano Previsione Domani (16:30)'
+  description: 'Controlla alle 16:30 l avvenuta pubblicazione del bollettino DPC per domani e avvisa se sono previste allerte meteo per Casa o Roma.'
+  mode: single
+  trigger:
+    - trigger: time
+      at: '16:30:00'
+  condition:
+    - condition: template
+      value_template: >-
+        {{ is_state('binary_sensor.42_152875_12_678384_idrogeologico_domani', 'on')
+           or is_state('binary_sensor.42_152875_12_678384_temporali_domani', 'on')
+           or is_state('binary_sensor.42_152875_12_678384_idraulico_domani', 'on')
+           or is_state('binary_sensor.41_933617_12_510125_idrogeologico_domani', 'on')
+           or is_state('binary_sensor.41_933617_12_510125_temporali_domani', 'on')
+           or is_state('binary_sensor.41_933617_12_510125_idraulico_domani', 'on') }}
+  action:
+    - variables:
+        casa_alert: >-
+          {% set r = [] %}
+          {% if is_state('binary_sensor.42_152875_12_678384_idrogeologico_domani', 'on') %}{% set r = r + ['Idrogeologico'] %}{% endif %}
+          {% if is_state('binary_sensor.42_152875_12_678384_temporali_domani', 'on') %}{% set r = r + ['Temporali'] %}{% endif %}
+          {% if is_state('binary_sensor.42_152875_12_678384_idraulico_domani', 'on') %}{% set r = r + ['Idraulico'] %}{% endif %}
+          {{ r | join(', ') }}
+        roma_alert: >-
+          {% set r = [] %}
+          {% if is_state('binary_sensor.41_933617_12_510125_idrogeologico_domani', 'on') %}{% set r = r + ['Idrogeologico'] %}{% endif %}
+          {% if is_state('binary_sensor.41_933617_12_510125_temporali_domani', 'on') %}{% set r = r + ['Temporali'] %}{% endif %}
+          {% if is_state('binary_sensor.41_933617_12_510125_idraulico_domani', 'on') %}{% set r = r + ['Idraulico'] %}{% endif %}
+          {{ r | join(', ') }}
+    - action: script.notifica_smart
+      data:
+        titolo: "📋 Bollettino DPC: Allerta Meteo Prevista per Domani"
+        messaggio: >-
+          La Protezione Civile ha diramato un'allerta per domani:
+          {% if casa_alert | length > 0 %}• Casa (Medio Tevere): Allerta {{ casa_alert }}.{% endif %}
+          {% if roma_alert | length > 0 %}• Roma (Zona Lavoro): Allerta {{ roma_alert }}.{% endif %}
+          Organizzare con anticipo uscite e spostamenti.
+        categoria: meteo
+        priorita: alta
+        canale: tutti_telefoni
+        tag: allerta_dpc_domani
+        azioni:
+          - action: URI
+            title: "🌐 Apri Plancia Eventi"
+            uri: /eco-home/meteo
+            url: /eco-home/meteo
+
+- id: 'meteo_allerta_dpc_arrivo_in_zona_allertata'
+  alias: 'Allerte DPC: Avviso all Arrivo in Zona con Allerta Attiva'
+  description: 'Quando Utente 1 o Utente 2 arrivano in una zona monitorata (es. Lavoro a Roma), se in quella zona è attiva un allerta meteo viene inviato un promemoria push mirato.'
+  mode: queued
+  trigger:
+    - trigger: state
+      entity_id:
+        - person.utente_1
+        - person.utente_2
+      to:
+        - Lavoro Utente 2
+        - Casa Familiare 6
+        - Casa Nonni Utente 2
+        - Roma
+      id: ingresso_zona_roma
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert') | int(0) >= 2 }}"
+    - condition: template
+      value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
+  action:
+    - variables:
+        lvl: "{{ states('sensor.dipartimento_protezione_civile_protezione_civile_roma_lavoro_laura_protezione_civile_roma_lavoro_laura_alert') | int(0) }}"
+        lvl_nome: "{{ 'GIALLA' if lvl == 2 else ('ARANCIONE' if lvl == 3 else 'ROSSA') }}"
+        persona_nome: "{{ 'Utente 1' if trigger.entity_id == 'person.utente_1' else 'Utente 2' }}"
+        canale_dest: "{{ 'utente_1' if trigger.entity_id == 'person.utente_1' else 'utente_2' }}"
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Attenzione: Sei arrivato in Zona in Allerta"
+        messaggio: "{{ persona_nome }}, sei a {{ trigger.to_state.state }}. In questa zona è attualmente attiva un'Allerta {{ lvl_nome }} della Protezione Civile. Prestare prudenza negli spostamenti."
+        categoria: meteo
+        priorita: alta
+        canale: "{{ canale_dest }}"
+        tag: allerta_ingresso_zona
+

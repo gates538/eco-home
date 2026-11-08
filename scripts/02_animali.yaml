@@ -1,381 +1,433 @@
 # ==============================================================================
-# GESTIONE ANIMALI: GATTE (LUNA & PICCOLA) E ACQUARIO — CASA MANCINI
-# ==============================================================================
-# Comandi presenza gatte in/out, erogazione pasti PetKit e gestione manuale luci/pasti/cambio acqua acquario.
-# Script inclusi in questo modulo: 14
+# 02 — ANIMALI DOMESTICI (ACQUARIO, GATTI PETKIT & ROBOT ASPIRAPOLVERE)
 # ==============================================================================
 
-imposta_luna_in_casa:
-  alias: Imposta Luna In Casa
-  icon: mdi:home-heart
+notifica_acquario:
+  alias: "Notifica Acquario Eco Home"
+  icon: "mdi:fish"
+  mode: parallel
+  max: 10
+  fields:
+    titolo:
+      description: "Titolo della notifica"
+      required: true
+    messaggio:
+      description: "Messaggio della notifica"
+      required: true
+    priorita:
+      description: "Priorità (alta, normale)"
+      default: normale
   sequence:
-    - action: surepetcare.set_pet_location
+    - action: notify.mobile_app_smartphone_utente_1
       data:
-        pet_name: Luna
-        location: Inside
-imposta_luna_fuori:
-  alias: Imposta Luna Fuori
-  icon: mdi:tree
-  sequence:
-    - action: surepetcare.set_pet_location
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
+        data:
+          channel: "Acquario"
+          priority: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          importance: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          tag: "acquario_alert"
+      continue_on_error: true
+    - action: notify.mobile_app_smartphone_utente_2
       data:
-        pet_name: Luna
-        location: Outside
-imposta_piccola_in_casa:
-  alias: Imposta Piccola In Casa
-  icon: mdi:home-heart
-  sequence:
-    - action: surepetcare.set_pet_location
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
+        data:
+          channel: "Acquario"
+          priority: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          importance: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          tag: "acquario_alert"
+      continue_on_error: true
+    - action: notify.persistent_notification
       data:
-        pet_name: Piccola
-        location: Inside
-imposta_piccola_fuori:
-  alias: Imposta Piccola Fuori
-  icon: mdi:tree
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
+      continue_on_error: true
+
+notifica_gatte:
+  alias: "Notifica Gatte Eco Home"
+  icon: "mdi:cat"
+  mode: parallel
+  max: 10
+  fields:
+    titolo:
+      description: "Titolo della notifica"
+      required: true
+    messaggio:
+      description: "Messaggio della notifica"
+      required: true
+    priorita:
+      description: "Priorità (alta, normale)"
+      default: normale
+    tag:
+      description: "Tag univoco notifica"
+      default: gatte_alert
   sequence:
-    - action: surepetcare.set_pet_location
+    - action: notify.mobile_app_smartphone_utente_1
       data:
-        pet_name: Piccola
-        location: Outside
-eroga_crocchette_manuale:
-  alias: Eroga Crocchette Manuale
-  icon: mdi:bowl-mix
-  sequence:
-    - if:
-        - condition: template
-          value_template: '{{ states(''input_number.dispenser_manuale_tramoggia_1'') | int(0) > 0 }}'
-      then:
-        - action: text.set_value
-          target:
-            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
-          data:
-            value: '{{ states(''input_number.dispenser_manuale_tramoggia_1'') | int(1) | string }}'
-    - if:
-        - condition: template
-          value_template: '{{ states(''input_number.dispenser_manuale_tramoggia_2'') | int(0) > 0 }}'
-      then:
-        - action: text.set_value
-          target:
-            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
-          data:
-            value: '{{ states(''input_number.dispenser_manuale_tramoggia_2'') | int(1) | string }}'
-    - action: button.press
-      target:
-        entity_id: button.dispenser_crocchette_play_sound
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
+        data:
+          channel: "Gatte e Animali"
+          priority: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          importance: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          tag: "{{ tag | default('gatte_alert') }}"
       continue_on_error: true
-eroga_crocchette_slot_1:
-  alias: Eroga Pasto Mattina (Slot 1)
-  icon: mdi:weather-sunset-up
-  sequence:
-    - if:
-        - condition: template
-          value_template: '{{ states(''input_number.dispenser_slot_1_porzioni_t1'') | int(0) > 0 }}'
-      then:
-        - action: text.set_value
-          target:
-            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
-          data:
-            value: '{{ states(''input_number.dispenser_slot_1_porzioni_t1'') | int(1) | string }}'
-    - if:
-        - condition: template
-          value_template: '{{ states(''input_number.dispenser_slot_1_porzioni_t2'') | int(0) > 0 }}'
-      then:
-        - action: text.set_value
-          target:
-            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
-          data:
-            value: '{{ states(''input_number.dispenser_slot_1_porzioni_t2'') | int(1) | string }}'
-    - action: button.press
-      target:
-        entity_id: button.dispenser_crocchette_play_sound
+    - action: notify.mobile_app_smartphone_utente_2
+      data:
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
+        data:
+          channel: "Gatte e Animali"
+          priority: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          importance: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          tag: "{{ tag | default('gatte_alert') }}"
       continue_on_error: true
-eroga_crocchette_slot_2:
-  alias: Eroga Pasto Pranzo (Slot 2)
-  icon: mdi:weather-sunny
-  sequence:
-    - if:
-        - condition: template
-          value_template: '{{ states(''input_number.dispenser_slot_2_porzioni_t1'') | int(0) > 0 }}'
-      then:
-        - action: text.set_value
-          target:
-            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
-          data:
-            value: '{{ states(''input_number.dispenser_slot_2_porzioni_t1'') | int(1) | string }}'
-    - if:
-        - condition: template
-          value_template: '{{ states(''input_number.dispenser_slot_2_porzioni_t2'') | int(0) > 0 }}'
-      then:
-        - action: text.set_value
-          target:
-            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
-          data:
-            value: '{{ states(''input_number.dispenser_slot_2_porzioni_t2'') | int(1) | string }}'
-    - action: button.press
-      target:
-        entity_id: button.dispenser_crocchette_play_sound
+    - action: notify.persistent_notification
+      data:
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
       continue_on_error: true
-eroga_crocchette_slot_3:
-  alias: Eroga Pasto Sera (Slot 3)
-  icon: mdi:weather-night
+
+notifica_dobby:
+  alias: "Notifica Dobby Eco Home"
+  icon: "mdi:robot-vacuum"
+  mode: parallel
+  max: 10
+  fields:
+    titolo:
+      description: "Titolo della notifica"
+      required: true
+    messaggio:
+      description: "Messaggio della notifica"
+      required: true
+    priorita:
+      description: "Priorità (alta, normale)"
+      default: normale
+    tag:
+      description: "Tag univoco notifica"
+      default: dobby_status
   sequence:
-    - if:
-        - condition: template
-          value_template: '{{ states(''input_number.dispenser_slot_3_porzioni_t1'') | int(0) > 0 }}'
-      then:
-        - action: text.set_value
-          target:
-            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
-          data:
-            value: '{{ states(''input_number.dispenser_slot_3_porzioni_t1'') | int(1) | string }}'
-    - if:
-        - condition: template
-          value_template: '{{ states(''input_number.dispenser_slot_3_porzioni_t2'') | int(0) > 0 }}'
-      then:
-        - action: text.set_value
-          target:
-            entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
-          data:
-            value: '{{ states(''input_number.dispenser_slot_3_porzioni_t2'') | int(1) | string }}'
-    - action: button.press
-      target:
-        entity_id: button.dispenser_crocchette_play_sound
+    - action: notify.mobile_app_smartphone_utente_1
+      data:
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
+        data:
+          channel: "Dobby Robot"
+          priority: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          importance: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          tag: "{{ tag | default('dobby_status') }}"
       continue_on_error: true
-acquario_ripristina_luce_automatica:
-  alias: 🐠 Acquario - Ripristina Luce Automatica
-  description: Interrompe l'override manuale e ripristina all'istante la fase del fotoperiodo biologico corretta per l'orario
-    attuale (buio dalle 23:30 alle 12:00).
-  icon: mdi:backup-restore
-  sequence:
-    - action: timer.cancel
-      target:
-        entity_id:
-          - timer.acquario_override_manuale
-          - timer.acquario_buio_24h
-    - action: input_boolean.turn_off
-      target:
-        entity_id:
-          - input_boolean.acquario_override_manuale
-          - input_boolean.acquario_buio_24h
-    - choose:
-        - conditions:
-            - condition: time
-              after: '12:00:00'
-              before: '13:30:00'
-          sequence:
-            - action: light.turn_on
-              target:
-                entity_id: light.fzone_acquario
-              data:
-                brightness_pct: 25
-                rgbw_color:
-                  - 255
-                  - 110
-                  - 10
-                  - 15
-                transition: 5
-        - conditions:
-            - condition: time
-              after: '13:30:00'
-              before: '18:30:00'
-          sequence:
-            - action: light.turn_on
-              target:
-                entity_id: light.fzone_acquario
-              data:
-                brightness_pct: 75
-                rgbw_color:
-                  - 240
-                  - 230
-                  - 255
-                  - 255
-                transition: 5
-        - conditions:
-            - condition: time
-              after: '18:30:00'
-              before: '20:00:00'
-          sequence:
-            - action: light.turn_on
-              target:
-                entity_id: light.fzone_acquario
-              data:
-                brightness_pct: 45
-                rgbw_color:
-                  - 255
-                  - 150
-                  - 40
-                  - 60
-                transition: 5
-        - conditions:
-            - condition: time
-              after: '20:00:00'
-              before: '23:30:00'
-            - condition: template
-              value_template: '{{ states(''zone.home'') | int(0) > 0 and is_state(''input_boolean.acquario_relax_serale'',
-                ''on'') }}'
-          sequence:
-            - action: light.turn_on
-              target:
-                entity_id: light.fzone_acquario
-              data:
-                brightness_pct: 18
-                rgbw_color:
-                  - 255
-                  - 75
-                  - 10
-                  - 0
-                transition: 5
-      default:
-        - action: light.turn_off
-          target:
-            entity_id: light.fzone_acquario
-    - delay: 00:00:01
-    - action: timer.cancel
-      target:
-        entity_id:
-          - timer.acquario_override_manuale
-          - timer.acquario_buio_24h
-    - action: input_boolean.turn_off
-      target:
-        entity_id:
-          - input_boolean.acquario_override_manuale
-          - input_boolean.acquario_buio_24h
+    - action: notify.mobile_app_smartphone_utente_2
+      data:
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
+        data:
+          channel: "Dobby Robot"
+          priority: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          importance: "{% if priorita == 'alta' %}high{% else %}normal{% endif %}"
+          tag: "{{ tag | default('dobby_status') }}"
+      continue_on_error: true
+    - action: notify.persistent_notification
+      data:
+        title: "{{ titolo }}"
+        message: "{{ messaggio }}"
+      continue_on_error: true
+
+acquario_buio_24h:
+  alias: "Acquario: Buio 24h"
+  icon: "mdi:weather-night"
   mode: restart
-acquario_modalita_pasto:
-  alias: 🍽️ Acquario - Avvia Modalità Pasto (5 min)
-  description: Imposta una luce ottimale diffusa e nitida (70%) per 5 minuti per consentire ai neon e alle rasbore di alimentarsi
-    in superficie, poi ripristina la luce oraria automatica.
-  icon: mdi:shaker
   sequence:
     - action: input_boolean.turn_on
       target:
-        entity_id: input_boolean.acquario_pasto_in_corso
-    - action: timer.start
+        entity_id: input_boolean.acquario_buio_24h
+    - action: light.turn_off
       target:
-        entity_id: timer.acquario_modalita_pasto
+        entity_id: light.fzone_acquario
+    - delay:
+        hours: 24
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.acquario_buio_24h
+    - action: automation.trigger
+      target:
+        entity_id: automation.acquario_luce_naturale_e_fotoperiodo_anti_alghe
       data:
-        duration: 00:05:00
+        skip_condition: true
+
+acquario_dai_cibo_pesci:
+  alias: "Acquario: Dai Cibo Pesci"
+  icon: "mdi:shaker"
+  mode: restart
+  sequence:
+    - action: switch.turn_off
+      target:
+        entity_id: switch.presa_ossigenatore_acquario
+      continue_on_error: true
     - action: light.turn_on
       target:
         entity_id: light.fzone_acquario
       data:
         brightness_pct: 70
-        rgbw_color:
-          - 255
-          - 235
-          - 220
-          - 255
+        rgbw_color: [255, 240, 230, 255]
         transition: 3
-  mode: restart
-acquario_registra_cambio_acqua:
-  alias: 💧 Acquario - Registra Cambio Acqua
-  description: Salva data e ora dell'ultimo cambio parziale d'acqua e notifica l'avvenuta manutenzione.
-  icon: mdi:water-sync
-  sequence:
-    - action: input_datetime.set_datetime
-      target:
-        entity_id: input_datetime.acquario_ultimo_cambio_acqua
-      data:
-        datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
-    - action: script.notifica_smart
-      data:
-        titolo: '💧 Acquario: Cambio Acqua Registrato'
-        messaggio: 'Registrato con successo il cambio parziale d''acqua. TDS attuale: {{ states(''sensor.sensoreacquario_tds'')
-          }} ppm, Temp: {{ states(''sensor.sensoreacquario_probe_temperature'') }} °C.'
-        categoria: pet
-        priorita: bassa
-        canale: stefano
-        tag: cambio_acqua_registrato
-  mode: restart
-acquario_eroga_cibo:
-  alias: 🐠 Acquario - Dai Cibo ai Pesci
-  description: Eroga una dose di cibo dalla mangiatoia smart VSON e imposta la luce dedicata per 5 minuti per l'alimentazione.
-  icon: mdi:shaker
-  sequence:
+      continue_on_error: true
     - action: button.press
       target:
         entity_id: button.mangiatoia_acquario_eroga_cibo
-    - action: script.acquario_modalita_pasto
-  mode: restart
-acquario_modalita_relax:
-  alias: 🛋️ Acquario - Modalità Salotto Relax
-  description: Attiva la tonalità soffusa ambrata (18%) a PAR nullo per ammirare l'acquario la sera senza alimentare alghe.
-  icon: mdi:weather-night
-  sequence:
-    - action: light.turn_on
+    - delay: '00:10:00'
+    - action: switch.turn_on
       target:
-        entity_id: light.fzone_acquario
-      data:
-        brightness_pct: 18
-        rgbw_color:
-          - 255
-          - 75
-          - 10
-          - 0
-        transition: 5
+        entity_id: switch.presa_ossigenatore_acquario
+      continue_on_error: true
+    - if:
+        - condition: state
+          entity_id: input_boolean.acquario_buio_24h
+          state: 'off'
+      then:
+        - action: automation.trigger
+          target:
+            entity_id: automation.acquario_luce_naturale_e_fotoperiodo_anti_alghe
+          data:
+            skip_condition: true
+
+acquario_ammira_ospiti_10min:
+  alias: "Acquario: Ammira per Ospiti (10 min)"
+  icon: "mdi:sparkles"
+  description: "Accende la plafoniera dell'acquario al 75% con spettro vivo per 10 minuti per far ammirare l'acquario agli ospiti, dopodiché ripristina automaticamente il fotoperiodo biologico regolare"
   mode: restart
-acquario_toggle_buio_24h:
-  alias: 🌑 Acquario - Attiva/Disattiva Buio 24 Ore
-  description: Avvia o interrompe un ciclo di buio continuo di 24 ore (es. per trattamento antialghe o riposo), al termine
-    del quale viene ripristinato automaticamente il fotoperiodo biologico.
-  icon: mdi:weather-night
   sequence:
-    - choose:
-        - conditions:
-            - condition: state
-              entity_id: input_boolean.acquario_buio_24h
-              state: 'on'
-          sequence:
-            - action: timer.cancel
-              target:
-                entity_id: timer.acquario_buio_24h
-            - action: input_boolean.turn_off
-              target:
-                entity_id: input_boolean.acquario_buio_24h
-            - action: script.acquario_ripristina_luce_automatica
-            - action: script.notifica_smart
-              data:
-                titolo: '💡 Acquario: Buio 24h Interrotto'
-                messaggio: Il trattamento di buio 24h è stato interrotto manualmente. Ripristinato il normale ciclo fotoperiodo.
-                categoria: pet
-                priorita: bassa
-                canale: stefano
-                tag: acquario_buio_24h
-        - conditions:
+    - if:
+        - condition: state
+          entity_id: input_boolean.acquario_modalita_ospiti
+          state: 'on'
+      then:
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.acquario_modalita_ospiti
+        - if:
             - condition: state
               entity_id: input_boolean.acquario_buio_24h
               state: 'off'
-          sequence:
-            - action: timer.cancel
+          then:
+            - action: automation.trigger
               target:
-                entity_id:
-                  - timer.acquario_override_manuale
-                  - timer.acquario_modalita_pasto
-            - action: input_boolean.turn_off
-              target:
-                entity_id:
-                  - input_boolean.acquario_override_manuale
-                  - input_boolean.acquario_pasto_in_corso
-            - action: input_boolean.turn_on
-              target:
-                entity_id: input_boolean.acquario_buio_24h
-            - action: timer.start
-              target:
-                entity_id: timer.acquario_buio_24h
+                entity_id: automation.acquario_luce_naturale_e_fotoperiodo_anti_alghe
               data:
-                duration: '24:00:00'
+                skip_condition: true
+          else:
             - action: light.turn_off
               target:
                 entity_id: light.fzone_acquario
               data:
-                transition: 5
-            - action: script.notifica_smart
+                transition: 3
+        - stop: "Modalità ospiti terminata anticipatamente dall'utente"
+      else:
+        - action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.acquario_modalita_ospiti
+        - action: light.turn_on
+          target:
+            entity_id: light.fzone_acquario
+          data:
+            brightness_pct: 75
+            rgbw_color: [255, 235, 220, 255]
+            transition: 3
+          continue_on_error: true
+        - delay: '00:10:00'
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.acquario_modalita_ospiti
+        - if:
+            - condition: state
+              entity_id: input_boolean.acquario_buio_24h
+              state: 'off'
+          then:
+            - action: automation.trigger
+              target:
+                entity_id: automation.acquario_luce_naturale_e_fotoperiodo_anti_alghe
               data:
-                titolo: '🌑 Acquario: Trattamento Buio 24h Avviato'
-                messaggio: Plafoniera spenta per 24 ore continue. Il normale fotoperiodo biologico riprenderà automaticamente
-                  domani alle {{ (now() + timedelta(days=1)).strftime('%H:%M') }}.
-                categoria: pet
-                priorita: normale
-                canale: stefano
-                tag: acquario_buio_24h
+                skip_condition: true
+          else:
+            - action: light.turn_off
+              target:
+                entity_id: light.fzone_acquario
+              data:
+                transition: 3
+
+gatte_dai_cibo:
+  alias: "Gatte: Dai Cibo (1 dose Serbatoio 1 + 1 dose Serbatoio 2)"
+  icon: "mdi:bowl-mix"
   mode: restart
+  sequence:
+    - action: text.set_value
+      target:
+        entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_1
+      data:
+        value: "1"
+      continue_on_error: true
+    - delay: "00:00:10"
+    - action: text.set_value
+      target:
+        entity_id: text.dispenser_crocchette_alimentazione_manuale_tramoggia_2
+      data:
+        value: "1"
+      continue_on_error: true
+    - action: button.press
+      target:
+        entity_id: button.dispenser_crocchette_play_sound
+      continue_on_error: true
+
+lettiera_pulisci:
+  alias: "Lettiera: Pulisci"
+  icon: "mdi:sparkles"
+  mode: restart
+  sequence:
+    - action: button.press
+      target:
+        entity_id: button.petkit_puramax_2_pulisci
+      continue_on_error: true
+
+dobby_avvia_modalita:
+  alias: "Dobby: Avvia Modalità"
+  icon: "mdi:robot-vacuum"
+  mode: restart
+  fields:
+    mode:
+      description: "Modalità di avvio ('genius' per CleanGenius Routine, 'deep' per CleanGenius Profondo, 'standard' per Pulizia Standard)"
+      example: "genius"
+      selector:
+        select:
+          options:
+            - label: "CleanGenius Routine (Aspira & Lava)"
+              value: "genius"
+            - label: "CleanGenius Profondo"
+              value: "deep"
+            - label: "Solo Aspirazione (Standard)"
+              value: "sweep"
+  sequence:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ mode == 'genius' }}"
+          sequence:
+            - action: select.select_option
+              target:
+                entity_id: select.dobby_cleangenius
+              data:
+                option: routine_cleaning
+              continue_on_error: true
+            - action: vacuum.start
+              target:
+                entity_id: vacuum.dobby
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: "{{ mode == 'deep' }}"
+          sequence:
+            - action: select.select_option
+              target:
+                entity_id: select.dobby_cleangenius
+              data:
+                option: deep_cleaning
+              continue_on_error: true
+            - action: vacuum.start
+              target:
+                entity_id: vacuum.dobby
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: "{{ mode == 'sweep' }}"
+          sequence:
+            - action: select.select_option
+              target:
+                entity_id: select.dobby_cleangenius
+              data:
+                option: "off"
+              continue_on_error: true
+            - action: vacuum.set_fan_speed
+              target:
+                entity_id: vacuum.dobby
+              data:
+                fan_speed: strong
+              continue_on_error: true
+            - action: vacuum.start
+              target:
+                entity_id: vacuum.dobby
+              continue_on_error: true
+      default:
+        - action: vacuum.start
+          target:
+            entity_id: vacuum.dobby
+          continue_on_error: true
+
+dobby_pulizia_base:
+  alias: "Dobby: Pulizia Stazione Base"
+  description: "Avvia la procedura automatica di pulizia della stazione di ricarica e lavaggio moci di Dobby."
+  icon: "mdi:car-wash"
+  mode: restart
+  sequence:
+    - action: dreame_vacuum.vacuum_call_action
+      target:
+        entity_id: vacuum.dobby
+      data:
+        key: "start_station_cleaning"
+    - action: script.notifica_smart
+      data:
+        titolo: "🧼 Dobby: Pulizia Base Avviata"
+        messaggio: "Dobby è uscito dalla base per consentire la pulizia della stazione di lavaggio. Seguire la procedura della stazione."
+        priorita: "normale"
+        categoria: "elettrodomestici"
+        tag: "dobby_pulizia_base"
+
+stato_gatte_vocale:
+  alias: "🐱 Gatte Vocale: Dove sono Gatto 1 e Gatto 2 e Stato Petkit"
+  description: "Legge sui Nest Hub se Gatto 1 e Gatto 2 sono in casa o fuori, le visite a dispenser/fontanella e lo stato della lettiera PuraMax 2."
+  icon: "mdi:cat"
+  mode: single
+  sequence:
+    - variables:
+        piccola_in: "{{ is_state('binary_sensor.gatto_1', 'on') }}"
+        luna_in: "{{ is_state('binary_sensor.gatto_2', 'on') }}"
+        pasti_oggi: "{{ states('sensor.dispenser_crocchette_volte_mangiato') | int(0) }}"
+        bevute_oggi: "{{ states('sensor.fontanella_volte_bevuto') | int(0) }}"
+        usi_lettiera: "{{ states('sensor.petkit_puramax_2_volte_usato') | int(0) }}"
+        sabbia_pct: "{{ states('sensor.petkit_puramax_2_livello_lettiera') | int(0) }}"
+        cestino_pieno: "{{ is_state('binary_sensor.petkit_puramax_2_cestino_pieno', 'on') }}"
+        messaggio_gatte: >-
+          {% if piccola_in and luna_in %}
+            Sia Gatto 1 che Gatto 2 sono in casa al sicuro.
+          {% elif piccola_in and not luna_in %}
+            Gatto 1 è in casa, mentre Gatto 2 in questo momento è fuori.
+          {% elif not piccola_in and luna_in %}
+            Gatto 2 è in casa, mentre Gatto 1 in questo momento è fuori.
+          {% else %}
+            In questo momento sia Gatto 1 che Gatto 2 sono fuori casa.
+          {% endif %}
+          Oggi hanno mangiato {{ pasti_oggi }} volte dal dispenser, bevuto {{ bevute_oggi }} volte dalla fontanella e usato la lettiera {{ usi_lettiera }} volte.
+          {% if cestino_pieno %}
+            Attenzione: il cestino della lettiera è pieno ed è da svuotare.
+          {% else %}
+            La sabbia nella lettiera è al {{ sabbia_pct }} per cento.
+          {% endif %}
+    - action: script.audio_annuncio_prepara
+      continue_on_error: true
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id:
+          - media_player.nest_hub_sala
+          - media_player.nest_hub_camera
+          - media_player.nest_hub_cameretta
+        message: "{{ messaggio_gatte }}"
+        language: "it"
+        options:
+          tld: "it"
+      continue_on_error: true
+    - delay:
+        seconds: 12
+    - action: script.audio_annuncio_ripristina
+      continue_on_error: true
+

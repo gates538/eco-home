@@ -15,7 +15,7 @@ views:
             content: |
               <div style="background: linear-gradient(135deg, #1f1c2c 0%, #3a3250 50%, #5d4a75 100%); padding: 24px; border-radius: 20px; color: #f2f3f5; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08);">
                 <h1 style="margin: 0; font-size: 26px; font-weight: 800; font-family: 'Outfit', sans-serif; letter-spacing: 1.5px; background: linear-gradient(to right, #00f2fe, #4facfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">STEFANO'S COMMAND CENTER</h1>
-                <p style="margin: 6px 0 0 0; opacity: 0.8; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; font-weight: 600;">Ecosistema Domotico &bull; Borgo Santa Maria, Roma</p>
+                <p style="margin: 6px 0 0 0; opacity: 0.8; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; font-weight: 600;">Ecosistema Domotico &bull; Località Residenziale, Roma</p>
                 
                 <div style="display: flex; justify-content: space-around; margin-top: 20px; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 15px; font-family: 'Plus Jakarta Sans', sans-serif;">
                   <div style="display: flex; align-items: center; gap: 6px;">
@@ -62,10 +62,10 @@ views:
                     show_name: true
                     show_state: true
                     entities:
-                      - entity: person.stefano
-                        name: Stefano
-                      - entity: person.laura
-                        name: Laura
+                      - entity: person.utente_1
+                        name: Utente 1
+                      - entity: person.utente_2
+                        name: Utente 2
                       - entity: binary_sensor.porta_contact
                         name: Portone
                         icon: mdi:door-closed
@@ -99,7 +99,7 @@ views:
                     title: 📺 Intrattenimento
                     show_header_toggle: false
                     entities:
-                      - entity: media_player.tv_sala_ue85du7170uxzt
+                      - entity: media_player.tv_sala_principale
                         name: TV Samsung 85"
                         icon: mdi:television
                       - entity: media_player.nest_hub_sala

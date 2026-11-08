@@ -5,12 +5,12 @@
   triggers:
   - trigger: state
     entity_id:
-    - person.stefano
-    - person.laura
-    - person.simone
-    - person.monica
-    - person.mauro
-    - person.rita
+    - person.utente_1
+    - person.utente_2
+    - person.familiare_2
+    - person.familiare_1
+    - person.familiare_4
+    - person.familiare_3
     to: home
     not_from:
     - home
@@ -129,15 +129,15 @@
       sequence:
       - variables:
           test_profile: >-
-            {% if test_scenario | trim == 'Rientro Stefano' %}Stefano
-            {% elif test_scenario | trim == 'Rientro Laura' %}Laura
+            {% if test_scenario | trim == 'Rientro Utente 1' %}Utente 1
+            {% elif test_scenario | trim == 'Rientro Utente 2' %}Utente 2
             {% elif test_scenario | trim == 'Rientro di coppia' %}Coppia
             {% elif test_scenario | trim == 'Modalità notte' %}Notte
             {% elif test_scenario | trim == 'Promemoria asciugatrice' %}Asciugatrice
             {% else %}Percorso audio{% endif %}
           test_nickname: >-
-            {% if test_profile | trim == 'Stefano' %}{{ stefano_nicknames | random }}
-            {% elif test_profile | trim == 'Laura' %}{{ laura_nicknames | random }}
+            {% if test_profile | trim == 'Utente 1' %}{{ stefano_nicknames | random }}
+            {% elif test_profile | trim == 'Utente 2' %}{{ laura_nicknames | random }}
             {% elif test_profile | trim in ['Coppia', 'Notte'] %}{{ couple_nicknames | random }}
             {% else %}amici di casa{% endif %}
           test_volume_level: >-
@@ -146,9 +146,9 @@
           nest_volume_before: '{{ state_attr(speaker, ''volume_level'') | float(-1) }}'
       - variables:
           test_message: >-
-            {% if test_profile | trim == 'Stefano' %}
+            {% if test_profile | trim == 'Utente 1' %}
               {{ saluto_orario }} {{ test_nickname | trim }}. {{ stefano_phrase_starts | random }}: {{ stefano_phrase_tails | random }}
-            {% elif test_profile | trim == 'Laura' %}
+            {% elif test_profile | trim == 'Utente 2' %}
               {{ saluto_orario }} {{ test_nickname | trim }}. {{ laura_phrase_starts | random }}: {{ laura_phrase_tails | random }}
             {% elif test_profile | trim == 'Coppia' %}
               {{ saluto_orario }} {{ test_nickname | trim }}. {{ couple_phrase_starts | random }}: {{ couple_phrase_tails | random }}
@@ -344,8 +344,8 @@
             + arrival_group_window_seconds) %}\n  {% set ns.names = ns.names + [p.attributes.friendly_name
             | default(p.entity_id | replace('person.', '') | title)] %}\n{% endfor
             %}\n{{ ns.names | unique | list | count }}"
-          stefano_arrived_recently: "{{\n  is_state('person.stefano', 'home')\n  and states['person.stefano'] is defined\n  and states['person.stefano'].last_changed is not none\n  and (as_timestamp(now()) - as_timestamp(states['person.stefano'].last_changed)) <= (arrival_person_door_window_seconds + 300)\n}}"
-          laura_arrived_recently: "{{\n  is_state('person.laura', 'home')\n  and states['person.laura'] is defined\n  and states['person.laura'].last_changed is not none\n  and (as_timestamp(now()) - as_timestamp(states['person.laura'].last_changed)) <= (arrival_person_door_window_seconds + 300)\n}}"
+          stefano_arrived_recently: "{{\n  is_state('person.utente_1', 'home')\n  and states['person.utente_1'] is defined\n  and states['person.utente_1'].last_changed is not none\n  and (as_timestamp(now()) - as_timestamp(states['person.utente_1'].last_changed)) <= (arrival_person_door_window_seconds + 300)\n}}"
+          laura_arrived_recently: "{{\n  is_state('person.utente_2', 'home')\n  and states['person.utente_2'] is defined\n  and states['person.utente_2'].last_changed is not none\n  and (as_timestamp(now()) - as_timestamp(states['person.utente_2'].last_changed)) <= (arrival_person_door_window_seconds + 300)\n}}"
           arrived_stefano: "{{ stefano_arrived_recently and not laura_arrived_recently }}"
           arrived_laura: "{{ laura_arrived_recently and not stefano_arrived_recently }}"
           arrived_now_couple: "{{ stefano_arrived_recently and laura_arrived_recently }}"
@@ -420,8 +420,8 @@
             {{ final_extra_text | trim }} {{ weather_alert_text | trim }} {{ temp_announcement_text | trim }} {{ dryer_arrival_text_final | trim }}'
           announced_profile: >-
             {% if arrived_now_couple or arrived_now_count | int(0) > 1 %}Coppia
-            {% elif arrived_stefano %}Stefano
-            {% elif arrived_laura %}Laura
+            {% elif arrived_stefano %}Utente 1
+            {% elif arrived_laura %}Utente 2
             {% else %}Generico{% endif %}
           nest_volume_before: '{{ state_attr(speaker, ''volume_level'') | float(-1) }}'
           tts_safe_delay_seconds: '{% set chars = messaggio_finale | length %} {{
@@ -464,7 +464,7 @@
             - action: '{{ stefano_notification_service }}'
               data:
                 title: "Rientro di Coppia - Eco Home"
-                message: "Bentornati a casa, Stefano e Laura!"
+                message: "Bentornati a casa, Utente 1 e Utente 2!"
                 data:
                   image: '{{ snapshot_access_url }}'
                   attachment:
@@ -479,7 +479,7 @@
               - action: '{{ laura_notification_service }}'
                 data:
                   title: "Rientro di Coppia - Eco Home"
-                  message: "Bentornati a casa, Stefano e Laura!"
+                  message: "Bentornati a casa, Utente 1 e Utente 2!"
                   data:
                     image: '{{ snapshot_access_url }}'
                     attachment:
@@ -494,7 +494,7 @@
             - action: '{{ stefano_notification_service }}'
               data:
                 title: "Rientro - Eco Home"
-                message: "Rilevato rientro di Stefano."
+                message: "Rilevato rientro di Utente 1."
                 data:
                   image: '{{ snapshot_access_url }}'
                   attachment:
@@ -509,7 +509,7 @@
             - action: '{{ laura_notification_service }}'
               data:
                 title: "Rientro - Eco Home"
-                message: "Rilevato rientro di Laura."
+                message: "Rilevato rientro di Utente 2."
                 data:
                   image: '{{ snapshot_access_url }}'
                   attachment:
@@ -845,7 +845,7 @@
     speaker: media_player.nest_hub_sala
     tts_engine: tts.google_translate_it_lt
     light_entity: light.luceambiente
-    tv_media_player: media_player.tv_sala_ue85du7170uxzt
+    tv_media_player: media_player.tv_sala_principale
     door_sensor: binary_sensor.porta_contact
     dryer_state_sensor: sensor.esterno_asciugatrice_machine_state
     dryer_power_sensor: sensor.esterno_asciugatrice_energia_elettrica
@@ -862,12 +862,12 @@
     - climate.condizionatore_sala
     - climate.condizionatore_camera
     tracked_people:
-    - person.stefano
-    - person.laura
-    - person.simone
-    - person.monica
-    - person.mauro
-    - person.rita
+    - person.utente_1
+    - person.utente_2
+    - person.familiare_2
+    - person.familiare_1
+    - person.familiare_4
+    - person.familiare_3
     weather_entity: weather.home
     alert_entity: sensor.allerta_meteo
     window_sensors:
@@ -879,7 +879,7 @@
     camera_notification_enabled: '{{ is_state(''input_boolean.eco_home_notifiche_foto'', ''on'') }}'
     test_scenario: >-
       {%- set selected = states('input_select.eco_home_scenario_test') -%}
-      {%- if selected in ['Percorso audio', 'Rientro Stefano', 'Rientro Laura',
+      {%- if selected in ['Percorso audio', 'Rientro Utente 1', 'Rientro Utente 2',
         'Rientro di coppia', 'Modalità notte', 'Promemoria asciugatrice'] %}
       {{- selected -}}
       {%- else -%}
@@ -956,8 +956,8 @@
       default=0) %} {{ (as_timestamp(now()) - ts) | int(999999) }}'
     welcome_cooldown_ok: '{{ seconds_from_last_announcement | int(999999) > welcome_cooldown_seconds
       }}'
-    special_day_text: "{% if today_md == '12-28' %}\n  Oggi è il compleanno di Stefano. Auguri Stefano!\n{% elif today_md == '03-31' %}\n  Oggi è il compleanno di Laura. Auguri Laura!\n{% elif today_md == '07-06' %}\n  Oggi è il compleanno di Simone! Tanti auguri Simone!\n{% elif today_md == '09-12' %}\n  Oggi è il compleanno di Monica! Tanti auguri Monica!\n{% elif today_md in ['04-26', '04-27', '04-28', '04-29'] %}\n  Siamo nei giorni del compleanno di Mauro! Tanti auguri Mauro!\n{% elif today_md == '11-02' %}\n  Oggi è il compleanno della micia Luna! Tanti auguri alla nostra splendida Luna!\n{% elif today_md == '08-01' %}\n  Oggi è il vostro anniversario del primo agosto. Auguri!\n{% elif today_md == '08-28' %}\n  Oggi è il 28 agosto, la data del vostro primo appuntamento.\n{% else %}\n  {{ '' }}\n{% endif %}"
-    italian_holiday_text: "{% set md = today_md %}\n{% if md == '01-01' %}\n  Oggi è Capodanno.\n{% elif md == '01-05' %}\n  Oggi è la Vigilia dell'Epifania.\n{% elif md == '01-06' %}\n  Oggi è l'Epifania.\n{% elif md == '04-24' %}\n  Oggi è la Vigilia della Liberazione.\n{% elif md == '04-25' %}\n  Oggi è la Festa della Liberazione.\n{% elif md == '04-30' %}\n  Oggi è la Vigilia del Primo Maggio.\n{% elif md == '05-01' %}\n  Oggi è la Festa dei Lavoratori.\n{% elif md == '06-01' %}\n  Oggi è la Vigilia della Festa della Repubblica.\n{% elif md == '06-02' %}\n  Oggi è la Festa della Repubblica.\n{% elif md == '08-14' %}\n  Oggi è la Vigilia di Ferragosto.\n{% elif md == '08-15' %}\n  Oggi è Ferragosto.\n{% elif md == '10-31' %}\n  Oggi è la Vigilia di Ognissanti e serata di Halloween.\n{% elif md == '11-01' %}\n  Oggi è Ognissanti.\n{% elif md == '12-07' %}\n  Oggi è la Vigilia dell'Immacolata.\n{% elif md == '12-08' %}\n  Oggi è l'Immacolata.\n{% elif md == '12-24' %}\n  Oggi è la Vigilia di Natale! Buona Vigilia!\n{% elif md == '12-25' %}\n  Oggi è Natale! Buon Natale!\n{% elif md == '12-26' %}\n  Oggi è Santo Stefano.\n{% elif md == '12-31' %}\n  Oggi è San Silvestro e la Vigilia di Capodanno! Prepararsi a festeggiare!\n{% else %}\n  {{ '' }}\n{% endif %}"
+    special_day_text: "{% if today_md == '12-28' %}\n  Oggi è il compleanno di Utente 1. Auguri Utente 1!\n{% elif today_md == '03-31' %}\n  Oggi è il compleanno di Utente 2. Auguri Utente 2!\n{% elif today_md == '07-06' %}\n  Oggi è il compleanno di Familiare 2! Tanti auguri Familiare 2!\n{% elif today_md == '09-12' %}\n  Oggi è il compleanno di Familiare 1! Tanti auguri Familiare 1!\n{% elif today_md in ['04-26', '04-27', '04-28', '04-29'] %}\n  Siamo nei giorni del compleanno di Familiare 4! Tanti auguri Familiare 4!\n{% elif today_md == '11-02' %}\n  Oggi è il compleanno della micia Gatto 2! Tanti auguri alla nostra splendida Gatto 2!\n{% elif today_md == '08-01' %}\n  Oggi è il vostro anniversario del primo agosto. Auguri!\n{% elif today_md == '08-28' %}\n  Oggi è il 28 agosto, la data del vostro primo appuntamento.\n{% else %}\n  {{ '' }}\n{% endif %}"
+    italian_holiday_text: "{% set md = today_md %}\n{% if md == '01-01' %}\n  Oggi è Capodanno.\n{% elif md == '01-05' %}\n  Oggi è la Vigilia dell'Epifania.\n{% elif md == '01-06' %}\n  Oggi è l'Epifania.\n{% elif md == '04-24' %}\n  Oggi è la Vigilia della Liberazione.\n{% elif md == '04-25' %}\n  Oggi è la Festa della Liberazione.\n{% elif md == '04-30' %}\n  Oggi è la Vigilia del Primo Maggio.\n{% elif md == '05-01' %}\n  Oggi è la Festa dei Lavoratori.\n{% elif md == '06-01' %}\n  Oggi è la Vigilia della Festa della Repubblica.\n{% elif md == '06-02' %}\n  Oggi è la Festa della Repubblica.\n{% elif md == '08-14' %}\n  Oggi è la Vigilia di Ferragosto.\n{% elif md == '08-15' %}\n  Oggi è Ferragosto.\n{% elif md == '10-31' %}\n  Oggi è la Vigilia di Ognissanti e serata di Halloween.\n{% elif md == '11-01' %}\n  Oggi è Ognissanti.\n{% elif md == '12-07' %}\n  Oggi è la Vigilia dell'Immacolata.\n{% elif md == '12-08' %}\n  Oggi è l'Immacolata.\n{% elif md == '12-24' %}\n  Oggi è la Vigilia di Natale! Buona Vigilia!\n{% elif md == '12-25' %}\n  Oggi è Natale! Buon Natale!\n{% elif md == '12-26' %}\n  Oggi è Santo Utente 1.\n{% elif md == '12-31' %}\n  Oggi è San Silvestro e la Vigilia di Capodanno! Prepararsi a festeggiare!\n{% else %}\n  {{ '' }}\n{% endif %}"
     dryer_finished_states:
     - 'off'
     - idle
@@ -1009,57 +1009,57 @@
     - duo delle meraviglie
     - squadra di casa
     laura_phrase_starts:
-    - Bentornata Laura,
+    - Bentornata Utente 2,
     - Eccola, la regina di casa è rientrata!
-    - Ingresso trionfale per Laura,
-    - Giornata lavorativa archiviata per Laura!
+    - Ingresso trionfale per Utente 2,
+    - Giornata lavorativa archiviata per Utente 2!
     - Bentornata Lau,
-    - Finalmente a casa Laura,
-    - Missione ufficio completata per Laura,
-    - Laura a rapporto nella sua oasi di pace,
+    - Finalmente a casa Utente 2,
+    - Missione ufficio completata per Utente 2,
+    - Utente 2 a rapporto nella sua oasi di pace,
     - Modalità relax attivata per Lau,
-    - La casa riprende vita: bentornata Laura!
+    - La casa riprende vita: bentornata Utente 2!
     - Buon venerdì sera Lau, settimana lavorativa archiviata!
-    - Punto Blu parcheggiata e weekend ufficialmente iniziato per Laura!
+    - Auto Utente 2 Blu parcheggiata e weekend ufficialmente iniziato per Utente 2!
     laura_phrase_tails:
     - stasera niente pensieri: solo divano, coccole e relax!
-    - hai la casa tutta per te prima che rientri Stefano!
+    - hai la casa tutta per te prima che rientri Utente 1!
     - le micie ti aspettavano sul lettone per il riposino serale.
-    - controlla se Luna è ancora nel lavandino del bagnetto o se è scesa!
+    - controlla se Gatto 2 è ancora nel lavandino del bagnetto o se è scesa!
     - togliti le scarpe, il caos di fuori è ufficialmente bandito.
     - la casa è accogliente e pronta a farti staccare la spina.
     - stasera ti meriti solo coccole dalle gatte e zero stress!
-    - Piccola e Luna ti hanno già riservato il posto d'onore sul lettone!
+    - Gatto 1 e Gatto 2 ti hanno già riservato il posto d'onore sul lettone!
     - atmosfera perfetta: mettiti comoda e goditi la serata.
     - chiudi la porta e lascia tutte le scartoffie fuori dal paese!
-    - la Punto Blu è a riposo, niente F24 o bilanci fino a lunedì!
+    - la Auto Utente 2 Blu è a riposo, niente F24 o bilanci fino a lunedì!
     - la settimana è finita: stasera solo divano, Emby e relax con le micie!
     stefano_phrase_starts:
     - Bentornato a casa Ste,
-    - Presenza del capitano Stefano confermata!
+    - Presenza del capitano Utente 1 confermata!
     - Il boss della domotica ha fatto ritorno,
-    - Bentornato Stefano,
-    - Ehi Ste, rientro registrato con successo,
+    - Bentornato Utente 1,
+    - Ehi Utente 1, rientro registrato con successo,
     - Eccoti qua capitano,
-    - Rientro operativo per Stefano,
+    - Rientro operativo per Utente 1,
     - Missione quotidiana finita per Ste,
     - Ingresso autorizzato per il capo di casa,
-    - Centralina smart attiva: bentornato Stefano!
-    - Buon venerdì sera Stefano, weekend alle porte!
-    - Discovery parcheggiata: rientro confermato per Ste!
+    - Centralina smart attiva: bentornato Utente 1!
+    - Buon venerdì sera Utente 1, weekend alle porte!
+    - Auto Utente 1 parcheggiata: rientro confermato per Ste!
     stefano_phrase_tails:
     - se è pausa pranzo fai un pit-stop veloce, altrimenti divano immediato!
     - le micie ti aspettavano per il controllo coccole serale!
-    - vai a vedere se Luna sta dormendo nel lavandino del bagnetto o sul lettone!
+    - vai a vedere se Gatto 2 sta dormendo nel lavandino del bagnetto o sul lettone!
     - la casa è al sicuro e i server della domotica sono stabili.
     - togliti le scarpe e lascia il lavoro fuori dalla porta.
-    - spero tu sia pronto a farti fare le fusa da Piccola e Luna!
+    - spero tu sia pronto a farti fare le fusa da Gatto 1 e Gatto 2!
     - rilassati e prenditi il meritato riposo prima di ripartire.
     - il divano della sala ti ha tenuto il posto caldo tutto il giorno!
     - ricordati che lo stress si lascia sullo zerbino di casa!
     - missione compiuta per oggi: ora solo comfort casalingo!
-    - la Discovery è al sicuro in garage e il weekend si avvicina!
-    - venerdì sera a casa: stasera film su Emby e relax con Laura e le gatte!
+    - la Auto Utente 1 è al sicuro in garage e il weekend si avvicina!
+    - venerdì sera a casa: stasera film su Emby e relax con Utente 2 e le gatte!
     couple_phrase_starts:
     - Bentornati ragazzi,
     - Rientro di coppia confermato,
@@ -1069,12 +1069,12 @@
     - Attenzione, duo dinamico a casa!
     - Doppio rientro registrato con successo,
     - Eccovi qua, bentornati a casa insieme!
-    - Buon venerdì sera Stefano e Laura, la squadra è a casa per il weekend!
-    - Punto Blu e Discovery a riposo: rientro di coppia del venerdì!
+    - Buon venerdì sera Utente 1 e Utente 2, la squadra è a casa per il weekend!
+    - Auto Utente 2 Blu e Auto Utente 1 a riposo: rientro di coppia del venerdì!
     couple_phrase_tails:
     - ora potete decidere insieme chi non ha voglia di cucinare stasera!
-    - Piccola e Luna vi aspettavano sul lettone per fare festa!
-    - controllate se Luna è ancora nel lavandino o se è venuta a salutarvi!
+    - Gatto 1 e Gatto 2 vi aspettavano sul lettone per fare festa!
+    - controllate se Gatto 2 è ancora nel lavandino o se è venuta a salutarvi!
     - il divano della sala vi aspetta per il relax sincronizzato.
     - chiudete fuori il mondo e godetevi la serata insieme!
     - stasera niente pulizie e niente pensieri: solo divano e relax.

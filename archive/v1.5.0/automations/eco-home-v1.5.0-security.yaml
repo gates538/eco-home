@@ -148,7 +148,7 @@
     entity_id: input_boolean.eco_home_attivo
     state: 'on'
   - condition: template
-    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+    value_template: "{{ is_state('person.utente_1', 'home') or is_state('person.utente_2', 'home') }}"
   actions:
   - variables:
       portone_aperto: "{{ is_state('binary_sensor.porta_contact', 'on') }}"
@@ -192,7 +192,7 @@
 
 - id: 'eco_home_allarme_portone_aperto_lungo_micie'
   alias: 'Eco Home - Allarme Portone Aperto a Lungo (> 3 Minuti - Sicurezza Micie)'
-  description: 'Avviso vocale tempestivo se il portone resta aperto per più di 3 minuti continui per non far scappare Piccola e Luna'
+  description: 'Avviso vocale tempestivo se il portone resta aperto per più di 3 minuti continui per non far scappare Gatto 1 e Gatto 2'
   triggers:
   - trigger: state
     entity_id: binary_sensor.porta_contact
@@ -207,7 +207,7 @@
     entity_id: input_boolean.eco_home_silenzioso
     state: 'off'
   - condition: template
-    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+    value_template: "{{ is_state('person.utente_1', 'home') or is_state('person.utente_2', 'home') }}"
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 600 }}"
   actions:
@@ -221,10 +221,10 @@
         tld: "it"
       message: >-
         {{ [
-          "Attenzione! Il portone d'ingresso è rimasto aperto da oltre tre minuti: controllate che sia ben chiuso per non far scappare Piccola e Luna!",
+          "Attenzione! Il portone d'ingresso è rimasto aperto da oltre tre minuti: controllate che sia ben chiuso per non far scappare Gatto 1 e Gatto 2!",
           "Allarme portone: la porta principale è aperta da tre minuti! Verificate che sia chiusa per la sicurezza della casa e delle gatte!",
           "Promemoria sicurezza: portone principale aperto da oltre tre minuti, occhio agli spifferi e alle micie!",
-          "Attenzione Stefano e Laura: portone aperto da più di tre minuti! Verificate che le gatte siano al sicuro e richiudete la porta!"
+          "Attenzione Utente 1 e Utente 2: portone aperto da più di tre minuti! Verificate che le gatte siano al sicuro e richiudete la porta!"
         ] | random }}
   - action: input_text.set_value
     target:

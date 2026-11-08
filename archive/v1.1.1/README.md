@@ -51,12 +51,12 @@ v1.1.1
 
 Controlla questi entity ID prima di usarla:
 
-- `person.stefano`
-- `person.laura`
+- `person.utente_1`
+- `person.utente_2`
 - `binary_sensor.porta_contact`
 - `media_player.nest_hub_sala`
 - `tts.google_ai_tts`
-- `media_player.tv_sala_ue85du7170uxzt`
+- `media_player.tv_sala_principale`
 - `light.luceambiente`
 - `sensor.esterno_asciugatrice_machine_state`
 - `sensor.esterno_asciugatrice_completion_time`

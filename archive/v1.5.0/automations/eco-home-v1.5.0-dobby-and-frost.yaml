@@ -18,7 +18,7 @@
     entity_id: input_boolean.eco_home_silenzioso
     state: 'off'
   - condition: template
-    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') or is_state('person.simone', 'home') or is_state('person.monica', 'home') }}"
+    value_template: "{{ is_state('person.utente_1', 'home') or is_state('person.utente_2', 'home') or is_state('person.familiare_2', 'home') or is_state('person.familiare_1', 'home') }}"
   actions:
   - action: tts.speak
     target:
@@ -45,7 +45,7 @@
 
 - id: 'eco_home_allerta_gelo_parabrezza_auto'
   alias: 'Eco Home - Allerta Gelo Parabrezza Serale (Netatmo Esterna)'
-  description: 'Notifica WhatsApp alle 22:00 se la temperatura esterna scende sotto i 3°C per preparare la Discovery al mattino'
+  description: 'Notifica WhatsApp alle 22:00 se la temperatura esterna scende sotto i 3°C per preparare la Auto Utente 1 al mattino'
   triggers:
   - trigger: time
     at: '22:00:00'
@@ -61,7 +61,7 @@
     data:
       message: >-
         {{ [
-          "❄️ Attenzione! La temperatura esterna stasera è di " ~ states('sensor.temperatura_media_esterna') ~ "°C. Domani mattina la Discovery potrebbe avere il parabrezza ghiacciato!",
+          "❄️ Attenzione! La temperatura esterna stasera è di " ~ states('sensor.temperatura_media_esterna') ~ "°C. Domani mattina la Auto Utente 1 potrebbe avere il parabrezza ghiacciato!",
           "🥶 Allerta Gelo! Fuori ci sono " ~ states('sensor.temperatura_media_esterna') ~ "°C. Preparare il raschietto per il ghiaccio o anticipare la sveglia di 5 minuti!",
           "🧊 Notte glaciale in arrivo (" ~ states('sensor.temperatura_media_esterna') ~ "°C). Domani mattina vetri dell'auto probabilmente congelati!"
         ] | random }}
@@ -81,8 +81,8 @@
     to: 'on'
   - trigger: state
     entity_id:
-    - person.stefano
-    - person.laura
+    - person.utente_1
+    - person.utente_2
     to: 'home'
   conditions:
   - condition: state

@@ -36,7 +36,7 @@
           language: "it"
           options:
             tld: "it"
-          message: "Attenzione Stefano e Laura! Alcune batterie dei sensori domotici sono scariche. Ho inviato l'elenco su WhatsApp!"
+          message: "Attenzione Utente 1 e Utente 2! Alcune batterie dei sensori domotici sono scariche. Ho inviato l'elenco su WhatsApp!"
       - action: input_text.set_value
         target:
           entity_id: input_text.eco_home_ultimo_messaggio

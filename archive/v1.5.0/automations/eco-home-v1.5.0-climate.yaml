@@ -44,7 +44,7 @@
 
 - id: 'eco_home_notifica_clima_conferma'
   alias: 'Eco Home - Notifica Clima con Conferma Esplicita'
-  description: 'Invia una notifica con pulsanti di conferma a Stefano e Laura prima di accendere il clima quando fa troppo caldo o troppo freddo'
+  description: 'Invia una notifica con pulsanti di conferma a Utente 1 e Utente 2 prima di accendere il clima quando fa troppo caldo o troppo freddo'
   triggers:
   - trigger: numeric_state
     entity_id: sensor.temperatura_media
@@ -62,10 +62,10 @@
   - condition: or
     conditions:
     - condition: state
-      entity_id: person.stefano
+      entity_id: person.utente_1
       state: 'home'
     - condition: state
-      entity_id: person.laura
+      entity_id: person.utente_2
       state: 'home'
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 7200 }}"
@@ -103,7 +103,7 @@
 
 - id: 'eco_home_risposta_notifica_clima'
   alias: 'Eco Home - Esecuzione Azione Clima su Conferma Utente'
-  description: 'Esegue accensione clima/riscaldamento SOLO ed ESCLUSIVAMENTE quando Stefano o Laura premono Sì sulla notifica'
+  description: 'Esegue accensione clima/riscaldamento SOLO ed ESCLUSIVAMENTE quando Utente 1 o Utente 2 premono Sì sulla notifica'
   triggers:
   - trigger: event
     event_type: mobile_app_notification_action
@@ -183,7 +183,7 @@
     entity_id: input_boolean.eco_home_silenzioso
     state: 'off'
   - condition: template
-    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+    value_template: "{{ is_state('person.utente_1', 'home') or is_state('person.utente_2', 'home') }}"
   - condition: template
     value_template: "{{ is_state('climate.condizionatore_sala', 'cool') or is_state('climate.condizionatore_camera', 'cool') }}"
   - condition: template
@@ -231,7 +231,7 @@
     entity_id: input_boolean.eco_home_silenzioso
     state: 'off'
   - condition: template
-    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+    value_template: "{{ is_state('person.utente_1', 'home') or is_state('person.utente_2', 'home') }}"
   - condition: numeric_state
     entity_id: sensor.temperatura_media_esterna
     below: 13
@@ -247,7 +247,7 @@
       message: >-
         {{ [
           "Promemoria serale per il termocamino: ricordatevi di controllare il serbatoio del pellet prima di andare a letto, così domattina troverete la casa calda!",
-          "Attenzione capitano Stefano: controllo pellet al termocamino in sala prima di dormire, per una notte calda e serena!",
+          "Attenzione capitano Utente 1: controllo pellet al termocamino in sala prima di dormire, per una notte calda e serena!",
           "Promemoria per la notte: verificate la carica di pellet del termocamino prima di coricarvi!"
         ] | random }}
   - action: input_text.set_value
@@ -258,7 +258,7 @@
   mode: single
 
 - id: 'eco_home_luna_bagnetto_clima_estivo'
-  alias: 'Eco Home - Termo-Alert Bagnetto per Luna (Avvio Clima Estivo)'
+  alias: 'Eco Home - Termo-Alert Bagnetto per Gatto 2 (Avvio Clima Estivo)'
   description: 'Battuta vocale sul Nest Hub all avvio del climatizzatore estivo quando fa molto caldo'
   triggers:
   - trigger: state
@@ -279,7 +279,7 @@
     entity_id: input_boolean.eco_home_silenzioso
     state: 'off'
   - condition: template
-    value_template: "{{ is_state('person.stefano', 'home') or is_state('person.laura', 'home') }}"
+    value_template: "{{ is_state('person.utente_1', 'home') or is_state('person.utente_2', 'home') }}"
   - condition: template
     value_template: "{{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 14400 }}"
   actions:
@@ -293,14 +293,14 @@
         tld: "it"
       message: >-
         {{ [
-          "Clima avviato! Temperatura in discesa: Luna può ufficialmente abbandonare il lavandino del bagnetto e tornare a dormire comoda sul lettone!",
-          "Aria fresca in arrivo! Piccola e Luna approvano la scelta, e Luna ringrazia per il refrigerio fuori dal lavandino!",
-          "Raffrescamento attivo: il caldo è sconfitto! Comfort garantito per Stefano, Laura e le micie!",
-          "Climatizzatore in azione: finalmente si respira! Luna, puoi lasciare il lavandino, il fresco è arrivato in tutta la casa!"
+          "Clima avviato! Temperatura in discesa: Gatto 2 può ufficialmente abbandonare il lavandino del bagnetto e tornare a dormire comoda sul lettone!",
+          "Aria fresca in arrivo! Gatto 1 e Gatto 2 approvano la scelta, e Gatto 2 ringrazia per il refrigerio fuori dal lavandino!",
+          "Raffrescamento attivo: il caldo è sconfitto! Comfort garantito per Utente 1, Utente 2 e le micie!",
+          "Climatizzatore in azione: finalmente si respira! Gatto 2, puoi lasciare il lavandino, il fresco è arrivato in tutta la casa!"
         ] | random }}
   - action: input_text.set_value
     target:
       entity_id: input_text.eco_home_ultimo_messaggio
     data:
-      value: "Clima: Refrigerio estivo e relax per Luna"
+      value: "Clima: Refrigerio estivo e relax per Gatto 2"
   mode: single

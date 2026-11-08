@@ -12,8 +12,8 @@ input_button.eco_home_test_vocale
 | Scenario | Cosa verifica |
 |---|---|
 | Percorso audio | TTS, Nest Hub, volume e TV |
-| Rientro Stefano | Nomignoli e frasi maschili |
-| Rientro Laura | Nomignoli e frasi femminili |
+| Rientro Utente 1 | Nomignoli e frasi maschili |
+| Rientro Utente 2 | Nomignoli e frasi femminili |
 | Rientro di coppia | Nomignoli e frasi di coppia |
 | Modalità notte | Frasi notturne e volume ridotto |
 | Promemoria asciugatrice | Testo del promemoria senza modificare quello reale |

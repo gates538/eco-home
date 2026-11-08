@@ -136,8 +136,8 @@ entità `person.*`.
 Il file pubblicato è configurato per:
 
 ```text
-person.stefano
-person.laura
+person.utente_1
+person.utente_2
 ```
 
 Per ogni persona è necessario:
@@ -297,7 +297,7 @@ Prova prima il mute e subito dopo il ripristino:
 ```yaml
 action: media_player.volume_mute
 target:
-  entity_id: media_player.tv_sala_ue85du7170uxzt
+  entity_id: media_player.tv_sala_principale
 data:
   is_volume_muted: true
 ```

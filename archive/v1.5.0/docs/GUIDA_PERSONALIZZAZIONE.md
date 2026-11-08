@@ -7,8 +7,8 @@ I numeri di riga si riferiscono a `eco-home-v1.1.8.yaml` pubblicato con la relea
 Alle righe **10-11** e **795-796** sostituisci:
 
 ```text
-person.stefano
-person.laura
+person.utente_1
+person.utente_2
 ```
 
 Se cambi questi entity ID, sostituisci anche tutte le occorrenze nei blocchi `arrived_stefano`, `arrived_laura` e `arrived_now_couple`, circa alle righe **340-360**.
@@ -43,7 +43,7 @@ superare le prove TTS, volume e arresto descritte in
 ## TV e luce
 
 ```text
-media_player.tv_sala_ue85du7170uxzt
+media_player.tv_sala_principale
 light.luceambiente
 ```
 
@@ -89,8 +89,8 @@ Imposta `false` quando l'automazione è stabile e non vuoi più messaggi diagnos
 Le nuove variabili configurabili per la telecamera e le notifiche si trovano nella sezione `variables:` dell'automazione:
 
 - `camera_entity`: L'entity ID della telecamera (default: `camera.sala_2`).
-- `stefano_notification_service`: Il servizio di notifica per Stefano (default: `notify.notify` per tutti i dispositivi. Cambialo es. in `notify.mobile_app_stefano` per inviarlo solo a Stefano).
-- `laura_notification_service`: Il servizio di notifica per Laura (default: `notify.notify`).
+- `stefano_notification_service`: Il servizio di notifica per Utente 1 (default: `notify.notify` per tutti i dispositivi. Cambialo es. in `notify.mobile_app_stefano` per inviarlo solo a Utente 1).
+- `laura_notification_service`: Il servizio di notifica per Utente 2 (default: `notify.notify`).
 - `snapshot_file_path`: Il percorso su disco dove salvare temporaneamente lo snapshot (default: `/media/eco_home/eco_home_sala_2.jpg`).
 - `snapshot_access_url`: L'URL locale per l'allegato notifica (default: `/media/local/eco_home/eco_home_sala_2.jpg`).
 

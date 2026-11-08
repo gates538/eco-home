@@ -2,6 +2,25 @@
 
 Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
+## [2.0.0] - 2026-11-08
+
+### Allineamento Completo v2.0, AI Multimodale (Gemini Vision & TTS), Self-Healing & Sanitizzazione Totale
+- **Sincronizzazione Integrale (102 Automazioni & 105 Script)**:
+  - Allineati tutti i 7 moduli in `/automations` e i 6 moduli in `/scripts` con l'architettura di produzione attuale.
+  - Archiviata la precedente release modulare in `archive/v1.5.0`.
+- **Motore AI Multimodale & Annunci Generativi**:
+  - Aggiunti gli script di analisi visiva AI (`analizza_telecamera_con_vision_ai`, `ispeziona_terrazzi_ai`, `ispeziona_varco_ai`, `analizza_video_movimento_ai`, `cerca_auto_autonoma_ptz`, `verifica_fiamma_camino_ai`, `riconosci_auto_ospiti_ai`).
+  - Aggiunti gli annunci vocali generativi AI su Google Nest Hub (`annuncio_rientro_ai`, `annuncio_cucina_ai`, `annuncio_frigo_ai`, `annuncio_buongiorno_ai`, `buongiorno_weekend_ai`, `annuncio_rifiuti_ore_21_ai`, `annuncio_ospite_ai`, `pillola_sarcastica_nesthub`) con gestione automatica dei volumi (`audio_annuncio_prepara` / `audio_annuncio_ripristina`).
+  - Aggiunti i report vocali on-demand (`stato_finestre_porte_aperte`, `stato_acqua_calda_vocale`, `stato_gatte_vocale`, `stato_elettrodomestici_energia_vocale`, `stato_camino_vocale`, `stato_pioggia_pluviometro`, `stato_vento_anemometro`, `spesa_leggi_lista_vocale`).
+- **Clima, Termocamino & Ospiti**:
+  - Notifica interattiva pre-pranzo per l'accensione del Termocamino a pellet con gestione posticipo (+10/+15/+20 min o avvio automatico differito).
+  - Modalità Ospiti Cameretta con isolamento automatico di luci/tapparella/clima, disattivazione telecamera interna per privacy e sincronizzazione Boost Acqua Calda Sanitaria su pompa di calore.
+- **Infrastruttura, Self-Healing & Sicurezza**:
+  - Watchdog automatico Zigbee2MQTT + coordinatore SLZB-06, auto-healing Wi-Fi Mesh per telecamere, protezione anti-spegnimento prese critiche (NAS/UPS), aggiornamento settimanale container Docker e nightly update HACS.
+  - Rilevamento tentativi di accesso HTTP falliti con pulsante di Ban IP immediato da notifica push.
+- **Privacy & Anonimizzazione Completa**:
+  - Rimossi e sostituiti con placeholder generici tutti i nomi e cognomi reali, soprannomi, indirizzi, comuni, SSID Wi-Fi, domini, sottoreti IP e modelli specifici di veicoli in tutto il repository (inclusi `docs/` e `archive/`).
+
 ## [1.5.0] - 2026-08-18
 
 ### Riorganizzazione Modulare, Affidabilità & Personalizzazione Avanzata
@@ -9,8 +28,8 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 - **Risoluzione Race Condition Rientri di Coppia**: Configurato `mode: queued` (con `max: 10`) nel modulo principale (`eco-home-v1.5.0-core.yaml`), risolvendo il mutismo del Nest Hub causato dall'accavallamento di trigger simultanei.
 - **Armonizzazione TTS Voce Femminile Vivace**: Uniformate tutte le 16 chiamate `tts.speak` su `tts.google_translate_it_lt` con `language: "it"` e `options: { tld: "it" }` per un timbro femminile chiaro, veloce e naturale in ogni modulo.
 - **Personalizzazione Sartoriale Routine & Casa**: 
-  - Integrazione routine lavorative (pausa pranzo Stefano, rientro Laura alle 18:40, weekend).
-  - Riferimenti affettuosi e divertenti alle gatte **Piccola e Luna** (abitudini sul lettone, Luna nel lavandino del bagnetto).
+  - Integrazione routine lavorative (pausa pranzo Utente 1, rientro Utente 2 alle 18:40, weekend).
+  - Riferimenti affettuosi e divertenti alle gatte **Gatto 1 e Gatto 2** (abitudini sul lettone, Gatto 2 nel lavandino del bagnetto).
   - Gestione specifica impianto di riscaldamento (termocamino a pellet / termosifoni) e climatizzazione estiva (18000 BTU sala + dual split camere).
   - Adattamento vocabolario locale a misura di "paese".
 - **Espansione Sarcasmo & Allerte Vocali**: Arricchito il repertorio di battute casuali per allerta vento forte in terrazza, pioggia, cucina/fornelli, frigo/freezer aperti, cottura dimenticata, asciugatrice e dispenser pappa.
@@ -20,7 +39,7 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
 ### Nuove Caratteristiche & Miglioramenti Avanzati
 - **Voce Femminile Italiana Nativa**: Forzata la lingua ed il dominio italiano (`language: "it"`, `options: { tld: "it" }`) in tutte le chiamate TTS, garantendo una voce femminile naturale, fluida ed in italiano nativo.
-- **Tracciamento Esteso Persone (Rita & Mauro)**: Registrati e tracciati Rita (`person.rita`) e Mauro (`person.mauro`) con helper dedicati (`input_boolean.eco_home_saluti_rita` e `input_boolean.eco_home_saluti_mauro`) e logica di rientro integrata.
+- **Tracciamento Esteso Persone (Familiare 3 & Familiare 4)**: Registrati e tracciati Familiare 3 (`person.familiare_3`) e Familiare 4 (`person.familiare_4`) con helper dedicati (`input_boolean.eco_home_saluti_rita` e `input_boolean.eco_home_saluti_mauro`) e logica di rientro integrata.
 - **Allerta Porta Freezer Sarcastica**: Creata l'automazione allerta per la porta del congelatore (`binary_sensor.cucina_frigorifero_freezer_door`) con battute esilaranti e scherzose dopo 60 secondi di apertura.
 - **Fix Definitivo Annunci Cucina**:
   - Eliminati i trigger sui singoli fuochi per evitare annunci ad ogni cambio di potenza.
@@ -35,14 +54,14 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
 ### Nuove Caratteristiche & Miglioramenti Avanzati
 - **Regola d'Oro Casa Vuota**: Blindatura completa che impedisce qualsiasi annuncio vocale TTS sul Nest Hub se nessuno è fisicamente a casa (`person.*` home == 0).
-- **Tracciamento Persone Esteso**: Aggiunto tracciamento di presenza ed accoglienza vocale al rientro per **Simone** (`person.simone`) e **Monica** (`person.monica`).
-- **Interruttore Saluti Mauro**: Aggiunto `input_boolean.eco_home_saluti_mauro` per abilitare/disabilitare dall'interfaccia gli annunci vocali per Mauro ed evitare falsi positivi dal piano superiore.
+- **Tracciamento Persone Esteso**: Aggiunto tracciamento di presenza ed accoglienza vocale al rientro per **Familiare 2** (`person.familiare_2`) e **Familiare 1** (`person.familiare_1`).
+- **Interruttore Saluti Familiare 4**: Aggiunto `input_boolean.eco_home_saluti_mauro` per abilitare/disabilitare dall'interfaccia gli annunci vocali per Familiare 4 ed evitare falsi positivi dal piano superiore.
 - **Notifica Clima con Conferma Esplicita**: Notifiche interattive su smartphone per caldo (>26°C) e freddo (<19°C) con pulsanti di conferma esplicita (*Sì, Accendi Clima* / *No, Finestre Aperte*) prima di eseguire qualsiasi azione, evitando sprechi energetici.
 - **Automazione Dobby Robot Vacuum (Dreame L40 Pro)**: Pausa e ritorno automatico alla base di Dobby non appena qualcuno rientra a casa, più controlli di stato e batteria integrati nella scheda Lovelace.
 - **Report Settimanale Batterie Scariche**: Controllo automatico ogni lunedì alle 10:00 con invio report WhatsApp e avviso vocale se un sensore ha la batteria < 15%.
-- **Pet Alert Crocchette (Piccola & Luna)**: Annunci vocali personalizzati ogni volta che il dispenser Petkit eroga il pasto.
-- **Promemoria Carburante Auto (Discovery / Drivvo)**: Avviso vocale domenicale alle 20:30 per verificare l'autonomia prima dell'inizio della settimana.
-- **Sarcasmo Culinario per Laura**: Frasi esilaranti, ironiche e variegate ad ogni accensione dei fornelli sia per Chef Laura che per Chef Stefano.
+- **Pet Alert Crocchette (Gatto 1 & Gatto 2)**: Annunci vocali personalizzati ogni volta che il dispenser Petkit eroga il pasto.
+- **Promemoria Carburante Auto (Auto Utente 1 / Drivvo)**: Avviso vocale domenicale alle 20:30 per verificare l'autonomia prima dell'inizio della settimana.
+- **Sarcasmo Culinario per Utente 2**: Frasi esilaranti, ironiche e variegate ad ogni accensione dei fornelli sia per Chef Utente 2 che per Chef Utente 1.
 
 
 ## [1.2.0] - 2026-07-18
@@ -89,7 +108,7 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 ### Aggiunto
 
 - Funzionalità di scatto foto (snapshot) tramite telecamera (`camera.sala_2` / "Cam Sala 2") e invio di notifica push ricca con immagine sul cellulare al rientro.
-- La notifica viene inviata **solo se la casa era vuota** prima del rientro rilevato (ossia quando Stefano, Laura o persone future non erano in casa).
+- La notifica viene inviata **solo se la casa era vuota** prima del rientro rilevato (ossia quando Utente 1, Utente 2 o persone future non erano in casa).
 - Nuovo helper `input_boolean.eco_home_notifiche_foto` per abilitare/disabilitare le notifiche con foto direttamente dalla dashboard.
 - Configurazione flessibile per mappare i servizi di notifica individuali (es. `notify.mobile_app_stefano` o `notify.notify` per broadcast).
 - Nuova sezione dedicata nella plancia Lovelace per controllare lo stato delle notifiche con foto e visualizzare l'anteprima della telecamera.
@@ -119,7 +138,7 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 
 ### Aggiunto
 
-- Selettore con sei scenari di test: percorso audio, Stefano, Laura, coppia, notte e asciugatrice.
+- Selettore con sei scenari di test: percorso audio, Utente 1, Utente 2, coppia, notte e asciugatrice.
 - Diagnostica persistente con ultimo evento, esito, profilo, messaggio, persona, apertura del portone e arrivo.
 - Card con riepilogo grafico di persone, portone, asciugatrice e Nest Hub.
 - Package completo degli helper e package incrementale per chi aggiorna dalla 1.1.2.
@@ -146,7 +165,7 @@ Tutte le modifiche rilevanti di Eco Home sono documentate in questo file.
 - Il messaggio può partire sia con `persona home → portone` sia con `portone → persona home`.
 - Il trigger `person_arrived` viene accettato quando il portone è stato aperto recentemente.
 - La chiusura del portone non annulla la conferma mentre si attende l'aggiornamento della posizione.
-- L'identità viene determinata tramite `person.stefano` e `person.laura`.
+- L'identità viene determinata tramite `person.utente_1` e `person.utente_2`.
 
 ### Migliorato
 

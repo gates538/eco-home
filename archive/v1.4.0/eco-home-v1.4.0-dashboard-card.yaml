@@ -65,15 +65,15 @@ cards:
     title: Persone e Presenza
     show_header_toggle: false
     entities:
-      - entity: person.stefano
-        name: Stefano
-      - entity: person.laura
-        name: Laura
+      - entity: person.utente_1
+        name: Utente 1
+      - entity: person.utente_2
+        name: Utente 2
       - entity: device_tracker.realme_c55
-        name: Mamma Monica (Realme C55)
+        name: Mamma (Realme C55)
         icon: mdi:cellphone
       - entity: device_tracker.iphone_alessia
-        name: Alessia (iPhone)
+        name: Familiare 5 (iPhone)
         icon: mdi:cellphone
 
   - type: entities

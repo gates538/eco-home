@@ -49,7 +49,7 @@ Apri la plancia di Home Assistant, clicca sui tre puntini in alto a destra → *
 
 ## 5. Verifica del funzionamento
 1. Vai sulla dashboard di Eco Home e attiva il nuovo interruttore **Notifiche con foto**.
-2. Esegui un test selezionando lo scenario `Percorso audio` o `Rientro Stefano` dalla card e cliccando su **Avvia il test**.
+2. Esegui un test selezionando lo scenario `Percorso audio` o `Rientro Utente 1` dalla card e cliccando su **Avvia il test**.
 3. Verifica in `/media/eco_home/` se l'immagine temporanea viene correttamente creata.
 4. Controlla che i telefoni ricevano la notifica push con lo snapshot allegato.
 

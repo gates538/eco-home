@@ -1,0 +1,643 @@
+# ==============================================================================
+# 01 — TAPPARELLE, LUCI GLOBALI & SCENARI STAGIONALI / METEO
+# ==============================================================================
+
+spegni_tutte_le_luci:
+  alias: "Spegni Tutte le Luci"
+  icon: "mdi:lightbulb-off"
+  mode: restart
+  sequence:
+    - variables:
+        escludi_cameretta: "{{ is_state('input_boolean.modalita_ospiti_cameretta', 'on') }}"
+        luci_candidati: >-
+          {% set base = [
+            'light.luce_sala_2',
+            'light.luce_ambiente_sala',
+            'light.luce_mensole_camino',
+            'light.luce_mobiletto_camino',
+            'light.luce_cucina',
+            'light.luce_applique',
+            'light.faretti_cucina',
+            'light.luce_camera',
+            'light.luce_comodino_1_camera',
+            'light.luce_comodino_2_camera',
+            'light.luce_specchio_camera',
+            'light.luce_bagno',
+            'light.luce_specchio_bagno',
+            'light.luce_bagnetto',
+            'light.luce_specchio_bagnetto',
+            'light.luce_corridoio',
+            'light.luce_terrazzo',
+            'light.luce_terrazzo_2',
+            'light.luce_porta_terrazzo',
+            'light.luce_balcone_sala',
+            'light.luce_balcone_cucina',
+            'light.luce_balcone_camera',
+            'light.luce_locale_tecnico'
+          ] %}
+          {% if not escludi_cameretta %}
+            {% set base = base + ['light.luce_cameretta', 'light.luce_balcone_cameretta'] %}
+          {% endif %}
+          {{ base }}
+        luci_accese: >-
+          {{ expand(luci_candidati) | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}
+    - if:
+        - condition: template
+          value_template: "{{ luci_accese | length > 0 }}"
+      then:
+        - action: light.turn_off
+          target:
+            entity_id: "{{ luci_accese }}"
+          continue_on_error: true
+
+scenario_entra_casa:
+  alias: "🏠 Scenario Entra in Casa (Tasto Entra)"
+  icon: "mdi:home-import-outline"
+  mode: restart
+  sequence:
+    - action: script.apri_tutte_le_tapparelle
+      continue_on_error: true
+
+scenario_esci_casa:
+  alias: "🚪 Scenario Esci di Casa (Tasto Esci)"
+  icon: "mdi:home-export-outline"
+  mode: restart
+  sequence:
+    - variables:
+        finestre_aperte_list: >-
+          {{ (state_attr('binary_sensor.sicurezza_infissi_aperti', 'elenco_aperti') | default([], true))
+             | reject('in', ['Porta Ingresso', 'Portoncino', 'Ingresso Portoncino', 'Porta Giorno/Notte', 'Porta Camera']) | list }}
+        tutte_finestre_aperte: >-
+          {{ (states('sensor.numero_finestre_aperte') | int(0) >= 6) or
+             ((finestre_aperte_list | select('in', ['Finestra Sala', 'Finestra Cucina', 'Finestra Camera', 'Finestra Cameretta', 'Finestra Bagno', 'Finestra Bagnetto']) | list | length) >= 6) }}
+        finestre_aperte_str: >-
+          {% if tutte_finestre_aperte %}
+            tutte le finestre
+          {% else %}
+            {{ finestre_aperte_list | join(', ') }}
+          {% endif %}
+        piove: >-
+          {{ states('weather.casa') in ['rainy', 'pouring', 'lightning', 'lightning-rainy'] or
+             states('weather.meteoam_home') in ['rainy', 'pouring', 'lightning', 'lightning-rainy'] }}
+        messaggio_uscita_veloce: >-
+          {% if tutte_finestre_aperte %}
+            Attenzione prima di uscire: tutte le finestre sono ancora aperte! Chiudo tapparelle e luci, a dopo!
+          {% elif finestre_aperte_list | length > 1 %}
+            Attenzione prima di uscire: {{ finestre_aperte_str }} ancora aperte! Chiudo tapparelle e luci, a dopo!
+          {% elif finestre_aperte_list | length == 1 %}
+            Attenzione prima di uscire: {{ finestre_aperte_str }} ancora aperta! Chiudo tapparelle e luci, a dopo!
+          {% elif piove %}
+            Tapparelle in chiusura e luci spente. Occhio che piove, prendete l'ombrello! A dopo!
+          {% else %}
+            Tapparelle in chiusura e luci spente. Buona uscita ragazzi, a dopo!
+          {% endif %}
+    - parallel:
+        - sequence:
+            - action: media_player.volume_mute
+              target:
+                entity_id: media_player.nest_hub_sala
+              data:
+                is_volume_muted: false
+              continue_on_error: true
+            - action: media_player.volume_set
+              target:
+                entity_id: media_player.nest_hub_sala
+              data:
+                volume_level: 0.80
+              continue_on_error: true
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+                  sequence:
+                    - action: tts.speak
+                      target:
+                        entity_id: tts.home_assistant_cloud
+                      data:
+                        media_player_entity_id: media_player.nest_hub_sala
+                        message: "{{ messaggio_uscita_veloce }}"
+                        language: "it-IT"
+                        options:
+                          voice: "it-IT-Wavenet-A"
+                      continue_on_error: true
+              default:
+                - action: tts.speak
+                  target:
+                    entity_id: tts.google_translate_it_lt
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    message: "{{ messaggio_uscita_veloce }}"
+                    language: "it"
+                    options:
+                      tld: "it"
+                  continue_on_error: true
+        - sequence:
+            - action: script.spegni_tutte_le_luci
+              continue_on_error: true
+        - sequence:
+            - action: script.chiusura_standard_tapparelle
+              continue_on_error: true
+
+stop_tutte_le_tapparelle:
+  alias: "Stop Tutte le Tapparelle"
+  icon: "mdi:stop-circle"
+  mode: restart
+  sequence:
+    - action: cover.stop_cover
+      target:
+        entity_id:
+          - cover.tapparella_sala
+          - cover.tapparella_cucina
+          - cover.tapparella_camera
+          - cover.tapparella_cameretta
+          - cover.tapparella_bagno
+          - cover.tapparella_bagnetto
+
+applica_percentuale_tapparelle:
+  alias: "Applica Percentuale a Tutte le Tapparelle"
+  icon: "mdi:window-shutter-cog"
+  mode: restart
+  sequence:
+    - repeat:
+        for_each:
+          - entity_id: cover.tapparella_sala
+            min_pos: 8
+          - entity_id: cover.tapparella_camera
+            min_pos: 6
+          - entity_id: cover.tapparella_cameretta
+            min_pos: 7
+          - entity_id: cover.tapparella_cucina
+            min_pos: 7
+          - entity_id: cover.tapparella_bagno
+            min_pos: 6
+          - entity_id: cover.tapparella_bagnetto
+            min_pos: 6
+        sequence:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ not (repeat.item.entity_id == 'cover.tapparella_cameretta' and is_state('input_boolean.modalita_ospiti_cameretta', 'on')) }}
+            then:
+              - action: cover.set_cover_position
+                target:
+                  entity_id: "{{ repeat.item.entity_id }}"
+                data:
+                  position: >-
+                    {% set target = states('input_number.target_percentuale_tapparelle') | int(50) %}
+                    {{ [repeat.item.min_pos, target] | max }}
+                continue_on_error: true
+              - delay:
+                  milliseconds: 250
+
+chiusura_totale_tapparelle:
+  alias: "Chiudi Tutte le Tapparelle (Fessure Aperte)"
+  icon: "mdi:window-shutter"
+  mode: restart
+  sequence:
+    - repeat:
+        for_each:
+          - entity_id: cover.tapparella_sala
+            pos: 8
+          - entity_id: cover.tapparella_camera
+            pos: 6
+          - entity_id: cover.tapparella_cameretta
+            pos: 7
+          - entity_id: cover.tapparella_cucina
+            pos: 7
+          - entity_id: cover.tapparella_bagno
+            pos: 6
+          - entity_id: cover.tapparella_bagnetto
+            pos: 6
+        sequence:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ not (repeat.item.entity_id == 'cover.tapparella_cameretta' and is_state('input_boolean.modalita_ospiti_cameretta', 'on')) and
+                     (is_state(repeat.item.entity_id, 'closed') or
+                      (state_attr(repeat.item.entity_id, 'current_position') | int(100)) > (repeat.item.pos + 2) or
+                      (state_attr(repeat.item.entity_id, 'current_position') | int(100)) < (repeat.item.pos - 1)) }}
+            then:
+              - action: cover.set_cover_position
+                target:
+                  entity_id: "{{ repeat.item.entity_id }}"
+                data:
+                  position: "{{ repeat.item.pos }}"
+                continue_on_error: true
+              - delay:
+                   milliseconds: 350
+
+chiusura_standard_tapparelle:
+  alias: "Chiudi Tutte le Tapparelle (Fessure Aperte)"
+  icon: "mdi:window-shutter"
+  mode: restart
+  sequence:
+    - repeat:
+        for_each:
+          - entity_id: cover.tapparella_sala
+            pos: 8
+          - entity_id: cover.tapparella_camera
+            pos: 6
+          - entity_id: cover.tapparella_cameretta
+            pos: 7
+          - entity_id: cover.tapparella_cucina
+            pos: 7
+          - entity_id: cover.tapparella_bagno
+            pos: 6
+          - entity_id: cover.tapparella_bagnetto
+            pos: 6
+        sequence:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ not (repeat.item.entity_id == 'cover.tapparella_cameretta' and is_state('input_boolean.modalita_ospiti_cameretta', 'on')) and
+                     (is_state(repeat.item.entity_id, 'closed') or
+                      (state_attr(repeat.item.entity_id, 'current_position') | int(100)) > (repeat.item.pos + 2) or
+                      (state_attr(repeat.item.entity_id, 'current_position') | int(100)) < (repeat.item.pos - 1)) }}
+            then:
+              - action: cover.set_cover_position
+                target:
+                  entity_id: "{{ repeat.item.entity_id }}"
+                data:
+                  position: "{{ repeat.item.pos }}"
+                continue_on_error: true
+              - delay:
+                  milliseconds: 350
+
+tapparelle_chiuse_con_fessure_aperte:
+  alias: "Tapparelle Chiuse con Fessure Aperte"
+  icon: "mdi:window-shutter"
+  mode: restart
+  sequence:
+    - repeat:
+        for_each:
+          - entity_id: cover.tapparella_sala
+            pos: 8
+          - entity_id: cover.tapparella_camera
+            pos: 6
+          - entity_id: cover.tapparella_cameretta
+            pos: 7
+          - entity_id: cover.tapparella_cucina
+            pos: 7
+          - entity_id: cover.tapparella_bagno
+            pos: 6
+          - entity_id: cover.tapparella_bagnetto
+            pos: 6
+        sequence:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ not (repeat.item.entity_id == 'cover.tapparella_cameretta' and is_state('input_boolean.modalita_ospiti_cameretta', 'on')) and
+                     (is_state(repeat.item.entity_id, 'closed') or
+                      (state_attr(repeat.item.entity_id, 'current_position') | int(100)) > (repeat.item.pos + 2) or
+                      (state_attr(repeat.item.entity_id, 'current_position') | int(100)) < (repeat.item.pos - 1)) }}
+            then:
+              - action: cover.set_cover_position
+                target:
+                  entity_id: "{{ repeat.item.entity_id }}"
+                data:
+                  position: "{{ repeat.item.pos }}"
+                continue_on_error: true
+              - delay:
+                  milliseconds: 350
+
+apri_tutte_le_tapparelle:
+  alias: "Apri Tutte le Tapparelle (100%)"
+  icon: "mdi:window-shutter-open"
+  mode: restart
+  sequence:
+    - repeat:
+        for_each:
+          - cover.tapparella_sala
+          - cover.tapparella_cucina
+          - cover.tapparella_camera
+          - cover.tapparella_cameretta
+          - cover.tapparella_bagno
+          - cover.tapparella_bagnetto
+        sequence:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ not (repeat.item == 'cover.tapparella_cameretta' and is_state('input_boolean.modalita_ospiti_cameretta', 'on')) }}
+            then:
+              - action: cover.set_cover_position
+                target:
+                  entity_id: "{{ repeat.item }}"
+                data:
+                  position: 100
+                continue_on_error: true
+              - delay:
+                  milliseconds: 350
+
+estate:
+  alias: "Estate (Tapparelle 50% & Clima Auto)"
+  icon: "mdi:weather-sunny"
+  mode: restart
+  sequence:
+    - variables:
+        tapparelle_target: >-
+          {% set t = ['cover.tapparella_sala', 'cover.tapparella_cucina', 'cover.tapparella_camera', 'cover.tapparella_bagno', 'cover.tapparella_bagnetto'] %}
+          {% if is_state('input_boolean.modalita_ospiti_cameretta', 'off') %}
+            {% set t = t + ['cover.tapparella_cameretta'] %}
+          {% endif %}
+          {{ t }}
+        clima_target: >-
+          {% set c = ['climate.sala_condizionatore_sala', 'climate.camera_condizionatore_camera'] %}
+          {% if is_state('input_boolean.modalita_ospiti_cameretta', 'off') %}
+            {% set c = c + ['climate.cameretta_condizionatore_cameretta'] %}
+          {% endif %}
+          {{ c }}
+    - action: cover.set_cover_position
+      target:
+        entity_id: "{{ tapparelle_target }}"
+      data:
+        position: 50
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: "{{ clima_target }}"
+      data:
+        hvac_mode: auto
+
+inverno:
+  alias: "Inverno (Tapparelle 100% & Camino)"
+  icon: "mdi:snowflake"
+  mode: restart
+  sequence:
+    - variables:
+        tapparelle_target: >-
+          {% set t = ['cover.tapparella_sala', 'cover.tapparella_cucina', 'cover.tapparella_camera', 'cover.tapparella_bagno', 'cover.tapparella_bagnetto'] %}
+          {% if is_state('input_boolean.modalita_ospiti_cameretta', 'off') %}
+            {% set t = t + ['cover.tapparella_cameretta'] %}
+          {% endif %}
+          {{ t }}
+    - action: cover.set_cover_position
+      target:
+        entity_id: "{{ tapparelle_target }}"
+      data:
+        position: 100
+    - action: climate.set_hvac_mode
+      target:
+        entity_id:
+          - climate.camino_water
+      data:
+        hvac_mode: heat
+
+preparazione_notte:
+  alias: "Preparazione Notte (Dinamica)"
+  icon: "mdi:bed-clock"
+  mode: restart
+  sequence:
+    # 1. Spegnimento camino (se acceso)
+    - if:
+        - condition: state
+          entity_id: climate.camino_water
+          state: 'heat'
+      then:
+        - action: climate.set_hvac_mode
+          target:
+            entity_id: climate.camino_water
+          data:
+            hvac_mode: 'off'
+          continue_on_error: true
+
+    # 2. Spegnimento condizionatore sala (se acceso)
+    - if:
+        - condition: template
+          value_template: "{{ states('climate.sala_condizionatore_sala') not in ['off', 'unavailable', 'unknown'] }}"
+      then:
+        - action: climate.set_hvac_mode
+          target:
+            entity_id: climate.sala_condizionatore_sala
+          data:
+            hvac_mode: 'off'
+          continue_on_error: true
+
+    # 3. Spegnimento luci interne (zona giorno, corridoio, camera da letto) e luci esterne (escludendo Cameretta se ci sono ospiti a dormire)
+    - variables:
+        luci_notte_off: >-
+          {% set l = [
+            'light.luce_sala_2',
+            'light.luce_ambiente_sala',
+            'light.luce_mensole_camino',
+            'light.luce_mobiletto_camino',
+            'light.luce_cucina',
+            'light.faretti_cucina',
+            'light.luce_applique',
+            'light.luce_bagno',
+            'light.luce_specchio_bagno',
+            'light.luce_bagnetto',
+            'light.luce_specchio_bagnetto',
+            'light.luce_corridoio',
+            'light.luce_camera',
+            'light.luce_specchio_camera',
+            'light.luce_terrazzo',
+            'light.luce_terrazzo_2',
+            'light.luce_porta_terrazzo',
+            'light.luce_balcone_sala',
+            'light.luce_balcone_cucina',
+            'light.luce_balcone_camera'
+          ] %}
+          {% if is_state('input_boolean.modalita_ospiti_cameretta', 'off') %}
+            {% set l = l + ['light.luce_cameretta', 'light.luce_balcone_cameretta'] %}
+          {% endif %}
+          {{ l }}
+    - action: light.turn_off
+      target:
+        entity_id: "{{ luci_notte_off }}"
+      continue_on_error: true
+
+    # 4. Accensione luci letto Utente 1 e Utente 2 (on semplice al 100%)
+    - action: light.turn_on
+      target:
+        entity_id:
+          - light.luce_comodino_1_camera
+          - light.luce_comodino_2_camera
+      continue_on_error: true
+
+    # 5. Battuta velocissima su Nest Hub Camera (andare a letto presto)
+    - action: media_player.turn_on
+      target:
+        entity_id: media_player.nest_hub_camera
+      continue_on_error: true
+    - delay:
+        milliseconds: 300
+    - action: media_player.volume_mute
+      target:
+        entity_id: media_player.nest_hub_camera
+      data:
+        is_volume_muted: false
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_camera
+      data:
+        volume_level: 0.70
+      continue_on_error: true
+    - delay:
+        milliseconds: 400
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.home_assistant_cloud
+              data:
+                media_player_entity_id: media_player.nest_hub_camera
+                message: >-
+                  {{ [
+                    "A letto a quest'ora? Incredibile, chi siete e cosa avete fatto ai veri Utente 1 e Utente 2? Buona preparazione per la notte!",
+                    "Addirittura già a letto? Il record mondiale di puntualità è ufficialmente vostro stasera. Luci soffuse pronte!",
+                    "Così presto a nanna? Nemmeno le galline! Luci letto accese, relax autorizzato.",
+                    "Preparazione notte attivata! Incredibile ma vero, stasera avete battuto persino il coprifuoco. Buona lettura o buon riposo!",
+                    "Luci soffuse accese! Gatto 2 e Gatto 1 stavano già occupando tutto il materasso, vedete se vi lasciano un angolino!",
+                    "Modalità relax in camera pronta! Dobby fa la guardia dalla sua base e le abat-jour sono accese: buon riposo!",
+                    "Siete già sotto le coperte? Il divano in sala è rimasto scioccato da questo tradimento anticipato. Buona serata!"
+                  ] | random }}
+                language: "it-IT"
+                options:
+                  voice: "it-IT-Wavenet-A"
+              continue_on_error: true
+      default:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_camera
+            message: "A letto così presto stasera? Incredibile! Luci letto pronte, buon relax."
+            language: "it"
+            options:
+              tld: "it"
+          continue_on_error: true
+
+attiva_scenario_selezionato:
+  alias: "Attiva Scenario Selezionato"
+  icon: "mdi:play-circle"
+  mode: restart
+  sequence:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Tapparelle Fessure Aperte') }}"
+          sequence:
+            - action: script.chiusura_standard_tapparelle
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Scenario Notte') }}"
+          sequence:
+            - action: script.buonanotte_scenario_notte
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Scenario Notte Silenziosa') }}"
+          sequence:
+            - action: script.buonanotte_silenziosa
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Scenario Temporale (100% Chiuse)') }}"
+          sequence:
+            - action: script.scenario_temporale
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Cinema') }}"
+          sequence:
+            - action: script.attiva_scena_cinema
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Preparazione Notte (Dinamica)') }}"
+          sequence:
+            - action: script.preparazione_notte
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Spegni Tutte le Luci') }}"
+          sequence:
+            - action: script.spegni_tutte_le_luci
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Apri Tutte le Tapparelle') }}"
+          sequence:
+            - action: script.apri_tutte_le_tapparelle
+        - conditions:
+            - condition: template
+              value_template: "{{ is_state('input_select.scenario_selezionato_anteprima', 'Chiudi Tutte le Tapparelle') }}"
+          sequence:
+            - action: script.chiusura_totale_tapparelle
+      default:
+        - action: scene.turn_on
+          target:
+            entity_id: "{% set sel = states('input_select.scenario_selezionato_anteprima') %} {% set match = states.scene | selectattr('name', 'eq', sel) | map(attribute='entity_id') | list %} {{ match[0] if match | length > 0 else 'none' }}"
+
+scenario_temporale:
+  alias: "Scenario Temporale (Chiudi Tapparelle 100%)"
+  icon: "mdi:weather-lightning-rainy"
+  mode: restart
+  sequence:
+    - action: cover.set_cover_position
+      target:
+        entity_id:
+          - cover.tapparella_sala
+          - cover.tapparella_cucina
+          - cover.tapparella_camera
+          - cover.tapparella_cameretta
+          - cover.tapparella_bagno
+          - cover.tapparella_bagnetto
+      data:
+        position: 0
+    - parallel:
+        - action: notify.mobile_app_smartphone_utente_1
+          data:
+            title: "⛈️ Scenario Temporale Attivato"
+            message: "Tutte le tapparelle di Eco Home sono state chiuse al 100% per proteggere gli infissi dal temporale."
+            data:
+              tag: "meteo_allerta_temporale"
+              priority: high
+              importance: high
+          continue_on_error: true
+        - action: notify.mobile_app_smartphone_utente_2
+          data:
+            title: "⛈️ Scenario Temporale Attivato"
+            message: "Tutte le tapparelle di Eco Home sono state chiuse al 100% per proteggere gli infissi dal temporale."
+            data:
+              tag: "meteo_allerta_temporale"
+              priority: high
+              importance: high
+          continue_on_error: true
+        - if:
+            - condition: template
+              value_template: "{{ (is_state('person.utente_1', 'home') or is_state('person.utente_2', 'home')) and not (now().hour >= 23 or now().hour < 8) }}"
+          then:
+            # 1. Prepara audio sala: alza Nest Hub all'80%, mette in pausa o abbassa/muta TV
+            - action: script.audio_annuncio_prepara
+              continue_on_error: true
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+                  sequence:
+                    - action: tts.speak
+                      target:
+                        entity_id: tts.home_assistant_cloud
+                      data:
+                        media_player_entity_id: media_player.nest_hub_sala
+                        message: "Scenario temporale attivato: sto chiudendo tutte le tapparelle al cento per cento per proteggere le finestre."
+                        language: "it-IT"
+                        options:
+                          voice: "it-IT-Wavenet-A"
+                      continue_on_error: true
+              default:
+                - action: tts.speak
+                  target:
+                    entity_id: tts.google_translate_it_lt
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    message: "Scenario temporale attivato: sto chiudendo tutte le tapparelle al cento per cento per proteggere le finestre."
+                    language: "it"
+                    options:
+                      tld: "it"
+                  continue_on_error: true
+            # 2. Attesa fine annuncio
+            - delay:
+                seconds: 8
+            # 3. Ripristino audio sala: rimette play se era in pausa, ripristina volume TV precedente
+            - action: script.audio_annuncio_ripristina
+              continue_on_error: true
+

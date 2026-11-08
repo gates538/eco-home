@@ -1,12 +1,14 @@
 <div align="center">
 
-# 🌿 Eco Home — Casa Mancini
+# 🌿 Eco Home — v2.0.0
 
-**Ecosistema domotico integrato e intelligente per Home Assistant.**
+**Ecosistema domotico integrato, modulare e con intelligenza artificiale multimodale per Home Assistant.**
 
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Automation-41BDF5?style=flat-square&logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
-[![Stato](https://img.shields.io/badge/architettura-modulare-2ea44f?style=flat-square)](CHANGELOG.md)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.x-41BDF5?style=flat-square&logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
+[![Release](https://img.shields.io/badge/versione-v2.0.0-2ea44f?style=flat-square)](CHANGELOG.md)
 [![Formato](https://img.shields.io/badge/formato-YAML-CB171E?style=flat-square&logo=yaml&logoColor=white)](CHANGELOG.md)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Support-EA4AAA?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/gates538)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Offrimi%20un%20caffè-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/gates538)
 
 </div>
 
@@ -14,14 +16,14 @@
 
 ## 🏛️ Architettura del Progetto
 
-Il progetto è organizzato secondo un'architettura modulare chiara, scalabile e priva di ridondanze:
+Il progetto raccoglie **102 automazioni** e **105 script** organizzati in un'architettura modulare, scalabile e completamente anonimizzata:
 
 ```text
 eco-home/
-├── automations/      # Moduli logici di automazione (01 - 07)
-├── scripts/          # Moduli script operativi per Home Assistant (01 - 06)
+├── automations/      # 7 moduli logici di automazione (102 automazioni totali)
+├── scripts/          # 6 moduli script operativi e AI per Home Assistant (105 script totali)
 ├── docs/             # Guide tecniche, dipendenze e requisiti hardware
-└── archive/          # Release storiche archiviate e ordinate per versione
+└── archive/          # Release storiche archiviate per versione (v1.1.1 -> v1.5.0)
 ```
 
 ---
@@ -30,13 +32,13 @@ eco-home/
 
 | Modulo | Descrizione Principale |
 |---|---|
-| [`01_sicurezza_e_presenza.yaml`](automations/01_sicurezza_e_presenza.yaml) | Centrale allarme, perimetrale, geofencing, sospensione ospiti, guardiano uscite e memoria presenze. |
-| [`02_clima_e_riscaldamento.yaml`](automations/02_clima_e_riscaldamento.yaml) | Termoregolazione, gestione termocamino a pellet, climatizzazione e risparmio energetico finestre. |
-| [`03_animali_petcare.yaml`](automations/03_animali_petcare.yaml) | Cura animali domestici (fontanella, lettiera Petkit Puramax 2, dispenser crocchette e gattaiola). |
-| [`04_casa_ed_elettrodomestici.yaml`](automations/04_casa_ed_elettrodomestici.yaml) | Notifiche sicurezza cucina, monitoraggio frigo/freezer aperti, forno e asciugatrice. |
-| [`05_luci_cinema_comfort.yaml`](automations/05_luci_cinema_comfort.yaml) | Scenari luminosi, modalità cinema Emby TV, gestione serale e automazioni zero sprechi. |
-| [`06_meteo_e_automobili.yaml`](automations/06_meteo_e_automobili.yaml) | Previsioni meteo, monitoraggio pioggia, vento su terrazza e stato veicoli. |
-| [`07_sistema_e_notifiche.yaml`](automations/07_sistema_e_notifiche.yaml) | Routine vocali buongiorno/buonanotte, notifiche smart smartphone/WhatsApp e manutenzione core. |
+| [`01_sicurezza_e_presenza.yaml`](automations/01_sicurezza_e_presenza.yaml) | Centrale allarme, perimetrale notturno, dissuasione visiva, geofencing, accoglienza ospiti one-shot, modalità ospiti cameretta e presidio PTZ. |
+| [`02_clima_e_riscaldamento.yaml`](automations/02_clima_e_riscaldamento.yaml) | Gestione Termocamino a pellet (con notifica interattiva pre-pranzo e posticipo), climatizzatori Samsung, pompa di calore ACS (boost ospiti) e raffreddamento apparati di rete. |
+| [`03_animali_petcare.yaml`](automations/03_animali_petcare.yaml) | Fotoperiodo biologico anti-alghe acquario (FZONE BLE), alimentazione intelligente VSON Smart, ossigenatore e monitoraggio completo Petkit (dispenser e fontanella). |
+| [`04_casa_ed_elettrodomestici.yaml`](automations/04_casa_ed_elettrodomestici.yaml) | Automazioni robot aspirapolvere Dreame (Clean Genius in assenza e rientro automatico), sicurezza piano induzione/forno/frigo/freezer, asciugatrice e anti-blackout 6 kW. |
+| [`05_luci_cinema_comfort.yaml`](automations/05_luci_cinema_comfort.yaml) | Gestione luci 4000K, telecomandi Zigbee (Hue Tap Dial & telecomando divano con doppio click), scena Cinema, LED blu BTicino Living Now e fessure tapparelle. |
+| [`06_meteo_e_automobili.yaml`](automations/06_meteo_e_automobili.yaml) | Stazione meteo Netatmo (pioggia, vento, allerta temporale con scenario interattivo), bollettini Protezione Civile (DPC) e aggiornamenti traffico pendolari. |
+| [`07_sistema_e_notifiche.yaml`](automations/07_sistema_e_notifiche.yaml) | Watchdog Zigbee2MQTT/SLZB-06, NAS Synology, auto-healing telecamere Mesh, auto-update Docker & HACS, DDNS/SSL, IP ban interattivo, routine AI e pillole sarcastiche. |
 
 ---
 
@@ -44,12 +46,12 @@ eco-home/
 
 | Modulo | Descrizione |
 |---|---|
-| [`01_tapparelle.yaml`](scripts/01_tapparelle.yaml) | Posizionamento automatico e scenari tapparelle. |
-| [`02_animali.yaml`](scripts/02_animali.yaml) | Routine igiene lettiera e dosaggio cibo. |
-| [`03_comfort_clima.yaml`](scripts/03_comfort_clima.yaml) | Profili termici rapidi e booster riscaldamento. |
-| [`04_telecamere_tablet.yaml`](scripts/04_telecamere_tablet.yaml) | Streaming live telecamere e gestione display. |
-| [`05_notifiche_smart.yaml`](scripts/05_notifiche_smart.yaml) | Canali di dispatch prioritari (App S25/S22 & WhatsApp). |
-| [`06_manutenzione_ha.yaml`](scripts/06_manutenzione_ha.yaml) | Backup programmato e polling diagnostico. |
+| [`01_tapparelle.yaml`](scripts/01_tapparelle.yaml) | Posizionamento tapparelle (totale, fessure aperte 8%, percentuale custom) e scenari globali (Entra, Esci, Estate, Inverno, Temporale, Preparazione Notte). |
+| [`02_animali.yaml`](scripts/02_animali.yaml) | Gestione acquario (modalità ammirazione ospiti, buio 24h, pasto con fermo pompa), dosaggio Petkit, pulizia lettiera, programmi robot aspirapolvere e report vocale. |
+| [`03_comfort_clima.yaml`](scripts/03_comfort_clima.yaml) | Gestione sospensione sveglie, scenari buonanotte, modalità ospiti cameretta, boost ACS pompa di calore, posticipo accensione camino e interrogazioni vocali di stato. |
+| [`04_telecamere_tablet.yaml`](scripts/04_telecamere_tablet.yaml) | Controllo PTZ multi-preset, calibrazione Home, scansione autonoma parcheggio e analisi AI multimodale (Gemini Vision) su telecamere, fiamma camino e varchi. |
+| [`05_notifiche_smart.yaml`](scripts/05_notifiche_smart.yaml) | Motore centralizzato `notifica_smart`, annunci vocali AI generativi (rientro, cucina, frigo, buongiorno, weekend, rifiuti, ospiti), pillole sarcastiche e lista spesa vocale. |
+| [`06_manutenzione_ha.yaml`](scripts/06_manutenzione_ha.yaml) | Controllo centrale sicurezza, orchestrazione container Docker su NAS Synology, aggiornamento automatico integrazioni HACS e verifica stato tunnel VPN. |
 
 ---
 
@@ -65,7 +67,7 @@ eco-home/
 
 ## 📦 Archivio Versioni Storiche (`/archive`)
 
-Le versioni monolitiche precedenti sono archiviate e ordinate nelle rispettive cartelle:
+Le versioni precedenti sono archiviate e ordinate nelle rispettive cartelle:
 - [`archive/v1.1.1`](archive/v1.1.1) fino a [`archive/v1.1.8`](archive/v1.1.8)
 - [`archive/v1.2.0`](archive/v1.2.0)
 - [`archive/v1.3.0`](archive/v1.3.0)

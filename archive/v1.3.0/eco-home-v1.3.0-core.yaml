@@ -7,8 +7,8 @@
   triggers:
   - trigger: state
     entity_id:
-    - person.stefano
-    - person.laura
+    - person.utente_1
+    - person.utente_2
     to: home
     not_from:
     - home
@@ -136,15 +136,15 @@
       sequence:
       - variables:
           test_profile: >-
-            {% if test_scenario | trim == 'Rientro Stefano' %}Stefano
-            {% elif test_scenario | trim == 'Rientro Laura' %}Laura
+            {% if test_scenario | trim == 'Rientro Utente 1' %}Utente 1
+            {% elif test_scenario | trim == 'Rientro Utente 2' %}Utente 2
             {% elif test_scenario | trim == 'Rientro di coppia' %}Coppia
             {% elif test_scenario | trim == 'Modalità notte' %}Notte
             {% elif test_scenario | trim == 'Promemoria asciugatrice' %}Asciugatrice
             {% else %}Percorso audio{% endif %}
           test_nickname: >-
-            {% if test_profile | trim == 'Stefano' %}{{ stefano_nicknames | random }}
-            {% elif test_profile | trim == 'Laura' %}{{ laura_nicknames | random }}
+            {% if test_profile | trim == 'Utente 1' %}{{ stefano_nicknames | random }}
+            {% elif test_profile | trim == 'Utente 2' %}{{ laura_nicknames | random }}
             {% elif test_profile | trim in ['Coppia', 'Notte'] %}{{ couple_nicknames | random }}
             {% else %}amici di casa{% endif %}
           test_volume_level: >-
@@ -153,9 +153,9 @@
           nest_volume_before: '{{ state_attr(speaker, ''volume_level'') | float(-1) }}'
       - variables:
           test_message: >-
-            {% if test_profile | trim == 'Stefano' %}
+            {% if test_profile | trim == 'Utente 1' %}
               {{ saluto_orario }} {{ test_nickname | trim }}. {{ stefano_phrase_starts | random }}: {{ stefano_phrase_tails | random }}
-            {% elif test_profile | trim == 'Laura' %}
+            {% elif test_profile | trim == 'Utente 2' %}
               {{ saluto_orario }} {{ test_nickname | trim }}. {{ laura_phrase_starts | random }}: {{ laura_phrase_tails | random }}
             {% elif test_profile | trim == 'Coppia' %}
               {{ saluto_orario }} {{ test_nickname | trim }}. {{ couple_phrase_starts | random }}: {{ couple_phrase_tails | random }}
@@ -370,17 +370,17 @@
             {% endfor %}
             {{ ns.names | unique | list | count }}
           arrived_stefano: "{% set recent = arrival_person_door_window_seconds
-            + arrival_group_window_seconds %} {{\n  is_state('person.stefano', 'home')\n
-            \ and (as_timestamp(now()) - as_timestamp(states.person.stefano.last_changed))
+            + arrival_group_window_seconds %} {{\n  is_state('person.utente_1', 'home')\n
+            \ and (as_timestamp(now()) - as_timestamp(states.person.utente_1.last_changed))
             < recent\n}}"
           arrived_laura: "{% set recent = arrival_person_door_window_seconds
-            + arrival_group_window_seconds %} {{\n  is_state('person.laura', 'home')\n
-            \ and (as_timestamp(now()) - as_timestamp(states.person.laura.last_changed))
+            + arrival_group_window_seconds %} {{\n  is_state('person.utente_2', 'home')\n
+            \ and (as_timestamp(now()) - as_timestamp(states.person.utente_2.last_changed))
             < recent\n}}"
           arrived_now_couple: "{% set recent = arrival_person_door_window_seconds
-            + arrival_group_window_seconds %} {{\n  is_state('person.stefano', 'home')\n
-            \ and is_state('person.laura', 'home')\n  and (as_timestamp(now()) - as_timestamp(states.person.stefano.last_changed))
-            < recent\n  and (as_timestamp(now()) - as_timestamp(states.person.laura.last_changed))
+            + arrival_group_window_seconds %} {{\n  is_state('person.utente_1', 'home')\n
+            \ and is_state('person.utente_2', 'home')\n  and (as_timestamp(now()) - as_timestamp(states.person.utente_1.last_changed))
+            < recent\n  and (as_timestamp(now()) - as_timestamp(states.person.utente_2.last_changed))
             < recent\n}}"
           welcome_name: >-
             {% if arrived_now_couple %}
@@ -425,9 +425,9 @@
           welcome_body: >-
             {% set md = today_md %}
             {% if md == '12-28' and arrived_stefano %}
-              Tantissimi auguri di compleanno, Stefano! Compi ben {{ now().year - 1990 }} anni. Che regalo vorresti stasera, oltre alla mia magnifica presenza e accoglienza?
+              Tantissimi auguri di compleanno, Utente 1! Compi ben {{ now().year - 1990 }} anni. Che regalo vorresti stasera, oltre alla mia magnifica presenza e accoglienza?
             {% elif md == '03-31' and arrived_laura %}
-              Buon compleanno Laura! Compi ben {{ now().year - 1994 }} anni. Oggi sei la regina indiscussa della casa: ordina a Stefano di fare qualsiasi cosa, te lo concedo!
+              Buon compleanno Utente 2! Compi ben {{ now().year - 1994 }} anni. Oggi sei la regina indiscussa della casa: ordina a Utente 1 di fare qualsiasi cosa, te lo concedo!
             {% elif md == '08-01' and (arrived_now_couple or arrived_now_count | int(0) > 1) %}
               Buon anniversario di matrimonio! Festeggiate {{ now().year - 2021 }} anni di matrimonio. Ancora insieme e non vi siete ancora stancati? Questa sì che è una vittoria!
             {% elif md == '08-28' and (arrived_now_couple or arrived_now_count | int(0) > 1) %}
@@ -494,8 +494,8 @@
             {{ final_extra_text | trim }} {{ weather_alert_text | trim }} {{ temp_announcement_text | trim }} {{ dryer_arrival_text_final | trim }}'
           announced_profile: >-
             {% if arrived_now_couple or arrived_now_count | int(0) > 1 %}Coppia
-            {% elif arrived_stefano %}Stefano
-            {% elif arrived_laura %}Laura
+            {% elif arrived_stefano %}Utente 1
+            {% elif arrived_laura %}Utente 2
             {% else %}Generico{% endif %}
           nest_volume_before: '{{ state_attr(speaker, ''volume_level'') | float(-1) }}'
           tts_safe_delay_seconds: '{% set chars = messaggio_finale | length %} {{
@@ -538,7 +538,7 @@
             - action: '{{ stefano_notification_service }}'
               data:
                 title: "Rientro di Coppia - Eco Home"
-                message: "Bentornati a casa, Stefano e Laura!"
+                message: "Bentornati a casa, Utente 1 e Utente 2!"
                 data:
                   image: '{{ snapshot_access_url }}'
                   attachment:
@@ -553,7 +553,7 @@
               - action: '{{ laura_notification_service }}'
                 data:
                   title: "Rientro di Coppia - Eco Home"
-                  message: "Bentornati a casa, Stefano e Laura!"
+                  message: "Bentornati a casa, Utente 1 e Utente 2!"
                   data:
                     image: '{{ snapshot_access_url }}'
                     attachment:
@@ -568,7 +568,7 @@
             - action: '{{ stefano_notification_service }}'
               data:
                 title: "Rientro - Eco Home"
-                message: "Rilevato rientro di Stefano."
+                message: "Rilevato rientro di Utente 1."
                 data:
                   image: '{{ snapshot_access_url }}'
                   attachment:
@@ -583,7 +583,7 @@
             - action: '{{ laura_notification_service }}'
               data:
                 title: "Rientro - Eco Home"
-                message: "Rilevato rientro di Laura."
+                message: "Rilevato rientro di Utente 2."
                 data:
                   image: '{{ snapshot_access_url }}'
                   attachment:
@@ -913,7 +913,7 @@
     speaker: media_player.nest_hub_sala
     tts_engine: tts.google_translate_it_lt
     light_entity: light.luceambiente
-    tv_media_player: media_player.tv_sala_ue85du7170uxzt
+    tv_media_player: media_player.tv_sala_principale
     door_sensor: binary_sensor.porta_contact
     dryer_state_sensor: sensor.esterno_asciugatrice_machine_state
     dryer_power_sensor: sensor.esterno_asciugatrice_energia_elettrica
@@ -930,16 +930,16 @@
     - climate.condizionatore_sala
     - climate.condizionatore_camera
     tracked_people:
-    - person.stefano
-    - person.laura
+    - person.utente_1
+    - person.utente_2
     tracked_guests:
     - device_tracker.realme_c55
     - device_tracker.iphone_alessia
     - device_tracker.iphone
     guest_names:
-      device_tracker.realme_c55: Monica
-      device_tracker.iphone_alessia: Alessia
-      device_tracker.iphone: Alessia
+      device_tracker.realme_c55: Familiare 1
+      device_tracker.iphone_alessia: Familiare 5
+      device_tracker.iphone: Familiare 5
     weather_entity: weather.home
     alert_entity: sensor.allerta_meteo
     window_sensors:
@@ -951,7 +951,7 @@
     camera_notification_enabled: '{{ is_state(''input_boolean.eco_home_notifiche_foto'', ''on'') }}'
     test_scenario: >-
       {%- set selected = states('input_select.eco_home_scenario_test') -%}
-      {%- if selected in ['Percorso audio', 'Rientro Stefano', 'Rientro Laura',
+      {%- if selected in ['Percorso audio', 'Rientro Utente 1', 'Rientro Utente 2',
         'Rientro di coppia', 'Modalità notte', 'Promemoria asciugatrice'] %}
       {{- selected -}}
       {%- else -%}
@@ -1036,8 +1036,8 @@
       default=0) %} {{ (as_timestamp(now()) - ts) | int(999999) }}'
     welcome_cooldown_ok: '{{ seconds_from_last_announcement | int(999999) > welcome_cooldown_seconds
       }}'
-    special_day_text: "{% if today_md == '12-28' %}\n  Oggi è il compleanno di Stefano! Compi ben {{ now().year - 1990 }} anni. Auguri Stefano.\n{% elif today_md == '03-31' %}\n  Oggi è il compleanno di Laura! Compi ben {{ now().year - 1994 }} anni. Auguri Laura.\n{% elif today_md == '08-01' %}\n  Oggi è il vostro anniversario di matrimonio! Festeggiate {{ now().year - 2021 }} anni di matrimonio. Congratulazioni.\n{% elif today_md == '08-28' %}\n  Oggi è il vostro anniversario di fidanzamento, la data più importante di tutte! Sono passati {{ now().year - 2008 }} anni dal vostro primo appuntamento nel 2008. Tanti auguri ragazzi.\n{% else %}\n  Nessuna data speciale personale.\n{% endif %}"
-    italian_holiday_text: "{% set md = today_md %}\n{% if md == '01-01' %}\n  Oggi è Capodanno.\n{% elif md == '01-06' %}\n  Oggi è l'Epifania.\n{% elif md == '02-14' %}\n  Oggi è San Valentino, la festa degli innamorati. Amatevi responsabilmente.\n{% elif md == '03-19' %}\n  Oggi è la Festa del Papà, ricordati di fare gli auguri.\n{% elif md == '04-25' %}\n  Oggi è la Festa della Liberazione.\n{% elif md == '05-01' %}\n  Oggi è la Festa dei Lavoratori.\n{% elif md == '06-02' %}\n  Oggi è la Festa della Repubblica.\n{% elif md == '08-15' %}\n  Oggi è Ferragosto.\n{% elif md == '10-02' %}\n  Oggi è la Festa dei Nonni.\n{% elif md == '10-31' %}\n  Oggi è Halloween, dolcetto o scherzetto?\n{% elif md == '11-01' %}\n  Oggi è Ognissanti.\n{% elif md == '12-08' %}\n  Oggi è l'Immacolata.\n{% elif md == '12-24' %}\n  Oggi è la Vigilia di Natale, pronti per il cenone.\n{% elif md == '12-25' %}\n  Oggi è Natale, auguri di cuore.\n{% elif md == '12-26' %}\n  Oggi è Santo Stefano.\n{% elif md == '12-31' %}\n  Oggi è San Silvestro, pronti per il brindisi.\n{% else %}\n  Nessuna festività italiana principale.\n{% endif %}"
+    special_day_text: "{% if today_md == '12-28' %}\n  Oggi è il compleanno di Utente 1! Compi ben {{ now().year - 1990 }} anni. Auguri Utente 1.\n{% elif today_md == '03-31' %}\n  Oggi è il compleanno di Utente 2! Compi ben {{ now().year - 1994 }} anni. Auguri Utente 2.\n{% elif today_md == '08-01' %}\n  Oggi è il vostro anniversario di matrimonio! Festeggiate {{ now().year - 2021 }} anni di matrimonio. Congratulazioni.\n{% elif today_md == '08-28' %}\n  Oggi è il vostro anniversario di fidanzamento, la data più importante di tutte! Sono passati {{ now().year - 2008 }} anni dal vostro primo appuntamento nel 2008. Tanti auguri ragazzi.\n{% else %}\n  Nessuna data speciale personale.\n{% endif %}"
+    italian_holiday_text: "{% set md = today_md %}\n{% if md == '01-01' %}\n  Oggi è Capodanno.\n{% elif md == '01-06' %}\n  Oggi è l'Epifania.\n{% elif md == '02-14' %}\n  Oggi è San Valentino, la festa degli innamorati. Amatevi responsabilmente.\n{% elif md == '03-19' %}\n  Oggi è la Festa del Papà, ricordati di fare gli auguri.\n{% elif md == '04-25' %}\n  Oggi è la Festa della Liberazione.\n{% elif md == '05-01' %}\n  Oggi è la Festa dei Lavoratori.\n{% elif md == '06-02' %}\n  Oggi è la Festa della Repubblica.\n{% elif md == '08-15' %}\n  Oggi è Ferragosto.\n{% elif md == '10-02' %}\n  Oggi è la Festa dei Nonni.\n{% elif md == '10-31' %}\n  Oggi è Halloween, dolcetto o scherzetto?\n{% elif md == '11-01' %}\n  Oggi è Ognissanti.\n{% elif md == '12-08' %}\n  Oggi è l'Immacolata.\n{% elif md == '12-24' %}\n  Oggi è la Vigilia di Natale, pronti per il cenone.\n{% elif md == '12-25' %}\n  Oggi è Natale, auguri di cuore.\n{% elif md == '12-26' %}\n  Oggi è Santo Utente 1.\n{% elif md == '12-31' %}\n  Oggi è San Silvestro, pronti per il brindisi.\n{% else %}\n  Nessuna festività italiana principale.\n{% endif %}"
     dryer_finished_states:
     - 'off'
     - idle
@@ -1099,11 +1099,11 @@
     - Qui c'è un po' di calma pronta per te
     - La casa ha preparato il suo lato più tenero
     - Bentornata, il ritmo può farsi più leggero
-    - Presenza di Laura rilevata, modalità dolcezza attiva
+    - Presenza di Utente 2 rilevata, modalità dolcezza attiva
     - La giornata può finalmente abbassare il volume
     - Tutto pronto per farti respirare un po'
     - La casa ti aspettava con pazienza
-    - Piccola accoglienza morbida in arrivo
+    - Gatto 1 accoglienza morbida in arrivo
     - Rientro elegante e sereno registrato
     - La casa si sistema meglio quando arrivi tu
     - Qui è tutto pronto per coccolarti un po'
@@ -1118,7 +1118,7 @@
     - la calma è già al suo posto.
     - puoi rallentare senza sensi di colpa.
     - ora la casa fa il tifo per il relax.
-    - c'è una piccola pace domestica pronta per te.
+    - c'è una gatto_1 pace domestica pronta per te.
     - qui nessuno ti mette fretta.
     - puoi respirare, sei a casa.
     - la serata può diventare più leggera.

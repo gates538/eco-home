@@ -1,0 +1,2784 @@
+# ==============================================================================
+# 05 — NOTIFICHE SMART, MOTORE VOCALE AI, PILLOLE SARCASTICHE & SPESA VOCALE
+# ==============================================================================
+
+annuncio_rientro_ai:
+  alias: "Annuncio Rientro AI & Notifica Incrociata"
+  icon: "mdi:account-voice"
+  mode: single
+  fields:
+    profilo:
+      description: "Profilo del rientro: Utente 1, Utente 2 oppure Coppia"
+      example: "Utente 1"
+      default: "Utente 1"
+    invia_notifica_foto:
+      description: "Invia notifica incrociata con foto telecamera SALA 2"
+      default: true
+    riproduci_voce:
+      description: "Riproduci annuncio vocale sarcastico/dolce su Nest Hub"
+      default: true
+  sequence:
+    # 1. SCATTO FOTO TELECAMERA SALA 2
+    # Viene eseguito solo se esplicitamente richiesto (es. esecuzione manuale dello script),
+    # in modo da preservare lo scatto perfetto eseguito dall'automazione all'ingresso.
+    - if:
+        - condition: template
+          value_template: "{{ scatta_foto | default(false) }}"
+      then:
+        - action: camera.snapshot
+          target:
+            entity_id: camera.sala_2
+          data:
+            filename: /config/www/cam_snapshots/sala_2.jpg
+          continue_on_error: true
+
+    # 2. NOTIFICA INCROCIATA SULLO SMARTPHONE DELL'ALTRO CON SCREEN SALA 2
+    - if:
+        - condition: template
+          value_template: "{{ invia_notifica_foto | default(true) }}"
+      then:
+        - choose:
+            # --- RIENTRO STEFANO -> Notifica a Utente 2 ---
+            - conditions:
+                - condition: template
+                  value_template: "{{ (profilo | default('Utente 1')) == 'Utente 1' }}"
+              sequence:
+                - action: notify.mobile_app_smartphone_utente_2
+                  data:
+                    title: "🏠 Utente 1 è rientrato a casa!"
+                    message: "Rilevato il rientro di Utente 1 a Eco Home."
+                    data:
+                      image: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
+                      channel: "Presenza"
+                      tag: "rientro_presenza"
+                      actions:
+                        - action: "URI"
+                          title: "👁️ Live Sala 2"
+                          uri: "entityId:camera.sala_2"
+                        - action: "URI"
+                          title: "📹 Scale"
+                          uri: "entityId:camera.scale"
+                  continue_on_error: true
+
+            # --- RIENTRO LAURA -> Notifica a Utente 1 ---
+            - conditions:
+                - condition: template
+                  value_template: "{{ profilo == 'Utente 2' }}"
+              sequence:
+                - action: notify.mobile_app_smartphone_utente_1
+                  data:
+                    title: "🏠 Utente 2 è rientrata a casa!"
+                    message: "Rilevato il rientro di Utente 2 a Eco Home."
+                    data:
+                      image: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
+                      channel: "Presenza"
+                      tag: "rientro_presenza"
+                      actions:
+                        - action: "URI"
+                          title: "👁️ Live Sala 2"
+                          uri: "entityId:camera.sala_2"
+                        - action: "URI"
+                          title: "📹 Scale"
+                          uri: "entityId:camera.scale"
+                  continue_on_error: true
+
+            # --- RIENTRO COPPIA -> Notifica a entrambi ---
+            - conditions:
+                - condition: template
+                  value_template: "{{ profilo == 'Coppia' }}"
+              sequence:
+                - action: notify.mobile_app_smartphone_utente_1
+                  data:
+                    title: "🏠 Bentornati a casa!"
+                    message: "Rientro di coppia rilevato a Eco Home."
+                    data:
+                      image: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
+                      channel: "Presenza"
+                      tag: "rientro_presenza"
+                      actions:
+                        - action: "URI"
+                          title: "👁️ Live Sala 2"
+                          uri: "entityId:camera.sala_2"
+                        - action: "URI"
+                          title: "📹 Scale"
+                          uri: "entityId:camera.scale"
+                  continue_on_error: true
+                - action: notify.mobile_app_smartphone_utente_2
+                  data:
+                    title: "🏠 Bentornati a casa!"
+                    message: "Rientro di coppia rilevato a Eco Home."
+                    data:
+                      image: "/local/cam_snapshots/sala_2.jpg?t={{ now().timestamp() | int }}"
+                      channel: "Presenza"
+                      tag: "rientro_presenza"
+                      actions:
+                        - action: "URI"
+                          title: "👁️ Live Sala 2"
+                          uri: "entityId:camera.sala_2"
+                        - action: "URI"
+                          title: "📹 Scale"
+                          uri: "entityId:camera.scale"
+                  continue_on_error: true
+
+    # 3. ANNUNCIO VOCALE AI SU NEST HUB (SE ABILITATO E PRIMA DELLE 23:00)
+    - if:
+        - condition: template
+          value_template: "{{ (riproduci_voce | default(true)) and is_state('input_boolean.annunci_vocali_rientro', 'on') and not (now().hour >= 23 or now().hour < 7) }}"
+      then:
+        # 3.1. CALCOLO STATO CASA E CONTESTO RIENTRO
+        - variables:
+            temp_int_pronuncia: "{{ states('sensor.temperatura_media') | float(20) | round(0) | int }}"
+            dobby_state: "{{ states('vacuum.dobby') }}"
+            dobby_area: >-
+              {% set hist_attrs = states.sensor.dobby_cleaning_history.attributes | default({}) %}
+              {% set ns = namespace(max_area=0) %}
+              {% for k, v in hist_attrs.items() if v is mapping and v.timestamp is defined %}
+                {% set dt = as_datetime(v.timestamp) %}
+                {% if dt and dt.date() == now().date() %}
+                  {% set a = v.cleaned_area | replace(" m²", "") | int(0) %}
+                  {% if a > ns.max_area %}
+                    {% set ns.max_area = a %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+              {% if ns.max_area > 0 %}{{ ns.max_area }}{% else %}{{ states('sensor.dobby_cleaned_area') | default('0') }}{% endif %}
+            dobby_report: >-
+              {% if dobby_state in ['cleaning', 'sweeping', 'mopping'] %}Dobby sta pulendo in questo momento{% elif dobby_area | int(0) > 0 %}Dobby ha già pulito {{ dobby_area }} metri quadri oggi ed è tornato alla sua base in camera{% else %}Dobby è riposato alla sua base in camera{% endif %}
+            finestre_aperte_list: >-
+              {{ states.binary_sensor | selectattr('entity_id', 'in', ['binary_sensor.finestra_sala_contact', 'binary_sensor.finestra_cucina_contact', 'binary_sensor.finestra_camera_contact', 'binary_sensor.finestra_cameretta_contact', 'binary_sensor.finestra_bagno_contact', 'binary_sensor.finestra_bagnetto_contact']) | selectattr('state', 'eq', 'on') | map(attribute='name') | list }}
+            finestre_report: >-
+              {% if finestre_aperte_list | length > 0 %}Ci sono finestre aperte: {{ finestre_aperte_list | join(', ') }}{% else %}Tutte le finestre sono chiuse{% endif %}
+            desc_target: >-
+              {% if profilo == 'Utente 1' %}Utente 1 (soprannomi affettuosi: Ste o Cù; caloroso, amante del divano e della tecnologia){% elif profilo == 'Utente 2' %}Utente 2 (soprannomi affettuosi: La, Utente 2, Pì o Lau; freddolosa, amante del relax e delle serie TV){% else %}la Coppia (Utente 1 e Utente 2, soprannomi affettuosi insieme: Utente 1 e Utente 2, Cù e Pì, Pì e Cù oppure Utente 1 e Utente 2; VIETATO abbinare "Ste" e "La" insieme){% endif %}
+            spunto_rientro: >-
+              {% if profilo == 'Utente 1' %}
+                {{ [
+                  "Prendilo in giro dicendo che il cuscino sul divano ha sentito la sua mancanza e aveva già perso la sua impronta.",
+                  "Scherza sul fatto che Gatto 2 e Gatto 1 lo stavano aspettando solo per farsi aprire i croccantini o rubargli il posto migliore sul divano.",
+                  "Fai una battuta sul fatto che è finalmente tornato nel suo regno tecnologico, ma prima di toccare qualsiasi configurazione o sensore deve rilassarsi.",
+                  "Scherza sul fatto che lui è sempre caloroso: chiedigli se ha già caldo appena varcata la soglia di casa.",
+                  "Prendilo in giro dicendo che persino i pesciolini dell'acquario hanno fatto la ola vedendolo entrare dalla porta.",
+                  "Fai una battuta spiritosa su Dobby che ha tenuto d'occhio la casa al posto suo e ora pretende le ferie.",
+                  "Scherza sul fatto che il telecomando della TV da 85 pollici si stava annoiando senza di lui.",
+                  "Accoglilo come se fosse appena rientrato da una spedizione sulla Gatto 2, quando in realtà non vedeva l'ora di mettersi in pantofole."
+                ] | random }}
+              {% elif profilo == 'Utente 2' %}
+                {{ [
+                  "Prendila in giro sul fatto che, essendo freddolosa, sta già cercando con lo sguardo la copertina o il plaid più caldo della casa.",
+                  "Scherza dicendo che Gatto 2 e Gatto 1 hanno tenuto d'occhio il salotto tutto il giorno ma ora cedono il trono alla vera regina di casa.",
+                  "Fai una battuta sul fatto che può finalmente lanciare la borsa, mettersi comoda e inaugurare la modalità relax totale.",
+                  "Prendila in giro chiedendole se ha usato un incantesimo di Materializzazione alla Harry Potter per arrivare finalmente a casa.",
+                  "Scherza su Dobby (l'elfo domestico aspirapolvere) che si inchina al rientro della sua padrona.",
+                  "Fai una battuta sul divano e su Netflix che stavano facendo il conto alla rovescia aspettando il suo ritorno.",
+                  "Prendila in giro dicendo che la casa senza di lei era troppo silenziosa, persino i pesci nell'acquario sbadigliavano.",
+                  "Scherza dicendo che le pantofole si stavano già scaldando i motori vicino all'ingresso per accoglierla."
+                ] | random }}
+              {% else %}
+                {{ [
+                  "Prendili in giro chiedendo chi dei due si tufferà per primo sul divano per conquistare l'angolo migliore e il telecomando.",
+                  "Scherza sul fatto che Gatto 2 e Gatto 1 vi guardavano dalla porta come a dire: era ora, avevamo quasi finito le coccole di scorta.",
+                  "Fai una battuta sull'eterna lotta climatica di coppia: Utente 1 che ha già caldo e Utente 2 che cerca già una coperta.",
+                  "Prendili in giro dicendo che i sensori di movimento stavano per andare in pensione per noia, meno male che siete tornati.",
+                  "Scherza dicendo che il divano ha tirato un sospiro di gioia vedendovi entrare insieme: serata relax ufficialmente aperta.",
+                  "Fai una battuta spiritosa sul fatto che quando rientrate insieme sembrate due complici appena scappati per chiudersi nel loro fortino.",
+                  "Prendili in giro dicendo che Dobby e i sedici pesciolini dell'acquario vi danno il bentornato ufficiale nel vostro quartier generale."
+                ] | random }}
+              {% endif %}
+            presenza_altri: >-
+              {% if profilo == 'Utente 1' %}
+                {% if is_state('binary_sensor.utente_2_a_casa', 'on') %}Utente 2 è già a casa ad aspettarlo.{% else %}Utente 2 non è a casa (è ancora fuori).{% endif %}
+              {% elif profilo == 'Utente 2' %}
+                {% if is_state('binary_sensor.utente_1_a_casa', 'on') %}Utente 1 è già a casa.{% else %}Utente 1 non è a casa (è ancora fuori).{% endif %}
+              {% else %}
+                Utente 1 e Utente 2 sono rientrati insieme a casa.
+              {% endif %}
+        - variables:
+            ai_prompt: >-
+              Sei l'assistente vocale di casa su Google Nest Hub Sala.
+              Chi è appena rientrato: {{ profilo }} ({{ desc_target }}).
+              Situazione presenza: {{ presenza_altri }}.
+              SPUNTO CREATIVO DA USARE QUESTA VOLTA: {{ spunto_rientro }}
+              DATI STATO CASA:
+              - Dobby (robot aspirapolvere con base in camera da letto): {{ dobby_report }}.
+              - Infissi: {{ finestre_report }}.
+              - Termocamino a pellet Klover in sala: {{ 'acceso con la fiamma viva per scaldare tutti i termosifoni' if is_state('binary_sensor.camino_in_funzione', 'on') else 'spento' }}.
+              - Gatte Gatto 2 e Gatto 1: monitorate e tranquille.
+              - Temperatura interna: {{ temp_int_pronuncia }} gradi (NON citarla a meno che non ci siano finestre aperte col freddo/caldo; NON elencare mai temperatura interna ed esterna come un termometro!).
+
+              OBIETTIVO:
+              Genera un annuncio vocale di bentornato brillante, spiritoso, vario e originale seguendo lo SPUNTO CREATIVO indicato sopra:
+              1. Tono: sarcastico, vivace, arguto e mai ripetitivo, ma sempre affettuoso e naturale.
+              2. DIVIETO DI CLICHÉ RIPETITIVI: NON nominare Gricia, Carbonara o Babà al rientro! Varia il più possibile giocando sullo spunto creativo, sullo stato di casa (Dobby, finestre, camino) o sulle gatte. NON citare mai il lavoro, l'ufficio o le professioni, e NON recitare bollettini di gradi o temperature.
+              3. Dai il bentornato personalizzato usando SOLO il nome di battesimo o il nomignolo (per Utente 1 da solo: Utente 1, Ste o Cù; per Utente 2 da sola: Utente 2, La, Utente 2 o Pì; per la coppia insieme: "Utente 1 e Utente 2", "Cù e Pì", "Pì e Cù" oppure "Utente 1 e Utente 2" — VIETATO abbinare "Ste" e "La" insieme come "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La" o "La, Ste" perché nella sintesi vocale suona come "stela" o "laste"!).
+              4. DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home", di' semplicemente "a casa").
+              5. Se mai nomini un numero di gradi, usa SOLO un numero intero secco (es. "{{ temp_int_pronuncia }} gradi"), MAI "virgola" e MAI "e mezzo gradi".
+              REGOLE TASSATIVE:
+              - Lunghezza massima: tra 18 e 28 parole.
+              - Niente emoji, niente elenchi, niente preamboli, non racchiudere la frase tra doppi apici.
+              - APOSTROFI OBBLIGATORI: Usa SEMPRE l'apostrofo normale (') nelle elisioni italiane (es. l'acqua, l'aria, l'allarme, c'è, un'occhiata; NON scrivere MAI "l acqua" o "l aria" staccato senza apostrofo!).
+              - Italiano parlato naturale per sintesi vocale su Nest Hub Sala.
+        - action: ai_task.generate_data
+          data:
+            entity_id: ai_task.google_ai_task_3
+            task_name: "annuncio_rientro_presenza"
+            instructions: "{{ ai_prompt }}"
+          response_variable: ai_resp
+          continue_on_error: true
+        - variables:
+            ai_text: >-
+              {% if ai_resp is defined and ai_resp is mapping and 'data' in ai_resp and (ai_resp.data | trim | length) > 20 %}
+                {{ ai_resp.data | trim }}
+              {% else %}
+                {{ '' }}
+              {% endif %}
+            fallback_text: >-
+              {% if profilo == 'Utente 1' %}
+                {{ [
+                  'Bentornato a casa Ste! ' ~ dobby_report ~ ' e il tuo posto sul divano ti stava già reclamando.',
+                  'Bentornato a casa Utente 1! ' ~ finestre_report ~ '. Prima di toccare qualsiasi sensore, goditi un po\' di relax.',
+                  'Eccoti di ritorno Cù! ' ~ dobby_report ~ ' e le gatte dormono beate. Missione pantofole autorizzata.',
+                  'Ciao Ste, bentornato! Persino i pesciolini dell\'acquario hanno esultato appena si è aperta la porta.',
+                  'Bentornato nel tuo regno Cù! ' ~ finestre_report ~ '. Gatto 2 e Gatto 1 aspettavano giusto te per le coccole.'
+                ] | random }}
+              {% elif profilo == 'Utente 2' %}
+                {{ [
+                  'Bentornata a casa Utente 2! ' ~ dobby_report ~ ' e la tua copertina preferita sul divano è già pronta.',
+                  'Bentornata a casa La! ' ~ finestre_report ~ '. Lancia la borsa e goditi il meritato relax.',
+                  'Benvenuta Pì! ' ~ dobby_report ~ '. Gatto 2 e Gatto 1 ti cedono ufficialmente il trono del salotto.',
+                  'Eccoti finalmente Utente 2! Il divano e Netflix stavano facendo il conto alla rovescia aspettandoti.',
+                  'Bentornata a casa Pì! ' ~ finestre_report ~ '. L\'elfo domestico Dobby ti dà il benvenuto.'
+                ] | random }}
+              {% else %}
+                {{ [
+                  'Bentornati a casa Utente 1 e Utente 2! ' ~ dobby_report ~ ' e ' ~ finestre_report ~ '. Vediamo chi conquista per primo il divano!',
+                  'Bentornati Utente 1 e Utente 2! ' ~ dobby_report ~ '. Le gatte vi aspettavano al varco, buon relax a tutti e due.',
+                  'Ben ritrovati Cù e Pì! ' ~ dobby_report ~ '. Chiudete il mondo fuori, la serata relax è ufficialmente iniziata.',
+                  'Eccovi finalmente insieme Pì e Cù! ' ~ finestre_report ~ '. Il salotto è tutto vostro!'
+                ] | random }}
+              {% endif %}
+            testo_finale: >-
+              {{ (ai_text if ai_text | length > 20 else fallback_text)
+                 | replace('Eco Home', 'casa') | replace('Eco Home', 'casa')
+                 | replace('Famiglia', '') | replace('Famiglia', '')
+                 | replace('"', '')
+                 | regex_replace('(?i)\\bSte\\s*(?:,\\s*|\\s+e\\s+|\\s+)La\\b', 'Utente 1 e Utente 2')
+                 | regex_replace('(?i)\\bLa\\s*(?:,\\s*|\\s+e\\s+|\\s+)Ste\\b', 'Utente 2 e Utente 1')
+                 | regex_replace('(?i)\\bC[uù]\\s*(?:,\\s*|\\s+e\\s+|\\s+)L[aà]\\b', 'Cù e Pì')
+                 | regex_replace('(?i)\\bL[aà]\\s*(?:,\\s*|\\s+e\\s+|\\s+)C[uù]\\b', 'Pì e Cù')
+                 | regex_replace('(\\d+)\\s+e\\s+mezzo\\s+gradi', '\\1 gradi')
+                 | regex_replace('(\\d+)\\s*(?:virgola|\\.|,)\\s*\\d+', '\\1')
+                 | regex_replace('\\b([lLdD])\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+                 | regex_replace('\\b(all|dall|dell|nell|sull|All|Dall|Dell|Nell|Sull)\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+                 | regex_replace('\\b([cC])\\s+(è|era|erano)\\b', "\\1'\\2")
+                 | regex_replace('\\b([uU]n)\\s+(occhiata|eternità|ora|altra|idea|anima|emergenza)\\b', "\\1'\\2")
+                 | regex_replace('^[.\\s…,-]+', '')
+                 | trim }}
+        # 1. Prepara audio sala: alza Nest Hub all'80%, mette in pausa o abbassa/muta TV
+        - action: script.audio_annuncio_prepara
+          continue_on_error: true
+        # 2. Riproduzione sintesi vocale su Nest Hub Sala
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+              sequence:
+                - action: tts.speak
+                  target:
+                    entity_id: tts.home_assistant_cloud
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    message: "{{ testo_finale }}"
+                    language: "it-IT"
+                    options:
+                      voice: "it-IT-Wavenet-A"
+                  continue_on_error: true
+          default:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                message: "{{ testo_finale }}"
+                language: "it"
+                options:
+                  tld: "it"
+              continue_on_error: true
+        # 3. Attesa fine annuncio
+        - delay:
+            seconds: "{{ [8, ((testo_finale | length) / 10) | round(0, 'ceil') | int + 2] | max }}"
+        # 4. Ripristino audio sala: rimette play se era in pausa, ripristina volume TV precedente
+        - action: script.audio_annuncio_ripristina
+          continue_on_error: true
+
+annuncio_cucina_ai:
+  alias: "Annuncio Cucina AI Sarcastico"
+  icon: "mdi:chef-hat"
+  mode: single
+  fields:
+    dispositivo:
+      description: "Dispositivo acceso: piano_cottura o forno"
+      example: "piano_cottura"
+      default: "piano_cottura"
+  sequence:
+    - variables:
+        dev_label: "{{ 'il piano cottura a induzione' if (dispositivo | default('piano_cottura')) == 'piano_cottura' else 'il forno' }}"
+        stefano_home: "{{ is_state('binary_sensor.utente_1_a_casa', 'on') }}"
+        laura_home: "{{ is_state('binary_sensor.utente_2_a_casa', 'on') }}"
+        ospiti_attivi: "{{ is_state('input_boolean.modalita_ospiti_cameretta', 'on') or is_state('binary_sensor.sicurezza_sospensione_attiva', 'on') }}"
+        profilo_cuoco: >-
+          {% if stefano_home and not laura_home %}
+            Utente 1
+          {% elif laura_home and not stefano_home %}
+            Utente 2
+          {% elif stefano_home and laura_home %}
+            Coppia
+          {% elif ospiti_attivi %}
+            Ospiti
+          {% else %}
+            Nessuno
+          {% endif %}
+        usa_nick_domenico: "{{ [false, false, true] | random }}"
+        spunto_cucina: >-
+          {% if profilo_cuoco == 'Utente 1' %}
+            {{ [
+              "Scherza sul fatto che Utente 1 in settimana ha sempre poco tempo per cucinare, quindi se ha acceso i fornelli sarà sicuramente un capolavoro da veri gourmet.",
+              "Fai una battuta da nerd/chimico in cucina: chiedigli se sta dosando gli ingredienti col bilancino di precisione o se sta facendo un esperimento ad alta temperatura.",
+              "Prendilo in giro dicendo che Gatto 2 e Gatto 1 si sono già piazzate sotto la penisola della cucina con gli occhi a cuoricino sperando che cada qualcosa per terra.",
+              "Scherza sul fatto che ha lasciato il PC e la domotica per dedicarsi all'arte culinaria: chiedigli se ha automatizzato anche il mestolo.",
+              "Prendilo in giro chiedendo se sta preparando un piatto degno di una stella Michelin o se sta solo scaldando l'acqua col turbo dell'induzione.",
+              "Fai una battuta chiedendogli se stasera sfodera la sua celebre Gricia (cita la Gricia con ironia solo in questa occasione).",
+              "Scherza dicendo che i sensori antincendio e la cappa aspirante sono già in preallarme per lo show culinario di Ste.",
+              "Prendilo in giro dicendo che il profumino sta già distraendo anche i sedici pesciolini dell'acquario in sala."
+            ] | random }}
+          {% elif profilo_cuoco == 'Utente 2' %}
+            {{ [
+              "Scherza sul fatto che Utente 2 non ama particolarmente cucinare, ma come sempre salva eroicamente la cena in settimana: merita una statua in salotto!",
+              "Prendila in giro chiedendole se sta cucinando con la bacchetta magica come a Hogwarts o se vorrebbe un incantesimo per far trovare la cena già pronta.",
+              "Fai una battuta su Gatto 2 e Gatto 1 che la fissano dal pavimento come due piccoli avvoltoi pelosi pronti a fare il controllo qualità.",
+              "Scherza sul fatto che chi prepara la cena senza amare i fornelli acquisisce automaticamente il diritto sacro di scegliere cosa guardare stasera su Netflix.",
+              "Prendila in giro dicendo che ha acceso i fornelli a tempo di record pur di sbrigarsi e buttarsi il prima possibile sul divano.",
+              "Fai una battuta chiedendole se stasera prepara la sua famosa Carbonara (cita la Carbonara solo in questo spunto).",
+              "Scherza sul fatto che quando cucina lei, Utente 1 al rientro ha l'obbligo morale di sparecchiare e caricare la lavastoviglie senza fiatare.",
+              "Prendila in giro chiedendo se è una ricetta gourmet elaborata o un salvacena strategico da cinque minuti."
+            ] | random }}
+          {% elif profilo_cuoco == 'Coppia' %}
+            {{ [
+              "Scherza sul fatto che in due ai fornelli c'è sempre uno che cucina davvero e l'altro che ruba gli assaggi direttamente dalla padella.",
+              "Prendili in giro dicendo che sembra una puntata di MasterChef in famiglia, con Gatto 2 e Gatto 1 sedute in prima fila come giudici implacabili.",
+              "Fai una battuta sulla regola d'oro della casa: chi cucina stasera è esonerato ufficialmente dal caricare la lavastoviglie!",
+              "Scherza chiedendo se stanno collaborando in armonia o se stanno già litigando su quanto sale mettere e sui tempi di cottura.",
+              "Prendili in giro chiedendo se stasera c'è il grande classico tra la Gricia di Ste e la Carbonara di Utente 2 (cita questi piatti solo qui).",
+              "Fai una battuta dicendo che con quattro mani ai fornelli o esce un banchetto reale o suona il contatore elettrico per troppa potenza.",
+              "Scherza sul fatto che l'unico vero motivo per cui cucinate insieme è finire prima per fiondarvi sul divano."
+            ] | random }}
+          {% else %}
+            Chiediti con ironia chi stia cucinando se nessuno è a casa (le gatte Gatto 2 e Gatto 1 con il cappello da chef o i fantasmi).
+          {% endif %}
+        desc_presenza: >-
+          {% if is_state('input_boolean.modalita_ospiti_cameretta', 'on') and profilo_cuoco == 'Ospiti' %}
+            Ci sono i carissimi parenti ospiti {{ 'Ospite 1 (detto affettuosamente il Ospite del Nord)' if usa_nick_domenico else 'Ospite 1' }}, Ospite 2, Ospite 3 e Ospite 4 in casa (venuti per il matrimonio di Zia (Piano Superiore) e Familiare 4) mentre Utente 1 e Utente 2 sono fuori!
+          {% elif is_state('input_boolean.modalita_ospiti_cameretta', 'on') %}
+            In casa ci sono Utente 1/Utente 2 insieme ai carissimi parenti ospiti {{ 'Ospite 1 (detto affettuosamente il Ospite del Nord)' if usa_nick_domenico else 'Ospite 1' }}, Ospite 2, Ospite 3 e Ospite 4 (venuti per il matrimonio di Zia (Piano Superiore) e Familiare 4)!
+          {% elif ospiti_attivi and profilo_cuoco == 'Ospiti' %}
+            Ci sono ospiti o familiari in casa mentre Utente 1 e Utente 2 sono fuori!
+          {% elif ospiti_attivi %}
+            In casa ci sono Utente 1/Utente 2 insieme agli ospiti!
+          {% elif profilo_cuoco == 'Utente 1' %}
+            Utente 1 (nomignoli affettuosi: Ste o Cù) è a casa da solo ai fornelli (Utente 2 è fuori). Utente 1 ama cucinare anche se in settimana ha poco tempo.
+          {% elif profilo_cuoco == 'Utente 2' %}
+            Utente 2 (nomignoli affettuosi: La, Utente 2, Pì o Lau) è a casa da sola ai fornelli (Utente 1 è ancora fuori). Utente 2 non ama cucinare ma in settimana prepara quasi sempre lei la cena perché rientra prima.
+          {% elif profilo_cuoco == 'Coppia' %}
+            Sia Utente 1 che Utente 2 (in coppia chiamali Utente 1 e Utente 2, Pì e Cù, Cù e Pì oppure Utente 1 e Utente 2; VIETATO abbinare "Ste" e "La" insieme) sono a casa insieme ai fornelli!
+          {% else %}
+            Attenzione: sia Utente 1 che Utente 2 risultano fuori casa! Non c'è nessuno registrato a casa al momento.
+          {% endif %}
+        ai_prompt: >-
+          Sei l'assistente vocale di casa su Google Nest Hub Sala.
+          EVENTO: È appena stato acceso {{ dev_label }} in cucina.
+          PRESENZA IN CASA: {{ desc_presenza }}
+          COMPAGNIA: Le micie Gatto 2 e Gatto 1 sono sempre in agguato per eventuali bocconcini.
+
+          OBIETTIVO:
+          {% if ospiti_attivi %}
+          Genera un saluto caloroso, educato, ospitale e sorridente (SENZA sarcasmo pungente, perché ci sono gli ospiti in casa{% if is_state('input_boolean.modalita_ospiti_cameretta', 'on') %}: {{ 'Ospite 1 (che puoi chiamare con simpatia anche il Ospite del Nord)' if usa_nick_domenico else 'Ospite 1' }}, Ospite 2, Ospite 3 e Ospite 4{% endif %}): augura buona preparazione ai fornelli, fai sentire gli ospiti come a casa propria e cita con simpatia le micie Gatto 2 e Gatto 1 curiose dei profumi della cucina. Non pronunciare MAI alcun cognome.
+          {% else %}
+          Genera una battuta sarcastica, fulminea, scherzosa, originale e creativa strettamente legata a questo spunto (NON citare mai il lavoro, l'ufficio o le professioni, e NON nominare Gricia, Carbonara o Babà a meno che non siano espressamente richiesti nello spunto qui sotto!):
+          SPUNTO CREATIVO DA SEGUIRE: {{ spunto_cucina }}
+          - Usa il nome o nomignolo corretto (Utente 1/Ste/Cù; Utente 2/La/Utente 2/Pì/Lau; per la coppia insieme: "Utente 1 e Utente 2", "Pì e Cù", "Cù e Pì" oppure "Utente 1 e Utente 2" — VIETATO abbinare "Ste" e "La" insieme come "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La" o "La, Ste" perché nella sintesi vocale suona come "stela" o "laste"!).
+          {% endif %}
+
+          REGOLE TASSATIVE:
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home", di' semplicemente "in casa"). Usa solo il nome di battesimo o i nomignoli affettuosi.
+          - Lunghezza: tra 14 e 22 parole.
+          - Tono {{ 'caloroso, accogliente ed educato' if ospiti_attivi else 'sarcastico, spiritoso ma dolce e bonario' }}.
+          - Niente emoji, niente preamboli, non racchiudere la frase tra doppi apici.
+          - APOSTROFI OBBLIGATORI: Usa SEMPRE l'apostrofo normale (') nelle elisioni italiane (es. l'acqua, l'allarme, l'induzione, l'aria, c'è, un'occhiata; NON scrivere MAI "l acqua" o "l allarme" staccato senza apostrofo!).
+          - Italiano parlato naturale per sintesi vocale.
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "annuncio_cucina_sarcastico"
+        instructions: "{{ ai_prompt }}"
+      response_variable: ai_cucina_resp
+      continue_on_error: true
+    - variables:
+        ai_battuta: >-
+          {% if ai_cucina_resp is defined and ai_cucina_resp is mapping and 'data' in ai_cucina_resp and (ai_cucina_resp.data | trim | length) > 15 %}
+            {{ ai_cucina_resp.data | trim }}
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        fallback_battuta: >-
+          {% if ospiti_attivi %}
+            {{ [
+              "Cucina attiva con " ~ dev_label ~ "! Fate come se foste a casa vostra e buona preparazione, sotto lo sguardo curioso di Gatto 2 e Gatto 1!",
+              "Profumo di buono in cucina! Buon appetito a tutti gli ospiti di casa, Gatto 2 e Gatto 1 sono già in prima fila per annusare!",
+              "È acceso " ~ dev_label ~ " in cucina. Buona preparazione e buona permanenza in famiglia!"
+            ] | random }}
+          {% elif profilo_cuoco == 'Utente 1' %}
+            {{ [
+              "Chef Ste ai fornelli! Hai mollato il computer per regalarci un capolavoro culinario o stai solo facendo un esperimento chimico?",
+              "Utente 1 ha acceso " ~ dev_label ~ ". Gatto 2 e Gatto 1 si sono già piazzate sotto la penisola sperando in un assaggio!",
+              "Attenzione in cucina, Cù è ai comandi! Ricetta stellata in arrivo o stai cercando di automatizzare anche le padelle?",
+              "Ste ai fornelli! Visto che in settimana hai poco tempo, stasera ci aspettiamo effetti speciali da grande chef!"
+            ] | random }}
+          {% elif profilo_cuoco == 'Utente 2' %}
+            {{ [
+              "Utente 2 ha acceso " ~ dev_label ~ "! Anche se non ami stare ai fornelli, salvi sempre la cena: stasera decidi tu cosa vedere in TV!",
+              "Pì ai comandi in cucina in attesa di Ste. Le gatte Gatto 2 e Gatto 1 sono già pronte per il controllo qualità ufficiale.",
+              "Cottura avviata da Utente 2! Chi si sacrifica ai fornelli acquisisce l'esenzione totale dal caricare la lavastoviglie!",
+              "La ha acceso " ~ dev_label ~ ". Vorresti una bacchetta magica alla Harry Potter per far cucinare le pentole da sole, vero?"
+            ] | random }}
+          {% elif profilo_cuoco == 'Coppia' %}
+            {{ [
+              "Utente 1 e Utente 2 ai fornelli insieme! Vediamo chi dei due cucina davvero e chi ruba solo gli assaggi dalla padella.",
+              "Cucina attiva per Pì e Cù. Cooperazione culinaria in corso, e ricordate la regola d'oro: chi cucina non tocca la lavastoviglie!",
+              "Avviata la cottura a quattro mani per Utente 1 e Utente 2. Le micie Gatto 2 e Gatto 1 faranno da severissimi giudici di gara.",
+              "Cù e Pì in cucina insieme! Siete in perfetta sintonia o state già contrattando sui tempi di cottura?"
+            ] | random }}
+          {% else %}
+            {{ [
+              "Attenzione, " ~ dev_label ~ " è acceso ma nessuno è a casa. Gatto 2 e Gatto 1 stanno preparando la cena da sole?",
+              "Allarme cucina, rilevata cottura ma casa vuota. Fantasmi ai fornelli o le gatte hanno imparato a cucinare?"
+            ] | random }}
+          {% endif %}
+        testo_finale: >-
+          {{ (ai_battuta if ai_battuta | length > 15 else fallback_battuta)
+             | replace('Eco Home', 'casa') | replace('Eco Home', 'casa')
+             | replace('Famiglia', '') | replace('Famiglia', '')
+             | replace('"', '')
+             | regex_replace('(?i)\\bSte\\s*(?:,\\s*|\\s+e\\s+|\\s+)La\\b', 'Utente 1 e Utente 2')
+             | regex_replace('(?i)\\bLa\\s*(?:,\\s*|\\s+e\\s+|\\s+)Ste\\b', 'Utente 2 e Utente 1')
+             | regex_replace('(?i)\\bC[uù]\\s*(?:,\\s*|\\s+e\\s+|\\s+)L[aà]\\b', 'Cù e Pì')
+             | regex_replace('(?i)\\bL[aà]\\s*(?:,\\s*|\\s+e\\s+|\\s+)C[uù]\\b', 'Pì e Cù')
+             | regex_replace('\\b([lLdD])\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b(all|dall|dell|nell|sull|All|Dall|Dell|Nell|Sull)\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b([cC])\\s+(è|era|erano)\\b', "\\1'\\2")
+             | regex_replace('\\b([uU]n)\\s+(occhiata|eternità|ora|altra|idea|anima|emergenza)\\b', "\\1'\\2")
+             | trim }}
+        tv_on: "{{ is_state('media_player.tv_sala', 'on') }}"
+        is_notte: "{{ now().hour >= 23 or now().hour < 7 }}"
+
+    # 1. NOTIFICA SMART SUGLI SMARTPHONE
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ profilo_cuoco == 'Nessuno' }}"
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "⚠️ Allarme Cucina: Casa Vuota!"
+                message: "{{ dev_label | capitalize }} acceso mentre nessuno è in casa! {{ testo_finale }}"
+                data:
+                  priority: high
+                  ttl: 0
+              continue_on_error: true
+            - action: notify.mobile_app_smartphone_utente_2
+              data:
+                title: "⚠️ Allarme Cucina: Casa Vuota!"
+                message: "{{ dev_label | capitalize }} acceso mentre nessuno è in casa! {{ testo_finale }}"
+                data:
+                  priority: high
+                  ttl: 0
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: "{{ profilo_cuoco == 'Ospiti' }}"
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "🍳 Ospiti ai fornelli in Cucina"
+                message: "{{ dev_label | capitalize }} acceso dagli ospiti in casa. {{ testo_finale }}"
+                data:
+                  channel: "Cucina"
+              continue_on_error: true
+            - action: notify.mobile_app_smartphone_utente_2
+              data:
+                title: "🍳 Ospiti ai fornelli in Cucina"
+                message: "{{ dev_label | capitalize }} acceso dagli ospiti in casa. {{ testo_finale }}"
+                data:
+                  channel: "Cucina"
+              continue_on_error: true
+      default:
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ profilo_cuoco == 'Utente 1' }}"
+              sequence:
+                - action: notify.mobile_app_smartphone_utente_2
+                  data:
+                    title: "🍳 Chef Utente 1 ai fornelli!"
+                    message: "{{ testo_finale }}"
+                    data:
+                      channel: "Cucina"
+                  continue_on_error: true
+            - conditions:
+                - condition: template
+                  value_template: "{{ profilo_cuoco == 'Utente 2' }}"
+              sequence:
+                - action: notify.mobile_app_smartphone_utente_1
+                  data:
+                    title: "👩‍🍳 Chef Utente 2 ai fornelli!"
+                    message: "{{ testo_finale }}"
+                    data:
+                      channel: "Cucina"
+                  continue_on_error: true
+
+    # 2. ANNUNCIO VOCALE SU NEST HUB SALA (SE ABILITATO E NON DI NOTTE)
+    - if:
+        - condition: template
+          value_template: "{{ is_state('input_boolean.annunci_vocali_cucina', 'on') and not is_notte }}"
+      then:
+        # 1. Prepara audio sala: alza Nest Hub all'80%, mette in pausa o abbassa/muta TV
+        - action: script.audio_annuncio_prepara
+          continue_on_error: true
+        # 2. Riproduzione sintesi vocale su Nest Hub Sala
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+              sequence:
+                - action: tts.speak
+                  target:
+                    entity_id: tts.home_assistant_cloud
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    message: "{{ testo_finale }}"
+                    language: "it-IT"
+                    options:
+                      voice: "it-IT-Wavenet-A"
+                  continue_on_error: true
+          default:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                message: "{{ testo_finale }}"
+                language: "it"
+                options:
+                  tld: "it"
+              continue_on_error: true
+        # 3. Attesa fine annuncio
+        - delay:
+            seconds: "{{ [7, ((testo_finale | length) / 10) | round(0, 'ceil') | int + 2] | max }}"
+        # 4. Ripristino audio sala: rimette play se era in pausa, ripristina volume TV precedente
+        - action: script.audio_annuncio_ripristina
+          continue_on_error: true
+
+annuncio_frigo_ai:
+  alias: "Annuncio Frigo/Freezer AI Sarcastico"
+  icon: "mdi:fridge-alert"
+  mode: single
+  fields:
+    porta:
+      description: "Porta aperta: frigo, freezer o entrambi"
+      example: "frigo"
+      default: "frigo"
+    ripetizione:
+      description: "Numero progressivo del sollecito (1 per il primo avviso dopo 60s)"
+      example: 1
+      default: 1
+  sequence:
+    - variables:
+        p_norm: "{{ porta | default('frigo') }}"
+        rip_count: "{{ ripetizione | default(1) | int }}"
+        temp_frigo: "{{ states('sensor.cucina_frigorifero_fridge_temperature') | default('3') }}"
+        temp_freezer: "{{ states('sensor.cucina_frigorifero_freezer_temperature') | default('-19') }}"
+        nome_dispositivo: >-
+          {% if p_norm == 'freezer' %}
+            la porta del congelatore
+          {% elif p_norm == 'entrambi' %}
+            sia la porta del frigorifero che quella del congelatore
+          {% else %}
+            la porta del frigorifero
+          {% endif %}
+        stefano_home: "{{ is_state('binary_sensor.utente_1_a_casa', 'on') }}"
+        laura_home: "{{ is_state('binary_sensor.utente_2_a_casa', 'on') }}"
+        ospiti_attivi: "{{ is_state('input_boolean.modalita_ospiti_cameretta', 'on') or is_state('binary_sensor.sicurezza_sospensione_attiva', 'on') }}"
+        profilo: >-
+          {% if stefano_home and not laura_home %}
+            Utente 1
+          {% elif laura_home and not stefano_home %}
+            Utente 2
+          {% elif stefano_home and laura_home %}
+            Coppia
+          {% elif ospiti_attivi %}
+            Ospiti
+          {% else %}
+            Nessuno
+          {% endif %}
+        usa_nick_domenico: "{{ [false, false, true] | random }}"
+        spunto_frigo: >-
+          {% if profilo == 'Utente 1' %}
+            {{ [
+              "Prendilo in giro dicendo che fissare i ripiani del frigo per un minuto non farà comparire magicamente del cibo nuovo come per magia.",
+              "Scherza sul fatto che lui è sempre caloroso: chiedigli se ha aperto lo sportello per farsi una doccia d'aria fredda personalizzata.",
+              "Fai una battuta nerd: digli che i server e il NAS si raffreddano in cameretta con le ventole, non lasciando spalancato il frigorifero in cucina!",
+              "Scherza su Gatto 2 e Gatto 1 che hanno già messo il casco da spedizione e stanno per saccheggiare il ripiano più basso.",
+              "Prendilo in giro dicendo che il compressore del frigo sta chiedendo asilo politico e il contatore da 6 kilowatt sta prendendo appunti.",
+              "Chiedigli con ironia se è rimasto ipnotizzato dalla lucina interna del frigo o se sta cercando l'ispirazione per uno spuntino.",
+              "Scherza chiedendogli se sta cercando un Babà nascosto in fondo ai ripiani (cita il Babà solo in questo spunto)."
+            ] | random }}
+          {% elif profilo == 'Utente 2' %}
+            {{ [
+              "Prendila in giro sul fatto che lei è sempre freddolosa: con lo sportello aperto da un minuto sta trasformando la cucina nel Polo Nord!",
+              "Scherza dicendo che fissare i ripiani a lungo non farà cucinare la cena da sola, neanche con un incantesimo di Harry Potter.",
+              "Fai una battuta su Gatto 2 e Gatto 1 che stanno già pianificando un furto con destrezza tra formaggi e affettati.",
+              "Prendila in giro dicendo che i pinguini stanno per bussare alla porta del terrazzo per chiedere ospitalità in cucina.",
+              "Scherza sul fatto che il purificatore del frigo e il compressore stanno mandando un SOS disperato.",
+              "Chiedile con ironia se sta facendo l'inventario dettagliato dei ripiani o se si è persa nei suoi pensieri davanti allo sportello.",
+              "Scherza chiedendole se sta cercando un dolcetto o un Babà nascosto (cita il Babà solo in questo spunto)."
+            ] | random }}
+          {% elif profilo == 'Coppia' %}
+            {{ [
+              "Prendili in giro chiedendo chi dei due ha lasciato tutto spalancato e ora darà sicuramente la colpa all'altro o alle gatte.",
+              "Scherza dicendo che per climatizzare la casa ci sono già i tre condizionatori Samsung, non serve usare il frigorifero!",
+              "Fai una battuta dicendo che siete rimasti imbambolati in due davanti ai ripiani come se trasmettessero una serie Netflix dentro il frigo.",
+              "Prendili in giro dicendo che Gatto 2 e Gatto 1 ringraziano sentitamente gli umani per aver aperto il self-service gratuito in cucina.",
+              "Scherza sul fatto che tra poco i surgelati e gli yogurt chiederanno il rimborso spese per lo sbalzo termico.",
+              "Fai una battuta sul fatto che lo sportello non ha ancora un motore automatico come le tapparelle, quindi tocca chiuderlo a mano!"
+            ] | random }}
+          {% else %}
+            Allarme sarcastico per casa vuota: chiediti con ironia se Gatto 2 e Gatto 1 abbiano imparato ad aprire il frigo per un buffet clandestino.
+          {% endif %}
+        desc_presenza: >-
+          {% if is_state('input_boolean.modalita_ospiti_cameretta', 'on') and profilo == 'Ospiti' %}
+            Ci sono i carissimi parenti ospiti {{ 'Ospite 1 (detto affettuosamente il Ospite del Nord)' if usa_nick_domenico else 'Ospite 1' }}, Ospite 2, Ospite 3 e Ospite 4 in casa (venuti per il matrimonio di Zia (Piano Superiore) e Familiare 4) mentre Utente 1 e Utente 2 sono fuori.
+          {% elif is_state('input_boolean.modalita_ospiti_cameretta', 'on') %}
+            In casa ci sono Utente 1/Utente 2 insieme ai carissimi parenti ospiti {{ 'Ospite 1 (detto affettuosamente il Ospite del Nord)' if usa_nick_domenico else 'Ospite 1' }}, Ospite 2, Ospite 3 e Ospite 4 (venuti per il matrimonio di Zia (Piano Superiore) e Familiare 4).
+          {% elif ospiti_attivi and profilo == 'Ospiti' %}
+            Ci sono ospiti o familiari in casa mentre Utente 1 e Utente 2 sono fuori.
+          {% elif ospiti_attivi %}
+            In casa ci sono Utente 1/Utente 2 insieme agli ospiti.
+          {% elif profilo == 'Utente 1' %}
+            Utente 1 (nomignoli affettuosi: Ste o Cù) è a casa da solo.
+          {% elif profilo == 'Utente 2' %}
+            Utente 2 (nomignoli affettuosi: La, Utente 2, Pì o Lau) è a casa da sola.
+          {% elif profilo == 'Coppia' %}
+            Sia Utente 1 che Utente 2 (in coppia chiamali Utente 1 e Utente 2, Pì e Cù, Cù e Pì oppure Utente 1 e Utente 2; VIETATO abbinare "Ste" e "La" insieme) sono a casa insieme.
+          {% else %}
+            Attenzione: la casa è vuota! Nessuno risulta in casa al momento.
+          {% endif %}
+        sollecito_str: >-
+          {% if rip_count > 1 %}
+            Questo è il sollecito numero {{ rip_count }}. La porta è aperta da vari minuti ed è urgente chiuderla!
+          {% else %}
+            La porta è rimasta aperta per oltre 60 secondi.
+          {% endif %}
+        ai_prompt: >-
+          Sei l'assistente vocale di casa su Google Nest Hub Sala.
+          EVENTO: {{ nome_dispositivo | capitalize }} è rimasta aperta in cucina per oltre 60 secondi!
+          STATO: {{ sollecito_str }}
+          TEMPERATURA INTERNA ELETTRODOMESTICO: Frigo a {{ temp_frigo }} gradi, congelatore a {{ temp_freezer }} gradi.
+          PRESENZA IN CASA: {{ desc_presenza }}
+          COMPAGNIA: Le micie Gatto 2 e Gatto 1 sono sempre in agguato per eventuali bocconcini o per curiosare nel fresco.
+
+          OBIETTIVO:
+          {% if ospiti_attivi %}
+          Genera un avviso cortese, dolce, sorridente e ospitale (SENZA sarcasmo pungente, perché ci sono gli ospiti in casa{% if is_state('input_boolean.modalita_ospiti_cameretta', 'on') %}: {{ 'Ospite 1 (che puoi chiamare con simpatia anche il Ospite del Nord)' if usa_nick_domenico else 'Ospite 1' }}, Ospite 2, Ospite 3 e Ospite 4{% endif %}): ricorda gentilmente di socchiudere {{ nome_dispositivo }} rimasta aperta in cucina, aggiungendo con simpatia che altrimenti le gatte Gatto 2 e Gatto 1 ne approfittano subito per curiosare tra i ripiani! Non pronunciare MAI alcun cognome.
+          {% else %}
+          Genera una battuta sarcastica, brillante, scherzosa e spiritosa ma bonaria ed educata seguendo questo spunto creativo (NON citare mai il lavoro, l'ufficio o le professioni, e NON nominare Gricia, Carbonara o Babà a meno che non siano richiesti nello spunto!):
+          SPUNTO CREATIVO DA SEGUIRE: {{ spunto_frigo }}
+          - Usa il nome o nomignolo corretto (Utente 1/Ste/Cù; Utente 2/La/Utente 2/Pì/Lau; per la coppia insieme: "Utente 1 e Utente 2", "Pì e Cù", "Cù e Pì" oppure "Utente 1 e Utente 2" — VIETATO abbinare "Ste" e "La" insieme come "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La" o "La, Ste" perché nella sintesi vocale suona come "stela" o "laste"!).
+          {% endif %}
+
+          REGOLE TASSATIVE:
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home", di' semplicemente "in casa"). Usa solo il nome di battesimo o i nomignoli affettuosi.
+          - Lunghezza: tra 14 e 24 parole.
+          - Tono {{ 'cortese, sorridente e premuroso' if ospiti_attivi else 'sarcastico, spiritoso e premuroso' }}.
+          - Niente emoji, niente elenchi, niente preamboli, non racchiudere la frase tra doppi apici.
+          - APOSTROFI OBBLIGATORI: Usa SEMPRE l'apostrofo normale (') nelle elisioni italiane (es. l'acqua, l'aria, l'allarme, c'è, un'occhiata; NON scrivere MAI "l acqua" o "l aria" staccato senza apostrofo!).
+          - Italiano parlato naturale per sintesi vocale su Nest Hub Sala.
+
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "annuncio_frigo_sarcastico"
+        instructions: "{{ ai_prompt }}"
+      response_variable: ai_frigo_resp
+      continue_on_error: true
+
+    - variables:
+        ai_battuta: >-
+          {% if ai_frigo_resp is defined and ai_frigo_resp is mapping and 'data' in ai_frigo_resp and (ai_frigo_resp.data | trim | length) > 15 %}
+            {{ ai_frigo_resp.data | trim }}
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        fallback_battuta: >-
+          {% if ospiti_attivi %}
+            {{ [
+              "Piccolo promemoria dalla cucina: " ~ nome_dispositivo ~ " è rimasta socchiusa da un minuto, prima che Gatto 2 e Gatto 1 vadano a curiosare!",
+              "Scusate l'interruzione: " ~ nome_dispositivo ~ " in cucina è ancora aperta da sessanta secondi, potete accompagnarla? Grazie mille!"
+            ] | random }}
+          {% elif rip_count > 1 %}
+            {{ [
+              "Sollecito numero " ~ rip_count ~ ": " ~ nome_dispositivo ~ " è ancora aperta! Il compressore sta chiedendo asilo politico, chiudetela subito!",
+              "Insisto energicamente: " ~ nome_dispositivo ~ " è spalancata da vari minuti. Pietà per i surgelati e per il contatore elettrico!",
+              "Ulteriore avviso per " ~ nome_dispositivo ~ " aperta. Non si richiuderà con la forza del pensiero, andate a chiuderla!"
+            ] | random }}
+          {% elif p_norm == 'freezer' %}
+            {% if profilo == 'Utente 1' %}
+              {{ [
+                "Ste, la porta del congelatore è aperta da oltre un minuto. Stai tentando di overcloccare i surgelati a meno diciannove gradi?",
+                "Allarme freezer per Utente 1! Guardare i ghiaccioli non risolverà i tuoi script, chiudi quello sportello prima del disgelo.",
+                "Cù, congelatore spalancato da sessanta secondi. O trovi il gelato al volo o chiudi la porta, le gatte ringraziano."
+              ] | random }}
+            {% elif profilo == 'Utente 2' %}
+              {{ [
+                "Regina Utente 2, la porta del congelatore è spalancata da oltre un minuto. I surgelati chiedono aiuto prima di trasformarsi in zuppa.",
+                "La, attenzione al freezer aperto. Il freddo polare sta invadendo la cucina e le bollette stanno piangendo.",
+                "Utente 2, congelatore aperto da oltre sessanta secondi. Gatto 2 e Gatto 1 sono già pronte all'assalto dei bastoncini di pesce."
+              ] | random }}
+            {% elif profilo == 'Coppia' %}
+              {{ [
+                "Pì e Cù, la porta del freezer è aperta da oltre un minuto. Chi di voi due ha deciso di climatizzare la casa col ghiaccio?",
+                "Allarme congelatore per Utente 1 e Utente 2! Chiudete quello sportello prima che la cucina si trasformi in una pista di pattinaggio.",
+                "Utente 1 e Utente 2, la porta del freezer è spalancata da sessanta secondi. Chiudete prima del collasso termico!"
+              ] | random }}
+            {% else %}
+              {{ [
+                "Attenzione, congelatore aperto da un minuto e casa vuota. Le gatte Gatto 2 e Gatto 1 stanno organizzando un raid sottozero?",
+                "Allarme freezer aperto con casa vuota! I surgelati rischiano il disgelo, verificare tempestivamente la cucina."
+              ] | random }}
+            {% endif %}
+          {% elif p_norm == 'entrambi' %}
+            {{ [
+              "Attenzione generale: sia frigo che freezer sono spalancati da oltre un minuto! La cucina non è una cella frigorifera industriale.",
+              "Incredibile in cucina, tutte le porte del frigo aperte contemporaneamente. Stiamo preparando una tormenta di neve in salotto?",
+              "Allarme rosso in cucina: frigorifero e congelatore spalancati da sessanta secondi. Chiudete quegli sportelli immediatamente!"
+            ] | random }}
+          {% else %}
+            {% if profilo == 'Utente 1' %}
+              {{ [
+                "Ste, la porta del frigo è aperta da oltre un minuto. Guardare i ripiani non farà comparire magicamente una pizza.",
+                "Utente 1, chiudi quel frigorifero! I server si raffreddano con le ventole, non dissipando l'aria fredda dello yogurt.",
+                "Cù, la porta del frigo è spalancata. O prendi la birra al volo o Gatto 2 e Gatto 1 organizzano un buffet clandestino."
+              ] | random }}
+            {% elif profilo == 'Utente 2' %}
+              {{ [
+                "Utente 2, la porta del frigorifero è aperta da oltre sessanta secondi. La dispensa del fresco reclama la chiusura immediata.",
+                "La, contemplare i ripiani del frigo fa solo lievitare la bolletta. Chiudi lo sportello prima che il latte vada a male.",
+                "Attenzione Pì, porta del frigo spalancata. Gatto 2 e Gatto 1 hanno già avvistato i formaggi e sono pronte all'attacco."
+              ] | random }}
+            {% elif profilo == 'Coppia' %}
+              {{ [
+                "Pì e Cù, la porta del frigorifero è aperta da oltre un minuto. Chiudete prima che il formaggio prenda vita e scappi sul divano.",
+                "Utente 1 e Utente 2, chi di voi due ha scambiato il frigorifero per un condizionatore d'aria? Chiudete subito quello sportello!",
+                "La sala chiama la cucina: Utente 1 e Utente 2, porta del frigo aperta da sessanta secondi. Decidete il menu e richiudete, grazie."
+              ] | random }}
+            {% else %}
+              {{ [
+                "Allarme frigo aperto e casa vuota! Gatto 2 e Gatto 1 sono ufficialmente entrate nel buffet dei formaggi senza permesso.",
+                "Porta del frigorifero spalancata da oltre un minuto a casa vuota. Qualcuno ha dimenticato di chiudere lo sportello."
+              ] | random }}
+            {% endif %}
+          {% endif %}
+        testo_finale: >-
+          {{ (ai_battuta if ai_battuta | length > 15 else fallback_battuta)
+             | replace('Eco Home', 'casa') | replace('Eco Home', 'casa')
+             | replace('Famiglia', '') | replace('Famiglia', '')
+             | replace('"', '')
+             | regex_replace('(?i)\\bSte\\s*(?:,\\s*|\\s+e\\s+|\\s+)La\\b', 'Utente 1 e Utente 2')
+             | regex_replace('(?i)\\bLa\\s*(?:,\\s*|\\s+e\\s+|\\s+)Ste\\b', 'Utente 2 e Utente 1')
+             | regex_replace('(?i)\\bC[uù]\\s*(?:,\\s*|\\s+e\\s+|\\s+)L[aà]\\b', 'Cù e Pì')
+             | regex_replace('(?i)\\bL[aà]\\s*(?:,\\s*|\\s+e\\s+|\\s+)C[uù]\\b', 'Pì e Cù')
+             | regex_replace('\\b([lLdD])\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b(all|dall|dell|nell|sull|All|Dall|Dell|Nell|Sull)\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b([cC])\\s+(è|era|erano)\\b', "\\1'\\2")
+             | regex_replace('\\b([uU]n)\\s+(occhiata|eternità|ora|altra|idea|anima|emergenza)\\b', "\\1'\\2")
+             | trim }}
+        tv_on: "{{ is_state('media_player.tv_sala', 'on') }}"
+        is_notte: "{{ now().hour >= 23 or now().hour < 7 }}"
+        volume_target: "{{ 0.35 if is_notte else 0.70 }}"
+        titolo_notifica: >-
+          {% if p_norm == 'freezer' %}
+            ❄️ Freezer Aperto da >60s!
+          {% elif p_norm == 'entrambi' %}
+            🚨 Frigo e Freezer Aperti!
+          {% else %}
+            🧊 Frigo Aperto da >60s!
+          {% endif %}
+
+    # 1. NOTIFICHE SMART SU SMARTPHONE
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ profilo == 'Nessuno' }}"
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "⚠️ Allarme: {{ titolo_notifica }} (Casa Vuota)"
+                message: "{{ testo_finale }}"
+                data:
+                  priority: high
+                  ttl: 0
+                  tag: "porta_frigo_aperta"
+              continue_on_error: true
+            - action: notify.mobile_app_smartphone_utente_2
+              data:
+                title: "⚠️ Allarme: {{ titolo_notifica }} (Casa Vuota)"
+                message: "{{ testo_finale }}"
+                data:
+                  priority: high
+                  ttl: 0
+                  tag: "porta_frigo_aperta"
+              continue_on_error: true
+        - conditions:
+            - condition: template
+              value_template: "{{ profilo == 'Ospiti' }}"
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "{{ titolo_notifica }} (Ospiti in Casa)"
+                message: "{{ testo_finale }}"
+                data:
+                  tag: "porta_frigo_aperta"
+                  channel: "Cucina"
+              continue_on_error: true
+            - action: notify.mobile_app_smartphone_utente_2
+              data:
+                title: "{{ titolo_notifica }} (Ospiti in Casa)"
+                message: "{{ testo_finale }}"
+                data:
+                  tag: "porta_frigo_aperta"
+                  channel: "Cucina"
+              continue_on_error: true
+      default:
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ profilo in ['Utente 1', 'Coppia'] }}"
+              sequence:
+                - action: notify.mobile_app_smartphone_utente_1
+                  data:
+                    title: "{{ titolo_notifica }}"
+                    message: "{{ testo_finale }}"
+                    data:
+                      tag: "porta_frigo_aperta"
+                      channel: "Cucina"
+                  continue_on_error: true
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ profilo in ['Utente 2', 'Coppia'] }}"
+              sequence:
+                - action: notify.mobile_app_smartphone_utente_2
+                  data:
+                    title: "{{ titolo_notifica }}"
+                    message: "{{ testo_finale }}"
+                    data:
+                      tag: "porta_frigo_aperta"
+                      channel: "Cucina"
+                  continue_on_error: true
+
+    # 2. ANNUNCIO VOCALE SU NEST HUB SALA (SE ABILITATO)
+    - if:
+        - condition: template
+          value_template: "{{ is_state('input_boolean.annunci_vocali_frigo', 'on') }}"
+      then:
+        # 1. Prepara audio sala: alza Nest Hub all'80%, mette in pausa o abbassa/muta TV
+        - action: script.audio_annuncio_prepara
+          continue_on_error: true
+        # 2. Riproduzione sintesi vocale su Nest Hub Sala
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+              sequence:
+                - action: tts.speak
+                  target:
+                    entity_id: tts.home_assistant_cloud
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    message: "{{ testo_finale }}"
+                    language: "it-IT"
+                    options:
+                      voice: "it-IT-Wavenet-A"
+                  continue_on_error: true
+          default:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                message: "{{ testo_finale }}"
+                language: "it"
+                options:
+                  tld: "it"
+              continue_on_error: true
+        # 3. Attesa fine annuncio
+        - delay:
+            seconds: "{{ [7, ((testo_finale | length) / 10) | round(0, 'ceil') | int + 2] | max }}"
+        # 4. Ripristino audio sala: rimette play se era in pausa, ripristina volume TV precedente
+        - action: script.audio_annuncio_ripristina
+          continue_on_error: true
+
+annuncio_buongiorno_ai:
+  alias: "Annuncio Buongiorno AI Feriale"
+  icon: "mdi:weather-sunset-up"
+  mode: single
+  sequence:
+    # 0. Riattivazione Ossigenatore Acquario al Buongiorno
+    - action: switch.turn_on
+      target:
+        entity_id: switch.presa_ossigenatore_acquario
+      continue_on_error: true
+    # 0a. Aggiornamento on-demand Traffico Utente 2 (solo se Utente 2 è a casa)
+    - if:
+        - condition: state
+          entity_id: binary_sensor.utente_2_a_casa
+          state: "on"
+      then:
+        - action: homeassistant.update_entity
+          target:
+            entity_id: sensor.tempo_viaggio_laura_no_autostrada
+          continue_on_error: true
+        - delay:
+            seconds: 2
+    # 0b. Recupero Previsioni Meteo Giornaliere e Orarie per il Meteo di Oggi
+    - action: weather.get_forecasts
+      target:
+        entity_id:
+          - weather.meteoam_home
+          - weather.casa
+      data:
+        type: daily
+      response_variable: meteo_daily
+      continue_on_error: true
+    - action: weather.get_forecasts
+      target:
+        entity_id:
+          - weather.meteoam_home
+          - weather.casa
+      data:
+        type: hourly
+      response_variable: meteo_hourly
+      continue_on_error: true
+    - variables:
+        stefano_home: "{{ is_state('binary_sensor.utente_1_a_casa', 'on') }}"
+        laura_home: "{{ is_state('binary_sensor.utente_2_a_casa', 'on') }}"
+        profilo: >-
+          {% if stefano_home and not laura_home %}
+            Utente 1
+          {% elif laura_home and not stefano_home %}
+            Utente 2
+          {% elif stefano_home and laura_home %}
+            Coppia
+          {% else %}
+            Nessuno
+          {% endif %}
+        giorno_settimana: "{{ ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'][now().weekday()] }}"
+        fc_daily: >-
+          {{ meteo_daily['weather.casa'].forecast if meteo_daily is defined and 'weather.casa' in meteo_daily and meteo_daily['weather.casa'].forecast | length > 0
+          else (meteo_daily['weather.meteoam_home'].forecast if meteo_daily is defined and 'weather.meteoam_home' in meteo_daily and meteo_daily['weather.meteoam_home'].forecast | length > 0
+          else (meteo_daily.values() | selectattr('forecast', 'defined') | map(attribute='forecast') | first | default([]))) if meteo_daily is defined else [] }}
+        fc_hourly: >-
+          {{ meteo_hourly['weather.casa'].forecast if meteo_hourly is defined and 'weather.casa' in meteo_hourly and meteo_hourly['weather.casa'].forecast | length > 0
+          else (meteo_hourly['weather.meteoam_home'].forecast if meteo_hourly is defined and 'weather.meteoam_home' in meteo_hourly and meteo_hourly['weather.meteoam_home'].forecast | length > 0
+          else (meteo_hourly.values() | selectattr('forecast', 'defined') | map(attribute='forecast') | first | default([]))) if meteo_hourly is defined else [] }}
+        cond_map: >-
+          {{ {
+            'sunny': 'soleggiato',
+            'clear-night': 'sereno',
+            'partlycloudy': 'parzialmente nuvoloso',
+            'cloudy': 'nuvoloso',
+            'rainy': 'piovoso',
+            'pouring': 'pioggia battente',
+            'lightning': 'temporalesco',
+            'lightning-rainy': 'temporale con pioggia',
+            'fog': 'nebbioso',
+            'windy': 'ventoso',
+            'windy-variant': 'molto ventoso',
+            'snowy': 'nevoso',
+            'snowy-rainy': 'misto pioggia e neve',
+            'hail': 'grandine',
+            'exceptional': 'allerta meteo'
+          } }}
+        temp_est: "{{ states('sensor.meteo_temperatura_esterna_effettiva') | default('16') }}"
+        temp_est_tts: "{{ temp_est | float(16) | round(0) | int }}"
+        temp_int: "{{ states('sensor.temperatura_media') | default('21') }}"
+        temp_int_tts: "{{ temp_int | float(21) | round(0) | int }}"
+        condizione_raw: "{{ states('sensor.meteo_condizione_effettiva') | default('cloudy') }}"
+        condizione: "{{ cond_map.get(condizione_raw, condizione_raw) }}"
+        today_fc: "{{ fc_daily[0] if fc_daily | length > 0 else {} }}"
+        t_max_oggi: "{{ (today_fc.temperature if today_fc.temperature is defined else (states('sensor.meteo_previsione_temperatura_massima') | float(20))) | round(0) | int }}"
+        t_min_oggi: "{{ (today_fc.templow if today_fc.templow is defined else (states('sensor.meteo_previsione_temperatura_minima') | float(12))) | round(0) | int }}"
+        cond_oggi_raw: "{{ today_fc.condition | default(condizione_raw) }}"
+        cond_oggi: "{{ cond_map.get(cond_oggi_raw, cond_oggi_raw) }}"
+        prob_pioggia_oggi: "{{ (today_fc.precipitation_probability | default(0)) | round(0) | int }}"
+        vento_oggi: "{{ (today_fc.wind_speed | default(5)) | round(0) | int }}"
+        mattina_slice: "{{ fc_hourly[0:5] if fc_hourly is defined and fc_hourly is iterable and fc_hourly | length >= 5 else (fc_hourly if fc_hourly is defined and fc_hourly is iterable else []) }}"
+        pomeriggio_slice: "{{ fc_hourly[5:11] if fc_hourly is defined and fc_hourly is iterable and fc_hourly | length >= 11 else [] }}"
+        sera_slice: "{{ fc_hourly[11:16] if fc_hourly is defined and fc_hourly is iterable and fc_hourly | length >= 16 else [] }}"
+        cond_mattina: >-
+          {% set r_m = mattina_slice | selectattr('condition', 'defined') | map(attribute='condition') | select('in', ['pouring', 'lightning-rainy', 'lightning', 'hail', 'rainy']) | list %}
+          {% set m_raw = r_m[0] if r_m | length > 0 else (fc_hourly[2].condition if fc_hourly | length > 2 else cond_oggi_raw) %}
+          {{ cond_map.get(m_raw, m_raw) }}
+        cond_pomeriggio: >-
+          {% set r_p = pomeriggio_slice | selectattr('condition', 'defined') | map(attribute='condition') | select('in', ['pouring', 'lightning-rainy', 'lightning', 'hail', 'rainy']) | list %}
+          {% set p_raw = r_p[0] if r_p | length > 0 else (fc_hourly[7].condition if fc_hourly | length > 7 else cond_oggi_raw) %}
+          {{ cond_map.get(p_raw, p_raw) }}
+        cond_sera: >-
+          {% set r_s = sera_slice | selectattr('condition', 'defined') | map(attribute='condition') | select('in', ['pouring', 'lightning-rainy', 'lightning', 'hail', 'rainy']) | list %}
+          {% set s_raw = r_s[0] if r_s | length > 0 else (fc_hourly[13].condition if fc_hourly | length > 13 else cond_oggi_raw) %}
+          {{ cond_map.get(s_raw, s_raw) }}
+        piove_oggi: >-
+          {{ cond_oggi_raw in ['rainy', 'pouring', 'lightning', 'lightning-rainy', 'hail']
+             or cond_mattina in ['piovoso', 'pioggia battente', 'temporalesco', 'temporale con pioggia']
+             or cond_pomeriggio in ['piovoso', 'pioggia battente', 'temporalesco', 'temporale con pioggia']
+             or cond_sera in ['piovoso', 'pioggia battente', 'temporalesco', 'temporale con pioggia']
+             or prob_pioggia_oggi >= 45 }}
+        pluvio_raw: "{{ states('sensor.terrazza_pulvirometro_precipitazioni_oggi') }}"
+        pluvio_mm: "{{ (pluvio_raw | float(0) | round(1)) if pluvio_raw not in ['unavailable', 'unknown', 'none', ''] else 0.0 }}"
+        pluvio_mm_tts: "{{ [1, (pluvio_mm | float(0) | round(0) | int)] | max }}"
+        ha_piovuto: "{{ (pluvio_mm | float(0)) > 0.1 or is_state('input_boolean.meteo_pioggia_notturna_rilevata', 'on') }}"
+        t_val: "{{ temp_est | float(16) }}"
+        rischio_gelo: "{{ t_val <= 3.0 }}"
+        rischio_neve: "{{ condizione_raw in ['snowy', 'snowy-rainy', 'hail'] or cond_oggi_raw in ['snowy', 'snowy-rainy', 'hail'] }}"
+        dur_no_toll: "{{ states('sensor.tempo_viaggio_laura_no_autostrada') | float(0) | round(0) | int }}"
+        dur_std_no_toll: 68
+        diff_traffico: "{{ [0, dur_no_toll - dur_std_no_toll] | max }}"
+        extra_traffico: "{{ diff_traffico >= 7 }}"
+        ricorrenza_oggi: "{{ state_attr('sensor.ricorrenze_e_compleanni_oggi', 'ricorrenza_vocale_oggi') | default('', true) }}"
+        spunto_buongiorno_feriale: >-
+          {{ [
+            "Scherza sul contrasto mattutino delle 7:00: Utente 2 si alza subito scattante mentre Utente 1 fa resistenza passiva sotto le coperte fino alle sette e venti.",
+            "Fai una battuta su Gatto 2 e Gatto 1 che hanno dormito appiccicate a Utente 1 tutta la notte e ora vi guardano alzarsi per poi riprendersi tutto il letto per sé.",
+            "Prendili in giro sul trauma del distacco dal piumone caldo, proponendo una petizione per abolire la sveglia mattutina.",
+            "Scherza sul robot Dobby che è parcheggiato nella sua base lì in camera e vi osserva in silenzio con aria di sfida mentre cercate di aprire gli occhi.",
+            "Fai una battuta sulla macchina del caffè in cucina che sta già scaldando i motori per compiere il miracolo quotidiano della rianimazione.",
+            "Prendili in giro sul fatto che Utente 2 è freddolosa e vorrebbe uscire avvolta direttamente nel piumone, mentre Utente 1 è caloroso anche appena sveglio.",
+            "Fai una battuta spiritosa sul giorno della settimana (" ~ giorno_settimana ~ ") e sul conto alla rovescia psicologico verso il divano di stasera."
+          ] | random }}
+        ai_prompt: >-
+          Sei l'assistente vocale di casa su Google Nest Hub Camera.
+          EVENTO: Sveglia mattutina feriale delle ore 07:00, oggi è {{ giorno_settimana }}.
+          DESTINATARI: {{ 'Utente 1 e Utente 2 (in coppia chiamali Utente 1 e Utente 2, Cù e Pì, Pì e Cù oppure Utente 1 e Utente 2; VIETATO abbinare "Ste" e "La" insieme come "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La" o "La, Ste" perché nella sintesi vocale suona come "stela" o "laste"!)' if profilo == 'Coppia' else ('Utente 2 (nomignoli affettuosi: La, Utente 2, Pì o Lau)' if profilo == 'Utente 2' else 'Utente 1 (nomignoli affettuosi: Ste o Cù)') }}.
+          SPUNTO CREATIVO PER LA BATTUTA INIZIALE DI OGGI: {{ spunto_buongiorno_feriale }}
+          METEO ATTUALE IN TERRAZZA: {{ temp_est_tts }} gradi, cielo {{ condizione }}.
+          PIOGGIA DI QUESTA NOTTE: {{ ('QUESTA NOTTE HA PIOVUTO! Il pluviometro in terrazza ha registrato circa ' ~ pluvio_mm_tts ~ ' millimetri di pioggia e le strade sono bagnate.') if (ha_piovuto and (pluvio_mm | float(0)) > 0.1) else ("QUESTA NOTTE HA PIOVUTO! Il pluviometro ha rilevato pioggia notturna e l'asfalto è bagnato." if ha_piovuto else 'NESSUNA pioggia questa notte (notte asciutta).') }}
+          PREVISIONI METEO COMPLETE DI OGGI:
+          - Evoluzione della giornata: al mattino cielo {{ cond_mattina }}, nel pomeriggio {{ cond_pomeriggio }}, in serata {{ cond_sera }} (quadro generale: {{ cond_oggi }}).
+          - Temperature previste oggi: minima {{ t_min_oggi }} gradi, massima {{ t_max_oggi }} gradi.
+          - Pioggia prevista oggi: probabilità del {{ prob_pioggia_oggi }} percento{{ " (è prevista pioggia nel corso della giornata di oggi, ricorda di prendere l'ombrello!)" if piove_oggi else ' (non sono previste piogge significative oggi)' }}.
+          RISCHIO GHIACCIO O NEVE: {{ 'Segnalato rischio di neve' if rischio_neve else ('Rischio ghiaccio con temperatura a ' ~ temp_est_tts ~ ' gradi' if rischio_gelo else 'NESSUN rischio ghiaccio o neve') }}.
+          TRAFFICO GOOGLE MAPS VERSO Via Ufficio Centrale (Roma): {{ ("C'è più traffico del solito verso Via Ufficio Centrale: previsti " ~ dur_no_toll ~ ' minuti (' ~ diff_traffico ~ ' minuti di rallentamento rispetto al solito)') if extra_traffico else 'Traffico regolare, nessun ritardo anomalo' }}.
+          {%- if ricorrenza_oggi != '' %}
+          RICORRENZA O COMPLEANNO DI OGGI: {{ ricorrenza_oggi }}.
+          {%- endif %}
+
+          OBIETTIVO:
+          Genera un annuncio di buongiorno sarcastico, spiritoso, brillante, sempre diverso e mai ripetitivo che includa TUTTI questi punti nell'ordine (NON citare mai le professioni o i luoghi di lavoro, e NON nominare Gricia, Carbonara o Babà!):
+          1. Dai il buongiorno a {{ 'Utente 1 e Utente 2 (oppure Cù e Pì, Pì e Cù, o Utente 1 e Utente 2 — NON dire MAI "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La" o "La, Ste"!)' if profilo == 'Coppia' else (profilo ~ ' (o usando il suo nomignolo affettuoso)') }} sviluppando con originalità lo SPUNTO CREATIVO indicato sopra.
+          2. REGOLA TASSATIVA PIOGGIA NOTTURNA: {{ ('Di\' esplicitamente con le parole "questa notte ha piovuto", indicando che il pluviometro ha registrato circa ' ~ pluvio_mm_tts ~ " millimetri di pioggia e l'asfalto è bagnato.") if (ha_piovuto and (pluvio_mm | float(0)) > 0.1) else ('Di\' esplicitamente con le parole "questa notte ha piovuto" e che l\'asfalto è bagnato.' if ha_piovuto else 'NON menzionare pioggia notturna poiché questa notte non ha piovuto.') }}
+          3. REGOLA TASSATIVA METEO ATTUALE E PREVISIONI DI OGGI: Indica la temperatura attuale fuori ({{ temp_est_tts }} gradi, cielo {{ condizione }}) e descrivi OBBLIGATORIAMENTE il meteo previsto per oggi (come sarà il tempo stamattina, oggi pomeriggio e stasera: {{ cond_mattina }} al mattino, {{ cond_pomeriggio }} nel pomeriggio e {{ cond_sera }} in serata, con massima di {{ t_max_oggi }} gradi e probabilità di pioggia del {{ prob_pioggia_oggi }} percento{{ ", avvisando di portare l'ombrello" if piove_oggi else '' }}).
+          4. REGOLA TASSATIVA GHIACCIO/NEVE: {{ 'Avvisa del rischio ghiaccio o neve per chi deve guidare.' if (rischio_gelo or rischio_neve) else 'NON menzionare affatto ghiaccio o neve.' }}
+          5. REGOLA TASSATIVA TRAFFICO: {{ 'Avvisa che Google Maps rileva più traffico del solito per Utente 2 verso Via Ufficio Centrale con ' ~ dur_no_toll ~ ' minuti stimati.' if extra_traffico else 'NON menzionare affatto il traffico o Via Ufficio Centrale poiché il tragitto è regolare.' }}
+          {%- if ricorrenza_oggi != '' %}
+          6. REGOLA TASSATIVA RICORRENZA DI OGGI: Ricorda con entusiasmo che {{ ricorrenza_oggi }}!
+          {%- endif %}
+
+          REGOLE TASSATIVE DI FORMATO:
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home", di' semplicemente "a casa"). Usa solo il nome di battesimo o i nomignoli affettuosi.
+          - NUMERI INTERI: Usa SOLO numeri interi per i gradi (es. "{{ temp_est_tts }} gradi"), MAI virgole e MAI "e mezzo gradi".
+          - Lunghezza: tra 65 e 100 parole (dedica almeno due frasi ricche alla pioggia di questa notte e alle previsioni meteo di oggi).
+          - Tono sarcastico, frizzante ma affettuoso.
+          - Niente emoji, niente elenchi puntati né asterischi, non racchiudere la frase tra doppi apici.
+          - APOSTROFI OBBLIGATORI: Usa SEMPRE l'apostrofo normale (') nelle elisioni italiane (es. l'acqua, l'ombrello, l'asfalto, l'aria, c'è; NON scrivere MAI "l acqua" o "l ombrello" staccato senza apostrofo!). Italiano parlato naturale per sintesi vocale su Nest Hub Camera.
+
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "annuncio_buongiorno_feriale"
+        instructions: "{{ ai_prompt }}"
+      response_variable: ai_bg_resp
+      continue_on_error: true
+
+    - variables:
+        ai_battuta: >-
+          {% if ai_bg_resp is defined and ai_bg_resp is mapping and 'data' in ai_bg_resp and (ai_bg_resp.data | trim | length) > 20 %}
+            {{ ai_bg_resp.data | trim }}
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        frase_pioggia: >-
+          {% if ha_piovuto and (pluvio_mm | float(0)) > 0.1 %}
+             Questa notte ha piovuto: il pluviometro in terrazza ha registrato circa {{ pluvio_mm_tts }} millimetri di pioggia e l'asfalto è bagnato.
+          {% elif ha_piovuto %}
+             Questa notte ha piovuto e l'asfalto è bagnato.
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        frase_meteo_oggi: >-
+           Per il meteo di oggi sono previsti cielo {{ cond_mattina }} al mattino, {{ cond_pomeriggio }} nel pomeriggio e {{ cond_sera }} in serata, con temperature tra {{ t_min_oggi }} e {{ t_max_oggi }} gradi e probabilità di pioggia del {{ prob_pioggia_oggi }} percento{{ ", quindi tenete l'ombrello a portata di mano" if piove_oggi else '' }}.
+        frase_gelo: "{{ ' Attenzione al possibile ghiaccio sulle strade con ' ~ temp_est_tts ~ ' gradi.' if rischio_gelo else (' Attenzione alla neve.' if rischio_neve else '') }}"
+        frase_traffico: "{{ ' Utente 2, Google Maps segnala traffico intenso verso Via Ufficio Centrale: ' ~ dur_no_toll ~ ' minuti stimati.' if extra_traffico else '' }}"
+        frase_ricorrenza: "{{ ' Vi ricordo inoltre che ' ~ ricorrenza_oggi ~ '!' if ricorrenza_oggi != '' else '' }}"
+        fallback_battuta: >-
+          {% if profilo == 'Utente 1' %}
+            Buongiorno Ste, è {{ giorno_settimana }}! Fuori in terrazza ci sono {{ temp_est_tts }} gradi con cielo {{ condizione }}.{{ frase_pioggia }}{{ frase_meteo_oggi }}{{ frase_gelo }}{{ frase_traffico }}{{ frase_ricorrenza }} Buona giornata!
+          {% elif profilo == 'Utente 2' %}
+            Buongiorno La, benvenuta nel tuo {{ giorno_settimana }}! Fuori ci sono {{ temp_est_tts }} gradi e cielo {{ condizione }}.{{ frase_pioggia }}{{ frase_meteo_oggi }}{{ frase_gelo }}{{ frase_traffico }}{{ frase_ricorrenza }} Buona giornata!
+          {% else %}
+            Buongiorno Utente 1 e Utente 2, è {{ giorno_settimana }}! Fuori in terrazza ci sono {{ temp_est_tts }} gradi con cielo {{ condizione }}, e il piumone vi saluta con rimpianto.{{ frase_pioggia }}{{ frase_meteo_oggi }}{{ frase_gelo }}{{ frase_traffico }}{{ frase_ricorrenza }} Buona giornata a entrambi!
+          {% endif %}
+        testo_finale: >-
+          {{ (ai_battuta if ai_battuta | length > 20 else fallback_battuta)
+             | replace('Eco Home', 'casa') | replace('Eco Home', 'casa')
+             | replace('Famiglia', '') | replace('Famiglia', '')
+             | replace('"', '')
+             | regex_replace('(?i)\\bSte\\s*(?:,\\s*|\\s+e\\s+|\\s+)La\\b', 'Utente 1 e Utente 2')
+             | regex_replace('(?i)\\bLa\\s*(?:,\\s*|\\s+e\\s+|\\s+)Ste\\b', 'Utente 2 e Utente 1')
+             | regex_replace('(?i)\\bC[uù]\\s*(?:,\\s*|\\s+e\\s+|\\s+)L[aà]\\b', 'Cù e Pì')
+             | regex_replace('(?i)\\bL[aà]\\s*(?:,\\s*|\\s+e\\s+|\\s+)C[uù]\\b', 'Pì e Cù')
+             | regex_replace('(\\d+)\\s+e\\s+mezzo\\s+gradi', '\\1 gradi')
+             | regex_replace('(\\d+)\\s*(?:virgola|\\.|,)\\s*\\d+', '\\1')
+             | regex_replace('\\b([lLdD])\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b(all|dall|dell|nell|sull|All|Dall|Dell|Nell|Sull)\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b([cC])\\s+(è|era|erano)\\b', "\\1'\\2")
+             | regex_replace('\\b([uU]n)\\s+(occhiata|eternità|ora|altra|idea|anima|emergenza)\\b', "\\1'\\2")
+             | trim }}
+
+    # Imposta flag traffico segnalato per abilitare gli aggiornamenti delle 07:20 e 07:40
+    - if:
+        - condition: template
+          value_template: "{{ extra_traffico }}"
+      then:
+        - action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.buongiorno_traffico_segnalato
+          continue_on_error: true
+      else:
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.buongiorno_traffico_segnalato
+          continue_on_error: true
+
+    # 1. NOTIFICHE PUSH SMARTPHONE
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ profilo in ['Utente 1', 'Coppia'] }}"
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "🌅 Buongiorno {{ giorno_settimana }}!"
+                message: "{{ testo_finale }}"
+                data:
+                  tag: "buongiorno_mancini"
+                  channel: "Sveglia"
+              continue_on_error: true
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ profilo in ['Utente 2', 'Coppia'] }}"
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_2
+              data:
+                title: "🌅 Buongiorno {{ giorno_settimana }}!"
+                message: "{{ testo_finale }}"
+                data:
+                  tag: "buongiorno_mancini"
+                  channel: "Sveglia"
+              continue_on_error: true
+
+    # 2. ANNUNCIO VOCALE SU NEST HUB CAMERA
+    - action: media_player.turn_on
+      target:
+        entity_id: media_player.nest_hub_camera
+      continue_on_error: true
+    - delay:
+        milliseconds: 500
+    - action: media_player.volume_mute
+      target:
+        entity_id: media_player.nest_hub_camera
+      data:
+        is_volume_muted: false
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_camera
+      data:
+        volume_level: 0.70
+      continue_on_error: true
+    - delay:
+        milliseconds: 600
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.home_assistant_cloud
+              data:
+                media_player_entity_id: media_player.nest_hub_camera
+                message: "{{ testo_finale }}"
+                language: "it-IT"
+                options:
+                  voice: "it-IT-Wavenet-A"
+              continue_on_error: true
+      default:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_camera
+            message: "{{ testo_finale }}"
+            language: "it"
+            options:
+              tld: "it"
+          continue_on_error: true
+
+annuncio_buonanotte_ai:
+  alias: "Annuncio Buonanotte AI (Avvia Buonanotte)"
+  icon: "mdi:bed-clock"
+  mode: single
+  sequence:
+    - action: script.buonanotte_scenario_notte
+
+annuncio_rifiuti_ore_21_ai:
+  alias: "Annuncio Promemoria Spazzatura Ore 21 AI"
+  icon: "mdi:trash-can"
+  mode: single
+  sequence:
+    - variables:
+        cal_summary: "{{ state_attr('calendar.raccolta_rifiuti', 'message') | default('') }}"
+        sensor_state: "{{ states('sensor.raccolta_rifiuti') | default('') }}"
+        types: "{{ state_attr('sensor.raccolta_rifiuti', 'collection_types') }}"
+        days_rem: "{{ state_attr('sensor.raccolta_rifiuti', 'days_remaining') | int(0) }}"
+        ha_ritiro: >-
+          {{ (is_state('calendar.raccolta_rifiuti', 'on') and days_rem == 0) or (sensor_state not in ['unknown', 'unavailable', 'none', '', 'Nessun Ritiro', 'Nessuna raccolta programmata'] and days_rem == 0) }}
+
+    # Se stasera non ci sono bidoni da esporre, interrompi subito senza annunci o notifiche
+    - condition: template
+      value_template: "{{ ha_ritiro }}"
+
+    - variables:
+        nome_bidone: >-
+          {% if types is defined and types is iterable and types | length > 0 %}
+            {{ types | join(' e ') }}
+          {% elif cal_summary != '' %}
+            {{ cal_summary }}
+          {% else %}
+            {{ sensor_state }}
+          {% endif %}
+        stefano_home: "{{ is_state('binary_sensor.utente_1_a_casa', 'on') }}"
+        laura_home: "{{ is_state('binary_sensor.utente_2_a_casa', 'on') }}"
+        profilo: >-
+          {% if stefano_home and not laura_home %}
+            Utente 1
+          {% elif laura_home and not stefano_home %}
+            Utente 2
+          {% elif stefano_home and laura_home %}
+            Coppia
+          {% else %}
+            Nessuno
+          {% endif %}
+        temp_est: "{{ states('sensor.meteo_temperatura_esterna_effettiva') | default('16') }}"
+        t_val: "{{ temp_est | float(16) }}"
+        temp_est_tts: "{{ t_val | round(0) | int }}"
+        fa_freddo: "{{ t_val <= 12.0 }}"
+        piove_ora: "{{ is_state('binary_sensor.meteo_piove_ora', 'on') or (states('sensor.meteo_pioggia_attuale_effettiva') | float(0) > 0.05) }}"
+        vento_val: "{{ states('sensor.meteo_vento_attuale_effettivo') | default('0') | float(0) | round(0) | int }}"
+        molto_vento: "{{ vento_val >= 18 }}"
+        spunto_rifiuti: >-
+          {% if profilo == 'Coppia' %}
+            {{ [
+              "Proponi una sfida all'ultimo sangue a morra cinese tra Utente 1 e Utente 2 per decidere chi dei due deve alzarsi dal divano per portare fuori il mastello.",
+              "Prendili in giro dicendo che fare finta di dormire sul divano o mimetizzarsi con i cuscini non farà sparire magicamente il bidone.",
+              "Scherza sul fatto che nemmeno i poteri magici di Harry Potter o le automazioni domotiche di Utente 1 possono teletrasportare la spazzatura in strada.",
+              "Fai una battuta dicendo che Gatto 2 e Gatto 1 hanno già votato all'unanimità: tocca agli umani uscire al fresco mentre loro presidiano il divano.",
+              "Scherza chiedendo chi dei due farà l'eroe della serata affrontando le scale con il sacchetto in mano."
+            ] | random }}
+          {% elif profilo == 'Utente 1' %}
+            {{ [
+              "Prendilo in giro dicendo che ha automatizzato tutta la casa ma non ha ancora costruito una catapulta smart o un drone per lanciare il mastello.",
+              "Scherza dicendogli di staccarsi un attimo dagli schermi e fare questi trenta secondi di cardio serale giù per le scale.",
+              "Fai una battuta dicendo che Dobby si rifiuta categoricamente di portare giù i bidoni, quindi tocca a lui."
+            ] | random }}
+          {% else %}
+            {{ [
+              "Prendila in giro chiedendole se vorrebbe usare l'incantesimo Wingardium Leviosa per far volare il bidone giù dalle scale senza uscire.",
+              "Scherza dicendo che una micro-passeggiata serale per esporre il mastello renderà il ritorno sotto la copertina sul divano ancora più bello.",
+              "Fai una battuta dicendo che Gatto 2 e Gatto 1 le fanno il tifo dalla finestra mentre compie la missione differenziata."
+            ] | random }}
+          {% endif %}
+        ai_prompt: >-
+          Sei l'assistente vocale di casa su Google Nest Hub Sala.
+          EVENTO: Ore 21:00 serali, promemoria raccolta differenziata spazzatura.
+          DESTINATARI: {{ 'Utente 1 e Utente 2 (in coppia chiamali Utente 1 e Utente 2, Cù e Pì, Pì e Cù oppure Utente 1 e Utente 2; VIETATO abbinare "Ste" e "La" insieme come "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La" o "La, Ste" perché nella sintesi vocale suona come "stela" o "laste"!)' if profilo == 'Coppia' else ('Utente 2 (nomignoli affettuosi: La, Utente 2 o Pì)' if profilo == 'Utente 2' else 'Utente 1 (nomignoli affettuosi: Ste o Cù)') }}.
+          STATO BIDONE STASERA: Stasera va esposto il bidone di: {{ nome_bidone }}.
+          SPUNTO CREATIVO DA USARE STASERA: {{ spunto_rifiuti }}
+          METEO ATTUALE FUORI:
+          - Temperatura: {{ temp_est_tts }} gradi ({{ 'FA FREDDO: avvisa di coprirsi bene!' if fa_freddo else 'Clima mite' }}).
+          - Pioggia: {{ "STA PIOVENDO IN QUESTO MOMENTO: avvisa di prendere l'ombrello per uscire!" if piove_ora else 'NON piove' }}.
+          - Vento: {{ 'TIRA MOLTO VENTO (' ~ vento_val ~ ' km/h): occhio che il bidone non voli via!' if molto_vento else 'Vento calmo' }}.
+
+          OBIETTIVO:
+          Genera un annuncio comico, sarcastico, vivace, vario ma utile:
+          1. Ricorda quale bidone va portato fuori stasera ({{ nome_bidone }}) sviluppando con brio lo SPUNTO CREATIVO indicato sopra (usa i nomi/nomignoli corretti; NON dire MAI "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La" o "La, Ste", e NON nominare cibo come Gricia, Carbonara o Babà!).
+          2. CONDIZIONI METEO TASSATIVE:
+          - {{ "Avvisa obbligatoriamente che fuori sta piovendo e serve l'ombrello." if piove_ora else 'NON menzionare la pioggia.' }}
+          - {{ 'Avvisa obbligatoriamente che tira molto vento (occhio ai bidoni che volano).' if molto_vento else 'NON menzionare il vento.' }}
+          - {{ 'Avvisa obbligatoriamente che fuori fa freddo e bisogna coprirsi bene.' if fa_freddo else 'NON menzionare il freddo.' }}
+
+          REGOLE TASSATIVE:
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia" né "Eco Home", di' semplicemente "a casa"). Usa solo il nome di battesimo o i nomignoli affettuosi.
+          - Temperature e numeri: Usa SOLO numeri interi per i gradi, MAI cifre con la virgola e MAI "e mezzo gradi".
+          - Lunghezza: tra 25 e 36 parole.
+          - Tono sarcastico, scherzoso ed energico.
+          - Niente emoji, non racchiudere la frase tra doppi apici, usa SEMPRE l'apostrofo normale (') nelle elisioni italiane (es. l'acqua, l'ombrello, l'aria, c'è, all'aperto; NON scrivere MAI "l acqua" o "l ombrello" staccato senza apostrofo!), parlato naturale italiano per sintesi vocale su Nest Hub Sala.
+
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "annuncio_rifiuti_sera"
+        instructions: "{{ ai_prompt }}"
+      response_variable: ai_rifiuti_resp
+      continue_on_error: true
+
+    - variables:
+        ai_battuta: >-
+          {% if ai_rifiuti_resp is defined and ai_rifiuti_resp is mapping and 'data' in ai_rifiuti_resp and (ai_rifiuti_resp.data | trim | length) > 20 %}
+            {{ ai_rifiuti_resp.data | trim }}
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        meteo_warn: >-
+          {% set parts = [] %}
+          {% if piove_ora %}{% set parts = parts + ["sta piovendo quindi prendete l'ombrello"] %}{% endif %}
+          {% if molto_vento %}{% set parts = parts + ['tira molto vento'] %}{% endif %}
+          {% if fa_freddo %}{% set parts = parts + ['fa parecchio freddo con ' ~ temp_est_tts ~ ' gradi'] %}{% endif %}
+          {% if parts | length > 0 %}
+            Fuori {{ parts | join(' e ') }}.
+          {% else %}
+            Fuori il clima è tranquillo.
+          {% endif %}
+        fallback_battuta: >-
+          {% if profilo == 'Coppia' %}
+            Ore ventuno: Utente 1 e Utente 2, stasera va esposto il bidone di {{ nome_bidone }}. {{ meteo_warn }} Chi dei due si sacrifica stasera per la missione bidone? Non fate finta di dormire!
+          {% elif profilo == 'Utente 1' %}
+            Ste, promemoria delle ventuno: stasera tocca al bidone di {{ nome_bidone }}. {{ meteo_warn }} Stacca gli occhi dagli schermi e vai a conferire prima che sia tardi!
+          {% else %}
+            La, promemoria delle ventuno: stasera c'è da portare fuori {{ nome_bidone }}. {{ meteo_warn }} Una veloce missione all'aperto prima del meritato relax serale!
+          {% endif %}
+        testo_finale: >-
+          {{ (ai_battuta if ai_battuta | length > 20 else fallback_battuta)
+             | replace('Eco Home', 'casa') | replace('Eco Home', 'casa')
+             | replace('Famiglia', '') | replace('Famiglia', '')
+             | replace('"', '')
+             | regex_replace('(?i)\\bSte\\s*(?:,\\s*|\\s+e\\s+|\\s+)La\\b', 'Utente 1 e Utente 2')
+             | regex_replace('(?i)\\bLa\\s*(?:,\\s*|\\s+e\\s+|\\s+)Ste\\b', 'Utente 2 e Utente 1')
+             | regex_replace('(?i)\\bC[uù]\\s*(?:,\\s*|\\s+e\\s+|\\s+)L[aà]\\b', 'Cù e Pì')
+             | regex_replace('(?i)\\bL[aà]\\s*(?:,\\s*|\\s+e\\s+|\\s+)C[uù]\\b', 'Pì e Cù')
+             | regex_replace('(\\d+)\\s+e\\s+mezzo\\s+gradi', '\\1 gradi')
+             | regex_replace('(\\d+)\\s*(?:virgola|\\.|,)\\s*\\d+', '\\1')
+             | regex_replace('\\b([lLdD])\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b(all|dall|dell|nell|sull|All|Dall|Dell|Nell|Sull)\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b([cC])\\s+(è|era|erano)\\b', "\\1'\\2")
+             | regex_replace('\\b([uU]n)\\s+(occhiata|eternità|ora|altra|idea|anima|emergenza)\\b', "\\1'\\2")
+             | trim }}
+        tv_on: "{{ is_state('media_player.tv_sala', 'on') }}"
+
+    # 1. NOTIFICHE PUSH SMARTPHONE
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ profilo in ['Utente 1', 'Coppia', 'Nessuno'] }}"
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "🗑️ Promemoria Spazzatura: {{ nome_bidone }}"
+                message: "{{ testo_finale }}"
+                data:
+                  tag: "promemoria_rifiuti"
+                  channel: "Casa"
+              continue_on_error: true
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ profilo in ['Utente 2', 'Coppia', 'Nessuno'] }}"
+          sequence:
+            - action: notify.mobile_app_smartphone_utente_2
+              data:
+                title: "🗑️ Promemoria Spazzatura: {{ nome_bidone }}"
+                message: "{{ testo_finale }}"
+                data:
+                  tag: "promemoria_rifiuti"
+                  channel: "Casa"
+              continue_on_error: true
+
+    # 2. ANNUNCIO VOCALE SU NEST HUB SALA (SE QUALCUNO È IN CASA)
+    - if:
+        - condition: template
+          value_template: "{{ profilo != 'Nessuno' }}"
+      then:
+        # 1. Prepara audio sala: alza Nest Hub all'80%, mette in pausa o abbassa/muta TV
+        - action: script.audio_annuncio_prepara
+          continue_on_error: true
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+              sequence:
+                - action: tts.speak
+                  target:
+                    entity_id: tts.home_assistant_cloud
+                  data:
+                    media_player_entity_id: media_player.nest_hub_sala
+                    message: "{{ testo_finale }}"
+                    language: "it-IT"
+                    options:
+                      voice: "it-IT-Wavenet-A"
+                  continue_on_error: true
+          default:
+            - action: tts.speak
+              target:
+                entity_id: tts.google_translate_it_lt
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                message: "{{ testo_finale }}"
+                language: "it"
+                options:
+                  tld: "it"
+              continue_on_error: true
+        - delay:
+            seconds: "{{ [7, ((testo_finale | length) / 10) | round(0, 'ceil') | int + 2] | max }}"
+        # 2. Ripristino audio sala: rimette play se era in pausa, ripristina volume TV precedente
+        - action: script.audio_annuncio_ripristina
+          continue_on_error: true
+
+notifica_smart:
+  alias: "Notifica Smart Eco Home"
+  icon: "mdi:bell-badge"
+  description: Motore unificato per l'invio intelligente di notifiche push prioritario sull'App Companion (Utente 1 & Utente 2)
+  mode: parallel
+  max: 20
+  fields:
+    titolo:
+      description: Titolo della notifica con eventuale emoji
+      example: ⚡ Allerta Blackout
+      required: true
+    messaggio:
+      description: Corpo del messaggio
+      example: Assorbimento oltre 6 kW! Spegnere i carichi pesanti.
+      required: true
+    canale:
+      description: "Canale di destinazione: 'tutti', 'tutti_telefoni', 'utente_1', 'utente_2'"
+      default: tutti
+    priorita:
+      description: "Livello di priorità: 'critica', 'alta', 'normale', 'bassa'"
+      default: normale
+    categoria:
+      description: "Categoria: 'sicurezza', 'energia', 'elettrodomestici', 'meteo', 'rifiuti', 'pet', 'generale'"
+      default: generale
+    immagine:
+      description: URL o percorso immagine / snapshot telecamera
+      example: /api/camera_proxy/camera.scale
+    azioni:
+      description: Pulsanti interattivi per smartphone (Actionable notifications)
+    tag:
+      description: Identificativo univoco facoltativo per raggruppamento o sostituzione (omettere per notifiche distinte)
+      example: blackout_alert
+  sequence:
+    - variables:
+        target_channel: >-
+          {% if canale is defined and canale not in ['', none] %}
+            {{ canale }}
+          {% else %}
+            tutti_telefoni
+          {% endif %}
+        cat: "{{ categoria | default('generale') }}"
+        prio: "{{ priorita | default('normale') }}"
+        is_critical: "{{ prio == 'critica' }}"
+        cat_enabled: >-
+          {% if is_critical %}true
+          {% elif states('input_boolean.notifiche_' ~ cat) in ['on', 'off'] %}
+            {{ is_state('input_boolean.notifiche_' ~ cat, 'on') }}
+          {% else %}true{% endif %}
+        should_send: "{{ cat_enabled }}"
+        click_target: >-
+          {% if url is defined and url not in ['', none] %}
+            {{ url }}
+          {% elif clickAction is defined and clickAction not in ['', none] %}
+            {{ clickAction }}
+          {% elif cat == 'sicurezza' %}
+            /eco-home/sicurezza
+          {% elif cat == 'meteo' %}
+            /eco-home/meteo
+          {% else %}
+            /eco-home/panoramica
+          {% endif %}
+        final_actions: >-
+          {% set ns = namespace(acts=[]) %}
+          {% if azioni is defined and azioni is iterable and azioni | length > 0 %}
+            {% for a in azioni %}
+              {% if a.uri is defined or a.url is defined or a.action in ['URI', 'APRI_SICUREZZA', 'APRI_METEO'] %}
+                {% set u = a.uri | default(a.url | default('/eco-home/sicurezza')) %}
+                {% set ns.acts = ns.acts + [{'action': 'URI', 'title': a.title, 'uri': u, 'url': u}] %}
+              {% else %}
+                {% set ns.acts = ns.acts + [{'action': a.action, 'title': a.title}] %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {{ ns.acts }}
+    - condition: template
+      value_template: "{{ should_send }}"
+    - parallel:
+        - sequence:
+            - condition: template
+              value_template: "{{ target_channel in ['tutti', 'tutti_telefoni', 'utente_1'] }}"
+            - action: notify.mobile_app_smartphone_utente_1
+              data:
+                title: "{{ titolo }}"
+                message: "{{ messaggio }}"
+                data:
+                  tag: "{{ tag if tag is defined and tag not in ['', none] else none }}"
+                  ttl: 0
+                  priority: "{% if is_critical or prio == 'alta' or cat in ['pet', 'sicurezza', 'energia', 'meteo', 'clima', 'elettrodomestici', 'pompa_calore'] %}high{% else %}normal{% endif %}"
+                  importance: "{% if is_critical or prio == 'alta' or cat in ['pet', 'sicurezza', 'energia', 'meteo', 'clima', 'elettrodomestici', 'pompa_calore'] %}high{% else %}high{% endif %}"
+                  channel: "{% if is_critical %}Allarmi Critici{% elif cat == 'meteo' %}Allerte Meteo{% elif cat == 'pet' %}Gattaiola e Pet Care{% elif cat == 'sicurezza' %}Sicurezza Casa{% elif cat in ['clima', 'pompa_calore', 'pdc'] %}Clima e Riscaldamento{% elif cat in ['elettrodomestici', 'elettrodomestico'] %}Elettrodomestici{% elif prio == 'alta' %}Importanti{% else %}Generale{% endif %}"
+                  alert_once: false
+                  image: "{{ immagine | default('') }}"
+                  clickAction: "{{ click_target }}"
+                  url: "{{ click_target }}"
+                  actions: "{{ final_actions }}"
+              continue_on_error: true
+        - sequence:
+            - condition: template
+              value_template: "{{ target_channel in ['tutti', 'tutti_telefoni', 'utente_2'] }}"
+            - action: notify.mobile_app_smartphone_utente_2
+              data:
+                title: "{{ titolo }}"
+                message: "{{ messaggio }}"
+                data:
+                  tag: "{{ tag if tag is defined and tag not in ['', none] else none }}"
+                  ttl: 0
+                  priority: "{% if is_critical or prio == 'alta' or cat in ['pet', 'sicurezza', 'energia', 'meteo', 'clima', 'elettrodomestici', 'pompa_calore'] %}high{% else %}normal{% endif %}"
+                  importance: "{% if is_critical or prio == 'alta' or cat in ['pet', 'sicurezza', 'energia', 'meteo', 'clima', 'elettrodomestici', 'pompa_calore'] %}high{% else %}high{% endif %}"
+                  channel: "{% if is_critical %}Allarmi Critici{% elif cat == 'meteo' %}Allerte Meteo{% elif cat == 'pet' %}Gattaiola e Pet Care{% elif cat == 'sicurezza' %}Sicurezza Casa{% elif cat in ['clima', 'pompa_calore', 'pdc'] %}Clima e Riscaldamento{% elif cat in ['elettrodomestici', 'elettrodomestico'] %}Elettrodomestici{% elif prio == 'alta' %}Importanti{% else %}Generale{% endif %}"
+                  alert_once: false
+                  image: "{{ immagine | default('') }}"
+                  clickAction: "{{ click_target }}"
+                  url: "{{ click_target }}"
+                  actions: "{{ final_actions }}"
+              continue_on_error: true
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.eco_home_ultimo_messaggio
+      data:
+        value: "{{ (titolo ~ ': ' ~ messaggio) | truncate(250, true, '') }}"
+      continue_on_error: true
+    - action: logbook.log
+      data:
+        name: "{{ titolo }}"
+        message: "{{ messaggio }}"
+        entity_id: script.notifica_smart
+      continue_on_error: true
+
+seleziona_accoglienza_ospite:
+  alias: "Ospiti: Seleziona Accoglienza One-Shot"
+  description: "Attiva o disattiva l'accoglienza personalizzata con toni dolci per l'ospite selezionato o personalizzato."
+  mode: single
+  fields:
+    ospite:
+      description: "Nome dell'ospite (Zia (Piano Superiore), Mamma, Familiare 2, Familiare 4, Familiare 5, Coppia Familiari 1, Familiare 6, Familiare 7, Coppia Familiari 2, Coppia Familiari 3, Familiare 13, Coppia Amici 1, Coppia Amici 2, Coppia Colleghi 1, Coppia Colleghi 2, Gruppo Ospiti Famiglia, Coppia Ospiti 1, Nessuno, Personalizzato)"
+      example: "Zia (Piano Superiore)"
+  sequence:
+    - variables:
+        attuale: "{{ states('input_text.ospite_in_attesa') }}"
+        target_name_raw: >-
+          {% if ospite == 'Personalizzato' %}
+            {{ states('input_text.ospite_personalizzato_nome') | trim }}
+          {% else %}
+            {{ ospite | trim }}
+          {% endif %}
+        target_name: >-
+          {% set cleaned = target_name_raw
+             | regex_replace('(?i)\\bde\\s+santis\\b', '')
+             | regex_replace('(?i)\\bserioli\\b', '')
+             | regex_replace('(?i)\\bmancini\\b', '')
+             | regex_replace('\\s+', ' ')
+             | trim %}
+          {% set parts = cleaned.split() %}
+          {% if parts | length == 0 %}
+            {{ '' }}
+          {% elif ',' in cleaned %}
+            {{ cleaned }}
+          {% elif parts | length >= 3 and parts[1] | lower == 'e' %}
+            {{ parts[0] ~ ' e ' ~ parts[2] }}
+          {% elif parts[0] | lower in ['zia', 'zio', 'nonna', 'nonno'] and parts | length >= 2 %}
+            {{ parts[0] ~ ' ' ~ parts[1] }}
+          {% else %}
+            {{ parts[0] }}
+          {% endif %}
+        nuovo: "{{ 'Nessuno' if (target_name == attuale or target_name in ['Nessuno', '']) else target_name }}"
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.ospite_in_attesa
+      data:
+        value: "{{ nuovo }}"
+    - if:
+        - condition: template
+          value_template: "{{ nuovo in ['Nessuno', 'Zia (Piano Superiore)', 'Mamma', 'Familiare 2', 'Familiare 4', 'Familiare 5', 'Coppia Familiari 1', 'Familiare 6', 'Familiare 7', 'Coppia Familiari 2', 'Coppia Familiari 3', 'Familiare 13', 'Coppia Amici 1', 'Coppia Amici 2', 'Coppia Colleghi 1', 'Coppia Colleghi 2', 'Gruppo Ospiti Famiglia', 'Coppia Ospiti 1'] }}"
+      then:
+        - action: input_select.select_option
+          target:
+            entity_id: input_select.accoglienza_ospite_one_shot
+          data:
+            option: "{{ nuovo }}"
+          continue_on_error: true
+      else:
+        - action: input_select.select_option
+          target:
+            entity_id: input_select.accoglienza_ospite_one_shot
+          data:
+            option: "Nessuno"
+          continue_on_error: true
+    - if:
+        - condition: template
+          value_template: "{{ nuovo != 'Nessuno' }}"
+      then:
+        - action: timer.start
+          target:
+            entity_id: timer.accoglienza_ospite_timeout
+          data:
+            duration: "02:00:00"
+      else:
+        - action: timer.cancel
+          target:
+            entity_id: timer.accoglienza_ospite_timeout
+          continue_on_error: true
+
+annuncio_ospite_ai:
+  alias: "Ospiti: Annuncio Vocale AI di Benvenuto su Nest Hub"
+  description: "Genera e riproduce tramite Google Gemini un benvenuto a toni dolcissimi, affettuosi e calorosi per l'ospite selezionato."
+  mode: single
+  fields:
+    ospite:
+      description: "Nome dell'ospite (Zia (Piano Superiore), Mamma, Familiare 2, Familiare 4, Familiare 5, Coppia Familiari 1, Familiare 6, Familiare 7, Coppia Familiari 2, Coppia Familiari 3, Familiare 13, Coppia Amici 1, Coppia Amici 2, Coppia Colleghi 1, Coppia Colleghi 2, Gruppo Ospiti Famiglia, Coppia Ospiti 1)"
+      example: "Zia (Piano Superiore)"
+  sequence:
+    - variables:
+        ospite_raw: "{{ (ospite | default('Ospite', true)) | trim }}"
+        ospite_nome: >-
+          {% set cleaned = ospite_raw
+             | regex_replace('(?i)\\bde\\s+santis\\b', '')
+             | regex_replace('(?i)\\bserioli\\b', '')
+             | regex_replace('(?i)\\bmancini\\b', '')
+             | regex_replace('\\s+', ' ')
+             | trim %}
+          {% set parts = cleaned.split() %}
+          {% if parts | length == 0 %}
+            Ospite
+          {% elif ',' in cleaned %}
+            {{ cleaned }}
+          {% elif parts | length >= 3 and parts[1] | lower == 'e' %}
+            {{ parts[0] ~ ' e ' ~ parts[2] }}
+          {% elif parts[0] | lower in ['zia', 'zio', 'nonna', 'nonno'] and parts | length >= 2 %}
+            {{ parts[0] ~ ' ' ~ parts[1] }}
+          {% else %}
+            {{ parts[0] }}
+          {% endif %}
+        temp_int: "{{ (states('sensor.temperatura_media') | default(states('sensor.temperatura_media_sala'), true) | float(21.0)) | round(0) | int }}"
+        temp_int_pronuncia: "{{ temp_int }}"
+        in_casa_ste_laura: "{{ is_state('person.utente_1', 'home') or is_state('person.utente_2', 'home') }}"
+        usa_nick_domenico: "{{ [false, false, true] | random }}"
+        desc_ospite: >-
+          {% if ospite_nome == 'Zia (Piano Superiore)' %}
+            Zia (Piano Superiore), la carissima zia di famiglia che abita al piano superiore ed è appena scesa a trovarci a casa nostra (e che il 29 ottobre 2026 si sposa con Familiare 4!).
+          {% elif ospite_nome == 'Mamma' %}
+            La Mamma (Familiare 1), persona speciale e dolcissima di casa, che amiamo tantissimo{% if not in_casa_ste_laura %} e che mentre Utente 1 e Utente 2 sono via è passata con tanto amore a dare un'occhiata a casa, alle gattine Gatto 1 e Gatto 2 e all'acquario{% else %} e che è venuta a trovarci{% endif %}.
+          {% elif ospite_nome == 'Familiare 2' %}
+            Familiare 2, il fratello di Utente 1, accolto con grandissimo affetto familiare a casa nostra{% if not in_casa_ste_laura %}, passato mentre Utente 1 e Utente 2 sono via a dare un'occhiata a casa, alle gattine Gatto 1 e Gatto 2 e all'acquario{% endif %}.
+          {% elif ospite_nome == 'Familiare 4' %}
+            Familiare 4, lo zio acquisito compagno di Zia (Piano Superiore) (che si sposano il 29 ottobre 2026!), accolto con grandissimo affetto familiare.
+          {% elif ospite_nome == 'Familiare 5' %}
+            Familiare 5, la carissima fidanzata di Familiare 2, accolta con grandissimo affetto familiare a casa nostra.
+          {% elif ospite_nome == 'Coppia Familiari 1' %}
+            Familiare 2 (il fratello di Utente 1) e la sua fidanzata Familiare 5, accolti con grandissimo affetto familiare a casa nostra{% if not in_casa_ste_laura %}, passati mentre Utente 1 e Utente 2 sono via a dare un'occhiata a casa, alle gattine Gatto 1 e Gatto 2 e all'acquario{% endif %}.
+          {% elif ospite_nome == 'Familiare 6' %}
+            Familiare 6, la dolcissima mamma di Utente 2, venuta da Roma a trovarci con tanto affetto.
+          {% elif ospite_nome == 'Familiare 7' %}
+            Familiare 7, il fratello minore di Utente 2, accolto a braccia aperte e con tantissimo affetto a casa nostra.
+          {% elif ospite_nome == 'Coppia Familiari 2' %}
+            Familiare 8 (la sorella di Utente 2) e suo marito Familiare 9, accolti con grandissima gioia e affetto familiare a casa nostra.
+          {% elif ospite_nome == 'Coppia Familiari 3' %}
+            Familiare 10 (il papà di Utente 2) e la sua compagna Familiare 11, venuti da Roma a trovarci e accolti con grandissimo affetto.
+          {% elif ospite_nome == 'Familiare 13' %}
+            Familiare 13, il cugino di Utente 1 e Familiare 2, accolto con grande piacere a casa nostra.
+          {% elif ospite_nome == 'Coppia Amici 1' %}
+            Coppia Amici 1, gli amici del cuore di Utente 1 e Utente 2 (Amico 1 ha anche celebrato ufficialmente il matrimonio di Utente 1 e Utente 2, e sono i genitori dei piccoli Bimbo 1 e Bimbo 2!), accolti con gioia immensa.
+          {% elif ospite_nome == 'Coppia Amici 2' %}
+            Amico 2 (testimone di nozze e amico fraterno di Utente 1) e Amica 2 (genitori della gatto_1 Bimba 1), venuti da lontano a trovarci e accolti con gioia immensa.
+          {% elif ospite_nome == 'Coppia Colleghi 1' %}
+            Coppia Colleghi 1, persone carissime e di famiglia, accolti con grandissimo affetto e stima a casa nostra.
+          {% elif ospite_nome == 'Coppia Colleghi 2' %}
+            Coppia Colleghi 2 (genitori del piccolo Bimbo 3 e della gatto_1 Bimba 2 nata da pochissimo il 14 ottobre 2026!), accolti con grandissimo affetto e gioia a casa nostra.
+          {% elif ospite_nome == 'Gruppo Ospiti Famiglia' %}
+            Ospite 1{% if usa_nick_domenico %} (chiamato con simpatia e affetto anche "il Ospite del Nord": nel saluto chiamalo pure "Ospite 1, il nostro Ospite del Nord"){% endif %} (figlio di zia Luciana sorella di nonno Sergio e di zio Antonio, cugino di primo grado di Mamma e di Zia (Piano Superiore)), sua moglie Ospite 2 e i loro figli Ospite 3 e Ospite 4, i carissimi parenti scesi dal Nord Italia (da Città Ospiti, in provincia di Brescia) dopo un lungo viaggio come nostri ospiti a casa (anche per festeggiare il matrimonio di Zia (Piano Superiore) e Familiare 4!), accolti a braccia aperte e con grandissima gioia nella casa che era di nonno Sergio e nonna Anna.
+          {% elif ospite_nome == 'Coppia Ospiti 1' %}
+            Ospite 1{% if usa_nick_domenico %} (chiamato con simpatia e affetto anche "il Ospite del Nord": nel saluto chiamalo pure "Ospite 1, il nostro Ospite del Nord"){% endif %} (cugino di Mamma e di Zia (Piano Superiore), figlio di zia Luciana sorella di nonno Sergio) e sua moglie Ospite 2, scesi da Città Ospiti (Brescia) come nostri carissimi parenti ospiti a casa nostra insieme a Ospite 3 e Ospite 4, accolti con grandissimo affetto e calore familiare.
+          {% elif ospite_nome == 'Ospite 1' %}
+            Ospite 1{% if usa_nick_domenico %} (chiamato con simpatia e affetto anche "il Ospite del Nord": nel saluto chiamalo pure "Ospite 1, il nostro Ospite del Nord"){% endif %} (cugino di Mamma e di Zia (Piano Superiore), figlio di zia Luciana sorella di nonno Sergio), venuto da Città Ospiti (Brescia) come carissimo parente ospite a casa nostra insieme a Ospite 2, Ospite 3 e Ospite 4, accolto con grandissimo affetto familiare.
+          {% elif ospite_nome == 'Ospite 2' %}
+            Ospite 2 (moglie di Ospite 1), venuta da Città Ospiti (Brescia) come carissima parente ospite a casa nostra insieme a Ospite 1, Ospite 3 e Ospite 4, accolta con grandissimo affetto familiare.
+          {% elif ospite_nome == 'Ospite 3' %}
+            Ospite 3 (figlia di Coppia Ospiti 1), venuta da Città Ospiti (Brescia) come carissima ospite di famiglia a casa nostra insieme a Ospite 1, Ospite 2 e Ospite 4, accolta con tantissimo affetto e simpatia.
+          {% elif ospite_nome == 'Ospite 4' %}
+            Ospite 4 (figlio di Coppia Ospiti 1), venuto da Città Ospiti (Brescia) come carissimo ospite di famiglia a casa nostra insieme a Ospite 1, Ospite 2 e Ospite 3, accolto con tantissimo affetto e simpatia.
+          {% else %}
+            {{ ospite_nome }}, carissimo ospite benvenuto a casa nostra.
+          {% endif %}
+        ai_prompt: >-
+          Sei l'assistente vocale di casa su Google Nest Hub Sala.
+          Chi è appena entrato dalla porta: {{ ospite_nome }} ({{ desc_ospite }}).
+          SITUAZIONE IN CASA:
+          {% if in_casa_ste_laura -%}
+          - Utente 1 e Utente 2 sono a casa pronti ad accoglierla/o/li.
+          - Le gattine Gatto 2 e Gatto 1 sono tranquille.
+          {% elif ospite_nome in ['Mamma', 'Familiare 2', 'Coppia Familiari 1'] -%}
+          - Utente 1 e Utente 2 in questo momento sono fuori casa / via, e {{ ospite_nome }} è passata/o/i a dare un'occhiata a casa, alle gattine Gatto 1 e Gatto 2 e ai pesciolini dell'acquario.
+          {% else -%}
+          - Le gattine Gatto 2 e Gatto 1 sono a casa tranquille.
+          {% endif %}
+          OBIETTIVO:
+          Formula un annuncio vocale di benvenuto ESTREMAMENTE DOLCE, CALOROSO, AFFETTUOSO E PREMUROSO per {{ ospite_nome }}:
+          1. Tono TASSATIVO: dolcissimo, gentile, pieno di affetto, accogliente e familiare. NESSUN sarcasmo, nessuna presa in giro.
+          2. Saluta calorosamente SOLO per nome ("{{ ospite_nome }}"{% if usa_nick_domenico and 'Ospite 1' in ospite_nome %}, chiamando con affetto Ospite 1 anche "il nostro Ospite del Nord"{% endif %}), {% if not in_casa_ste_laura and ospite_nome in ['Mamma', 'Familiare 2', 'Coppia Familiari 1'] %}ringraziando di cuore da parte di Utente 1 e Utente 2 per essere passati a prendersi cura di casa, di Gatto 1 e Gatto 2 e dell'acquario{% else %}esprimendo quanto sia bello e piacevole averla/o/li qui a casa con noi{% endif %}.
+          3. Invita con dolcezza a mettersi comoda/o/i e a sentirsi a casa.
+          
+          REGOLE TASSATIVE:
+          - DIVIETO ASSOLUTO DI COGNOMI: Non pronunciare MAI alcun cognome (non dire MAI "Famiglia", "Eco Home", "Famiglia" o "Famiglia", né alcun cognome dell'ospite; di' semplicemente "a casa" o "qui con noi").
+          - NON citare gradi o temperature.
+          - Lunghezza massima: tra 18 e 28 parole.
+          - Niente emoji, niente elenchi, niente preamboli, non racchiudere la frase tra doppi apici.
+          - APOSTROFI OBBLIGATORI: Usa SEMPRE l'apostrofo normale (') nelle elisioni italiane (es. l'acqua, l'acquario, un'occhiata, c'è; NON scrivere MAI "l acquario" o "l acqua" staccato senza apostrofo!).
+          - Italiano parlato naturale, dolce e melodico per Nest Hub Sala.
+    - action: ai_task.generate_data
+      target: {}
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "annuncio_ospite_dolce"
+        instructions: "{{ ai_prompt }}"
+      response_variable: ai_resp
+      continue_on_error: true
+    - variables:
+        ai_text: >-
+          {% if ai_resp is defined and ai_resp is mapping and 'data' in ai_resp and (ai_resp.data | trim | length) > 15 %}
+            {{ ai_resp.data | trim }}
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        fallback_text: >-
+          {% if ospite_nome == 'Zia (Piano Superiore)' %}
+            {{ [
+              'Benvenuta Zia (Piano Superiore)! Che gioia averti qui con noi. Mettiti comoda e sentiti a casa tua.',
+              'Ciao Zia (Piano Superiore), benvenuta! È sempre un piacere immenso quando passi a trovarci. Entra pure, mettiti comoda.',
+              'Carissima Zia (Piano Superiore), benvenuta a casa! Ci fa sempre tantissimo piacere vederti. Ben arrivata!'
+            ] | random }}
+          {% elif ospite_nome == 'Mamma' and not in_casa_ste_laura %}
+            {{ "Benvenuta mamma! Grazie di cuore da parte di Utente 1 e Utente 2 per essere passata a dare un'occhiata a casa, a Gatto 1, a Gatto 2 e all'acquario. Sentiti a casa tua!" }}
+          {% elif ospite_nome == 'Mamma' %}
+            {{ [
+              'Benvenuta mamma! Che bello averti qui con noi. Mettiti comoda e rilassati.',
+              'Ciao mamma, benvenuta! È una gioia grandissima vederti. Ti accogliamo a casa con tutto il cuore.',
+              'Ben arrivata mamma! Sentiti come sempre a casa tua. È sempre una festa averti qui.'
+            ] | random }}
+          {% elif ospite_nome == 'Familiare 2' and not in_casa_ste_laura %}
+            {{ "Ciao Familiare 2, benvenuto! Grazie di cuore da parte di Utente 1 e Utente 2 per essere passato a controllare casa, Gatto 1, Gatto 2 e l'acquario. Fai come fossi a casa tua!" }}
+          {% elif ospite_nome == 'Familiare 2' %}
+            {{ [
+              'Ciao Familiare 2, benvenuto a casa! È sempre un piacere enorme averti qui. Mettiti comodo e rilassati.',
+              'Benvenuto Familiare 2! Ti accogliamo a braccia aperte. Mettiti comodo, sei a casa tua.',
+              'Ciao Familiare 2, ben arrivato! È un piacere averti qui con noi oggi. Mettiti pure a tuo agio.'
+            ] | random }}
+          {% elif ospite_nome == 'Familiare 4' %}
+            {{ [
+              'Ciao Familiare 4, benvenuto a casa! È un vero piacere averti qui con noi. Mettiti comodo e fai come fossi a casa tua.',
+              'Benvenuto Familiare 4! Ti accogliamo con grandissimo affetto. Mettiti comodo e rilassati.',
+              'Ciao Familiare 4, ben arrivato! Felici di averti qui. Sentiti assolutamente a casa.'
+            ] | random }}
+          {% elif ospite_nome == 'Familiare 5' %}
+            {{ 'Ciao Familiare 5, benvenuta a casa! È una gioia grandissima averti qui con noi. Mettiti comoda e sentiti a casa tua!' }}
+          {% elif ospite_nome == 'Coppia Familiari 1' and not in_casa_ste_laura %}
+            {{ "Ciao Coppia Familiari 1, benvenuti! Grazie di cuore da parte di Utente 1 e Utente 2 per essere passati a dare un'occhiata a casa, a Gatto 1, a Gatto 2 e all'acquario!" }}
+          {% elif ospite_nome == 'Coppia Familiari 1' %}
+            {{ 'Ciao Coppia Familiari 1, benvenuti a casa! Che bello avervi qui con noi, mettetevi comodi e sentitevi a casa vostra!' }}
+          {% elif ospite_nome == 'Familiare 6' %}
+            {{ 'Benvenuta Familiare 6! Che gioia immensa averti qui a casa con noi. Mettiti comoda e rilassati!' }}
+          {% elif ospite_nome == 'Familiare 7' %}
+            {{ 'Ciao Familiare 7, benvenuto a casa! È sempre una festa averti qui con noi. Mettiti comodo e sentiti a casa tua!' }}
+          {% elif ospite_nome == 'Coppia Familiari 2' %}
+            {{ 'Ciao Coppia Familiari 2, benvenuti a casa! Che gioia grandissima avervi qui con noi oggi, mettetevi comodi!' }}
+          {% elif ospite_nome == 'Coppia Familiari 3' %}
+            {{ 'Benvenuti Coppia Familiari 3! È un piacere immenso avervi qui a casa con noi. Mettetevi comodi e sentitevi a casa!' }}
+          {% elif ospite_nome == 'Coppia Amici 1' %}
+            {{ 'Ciao Coppia Amici 1, benvenuti a casa! Che festa avervi qui con noi insieme ai piccoli, mettetevi comodi e sentitevi a casa vostra!' }}
+          {% elif ospite_nome == 'Coppia Amici 2' %}
+            {{ 'Ciao Coppia Amici 2, benvenuti a casa! Che gioia immensa avervi qui con noi dopo il viaggio, mettetevi comodi!' }}
+          {% elif ospite_nome == 'Coppia Colleghi 1' %}
+            {{ 'Benvenuti Coppia Colleghi 1! È un onore e una gioia grandissima avervi qui a casa con noi. Mettetevi comodi e sentitevi a casa!' }}
+          {% elif ospite_nome == 'Coppia Colleghi 2' %}
+            {{ 'Ciao Coppia Colleghi 2, benvenuti a casa! Che gioia immensa avervi qui con noi e con i piccoli Bimbo 3 e Bimba 2, mettetevi comodi!' }}
+          {% elif ospite_nome == 'Gruppo Ospiti Famiglia' %}
+            {{ 'Benvenuti a Ospite 1, il nostro Ospite del Nord, e a Ospite 2, Ospite 3 e Ospite 4! Che gioia immensa avervi qui a casa con noi! Mettetevi comodi e sentitevi davvero a casa vostra!' if usa_nick_domenico else 'Benvenuti Gruppo Ospiti Famiglia! Che gioia immensa avervi qui a casa con noi! Mettetevi comodi e sentitevi davvero a casa vostra!' }}
+          {% elif ospite_nome == 'Coppia Ospiti 1' %}
+            {{ 'Benvenuti a Ospite 1, il nostro Ospite del Nord, e a Ospite 2! È una gioia grandissima avervi qui a casa con noi. Mettetevi comodi e sentitevi a casa vostra!' if usa_nick_domenico else 'Benvenuti Coppia Ospiti 1! È una gioia grandissima avervi qui a casa con noi. Mettetevi comodi e sentitevi a casa vostra!' }}
+          {% elif ospite_nome == 'Ospite 1' %}
+            {{ 'Ciao Ospite 1, il nostro Ospite del Nord, benvenuto a casa! È un piacere immenso averti qui con noi. Mettiti comodo e sentiti a casa tua!' if usa_nick_domenico else 'Ciao Ospite 1, benvenuto a casa! È un piacere immenso averti qui con noi. Mettiti comodo e sentiti a casa tua!' }}
+          {% elif ospite_nome == 'Ospite 2' %}
+            {{ 'Ciao Ospite 2, benvenuta a casa! Che gioia averti qui con noi. Mettiti comoda e sentiti a casa tua!' }}
+          {% elif ospite_nome == 'Ospite 3' %}
+            {{ 'Ciao Ospite 3, benvenuta a casa! Che bello averti qui con noi. Mettiti comoda e sentiti a casa tua!' }}
+          {% elif ospite_nome == 'Ospite 4' %}
+            {{ 'Ciao Ospite 4, benvenuto a casa! Che bello averti qui con noi. Mettiti comodo e sentiti a casa tua!' }}
+          {% elif ' e ' in ospite_nome %}
+            {{ 'Benvenuti ' ~ ospite_nome ~ '! È un vero piacere avervi qui a casa con noi. Mettetevi comodi e rilassatevi.' }}
+          {% else %}
+            {{ 'Benvenuto ' ~ ospite_nome ~ '! È un vero piacere averti qui a casa con noi. Mettiti comodo e rilassati.' }}
+          {% endif %}
+        testo_finale: >-
+          {{ (ai_text if ai_text | length > 15 else fallback_text)
+             | replace('Eco Home', 'casa') | replace('Eco Home', 'casa')
+             | replace('Famiglia', '') | replace('Famiglia', '')
+             | regex_replace('(?i)\\bde\\s+santis\\b', '')
+             | regex_replace('(?i)\\bserioli\\b', '')
+             | replace('"', '')
+             | regex_replace('(\\d+)\\s+e\\s+mezzo\\s+gradi', '\\1 gradi')
+             | regex_replace('(\\d+)\\s*(?:virgola|\\.|,)\\s*\\d+', '\\1')
+             | regex_replace('\\b([lLdD])\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b(all|dall|dell|nell|sull|All|Dall|Dell|Nell|Sull)\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+             | regex_replace('\\b([cC])\\s+(è|era|erano)\\b', "\\1'\\2")
+             | regex_replace('\\b([uU]n)\\s+(occhiata|eternità|ora|altra|idea|anima|emergenza)\\b', "\\1'\\2")
+             | trim }}
+    # 1. Prepara audio sala: alza Nest Hub all'80%, mette in pausa o abbassa/muta TV
+    - action: script.audio_annuncio_prepara
+      continue_on_error: true
+    # 2. Sintesi vocale su Nest Hub Sala
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.home_assistant_cloud
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                message: "{{ testo_finale }}"
+                language: "it-IT"
+                options:
+                  voice: "it-IT-Wavenet-A"
+              continue_on_error: true
+      default:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            message: "{{ testo_finale }}"
+            language: "it"
+            options:
+              tld: "it"
+          continue_on_error: true
+    # 3. Attesa fine annuncio
+    - delay:
+        seconds: "{{ [8, ((testo_finale | length) / 10) | round(0, 'ceil') | int + 2] | max }}"
+    # 4. Ripristino audio sala: rimette play se era in pausa, ripristina volume TV precedente
+    - action: script.audio_annuncio_ripristina
+      continue_on_error: true
+
+audio_annuncio_prepara:
+  alias: "Audio: Prepara Sala per Annuncio (80% + Pausa/Abbassa TV)"
+  description: "Alza Nest Hub all'80%, mette in pausa e abbassa/muta la TV Samsung, Soundbar e Cast prima dell'annuncio (solo se Nest Hub Sala è online)."
+  mode: single
+  sequence:
+    # Se Nest Hub Sala è offline/unavailable, NON mutare la TV!
+    - condition: template
+      value_template: "{{ states('media_player.nest_hub_sala') not in ['unavailable', 'unknown'] }}"
+    - variables:
+        gia_in_corso: "{{ is_state('input_boolean.audio_annuncio_in_corso', 'on') }}"
+        samsung_on: "{{ is_state('media_player.tv_sala_principale', 'on') or is_state('media_player.tv_sala_principale', 'playing') or is_state('media_player.sala_ultra_slim_soundbar', 'on') or is_state('media_player.sala_tv_sala', 'on') }}"
+        samsung_tv_on: "{{ is_state('media_player.tv_sala_principale', 'on') or is_state('media_player.tv_sala_principale', 'playing') }}"
+        soundbar_on: "{{ is_state('media_player.sala_ultra_slim_soundbar', 'on') }}"
+        samsung_playing: "{{ is_state('media_player.tv_sala_principale', 'playing') }}"
+        raw_vol: "{{ state_attr('media_player.sala_ultra_slim_soundbar', 'volume_level') | default(state_attr('media_player.tv_sala_principale', 'volume_level'), true) | float(0.13) }}"
+        samsung_vol: "{{ raw_vol if raw_vol >= 0.05 else (states('input_number.tv_volume_precedente') | float(0.13)) }}"
+        cast_on: "{{ not is_state('media_player.tv_sala', 'off') and not is_state('media_player.tv_sala', 'unavailable') }}"
+        cast_playing: "{{ is_state('media_player.tv_sala', 'playing') }}"
+        vol_annuncio: "{{ 0.35 if (now().hour >= 23 or now().hour < 7) else 0.80 }}"
+
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.audio_annuncio_in_corso
+      continue_on_error: true
+
+    - if:
+        - condition: template
+          value_template: "{{ not gia_in_corso }}"
+      then:
+        - if:
+            - condition: template
+              value_template: "{{ cast_playing or samsung_playing }}"
+          then:
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.tv_era_in_riproduzione
+              continue_on_error: true
+          else:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.tv_era_in_riproduzione
+              continue_on_error: true
+
+        - if:
+            - condition: template
+              value_template: "{{ samsung_on or cast_on }}"
+          then:
+            - action: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.tv_era_accesa
+              continue_on_error: true
+            - action: input_number.set_value
+              target:
+                entity_id: input_number.tv_volume_precedente
+              data:
+                value: "{{ samsung_vol }}"
+              continue_on_error: true
+          else:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.tv_era_accesa
+              continue_on_error: true
+
+    # 1. Metti in pausa se possibile (Cast o Samsung TV)
+    - if:
+        - condition: template
+          value_template: "{{ cast_playing }}"
+      then:
+        - action: media_player.media_pause
+          target:
+            entity_id: media_player.tv_sala
+          continue_on_error: true
+      continue_on_error: true
+
+    - if:
+        - condition: template
+          value_template: "{{ samsung_playing }}"
+      then:
+        - action: media_player.media_pause
+          target:
+            entity_id: media_player.tv_sala_principale
+          continue_on_error: true
+      continue_on_error: true
+
+    # 2. Muta la Soundbar (senza inviare KEY_MUTE toggle a tv_sala_ue85du7170uxzt per evitare rimbalzi CEC)
+    - if:
+        - condition: template
+          value_template: "{{ soundbar_on }}"
+      then:
+        - action: media_player.volume_mute
+          target:
+            entity_id: media_player.sala_ultra_slim_soundbar
+          data:
+            is_volume_muted: true
+          continue_on_error: true
+      else:
+        - if:
+            - condition: template
+              value_template: "{{ samsung_tv_on and not is_state_attr('media_player.tv_sala_principale', 'is_volume_muted', true) }}"
+          then:
+            - action: media_player.volume_mute
+              target:
+                entity_id: media_player.tv_sala_principale
+              data:
+                is_volume_muted: true
+              continue_on_error: true
+      continue_on_error: true
+
+    - if:
+        - condition: template
+          value_template: "{{ cast_on }}"
+      then:
+        - action: media_player.volume_mute
+          target:
+            entity_id: media_player.tv_sala
+          data:
+            is_volume_muted: true
+          continue_on_error: true
+      continue_on_error: true
+
+    # 3. Accendi Nest Hub Sala, togli mute e imposta volume tassativamente all'80%
+    - action: media_player.turn_on
+      target:
+        entity_id: media_player.nest_hub_sala
+      continue_on_error: true
+    - action: media_player.volume_mute
+      target:
+        entity_id: media_player.nest_hub_sala
+      data:
+        is_volume_muted: false
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_sala
+      data:
+        volume_level: "{{ vol_annuncio }}"
+      continue_on_error: true
+    - delay:
+        milliseconds: 800
+
+audio_annuncio_ripristina:
+  alias: "Audio: Ripristina Sala dopo Annuncio"
+  description: "Ripristina il volume precedente della Soundbar/TV, toglie il mute e rimette in play se era in pausa."
+  mode: single
+  sequence:
+    - variables:
+        annuncio_attivo: "{{ is_state('input_boolean.audio_annuncio_in_corso', 'on') }}"
+        era_accesa: "{{ is_state('input_boolean.tv_era_accesa', 'on') }}"
+        era_in_play: "{{ is_state('input_boolean.tv_era_in_riproduzione', 'on') }}"
+        raw_vol_prec: "{{ states('input_number.tv_volume_precedente') | float(0.13) }}"
+        vol_precedente: "{{ raw_vol_prec if raw_vol_prec >= 0.05 else 0.13 }}"
+        cast_on: "{{ not is_state('media_player.tv_sala', 'off') and not is_state('media_player.tv_sala', 'unavailable') }}"
+
+    - if:
+        - condition: template
+          value_template: "{{ annuncio_attivo and era_accesa }}"
+      then:
+        # 1. Togli il mute e ripristina il volume ESCLUSIVAMENTE sulla Soundbar (evitando KEY_MUTE toggle su tv_sala_ue85du7170uxzt)
+        - action: media_player.volume_mute
+          target:
+            entity_id: media_player.sala_ultra_slim_soundbar
+          data:
+            is_volume_muted: false
+          continue_on_error: true
+        - action: media_player.volume_set
+          target:
+            entity_id: media_player.sala_ultra_slim_soundbar
+          data:
+            volume_level: "{{ vol_precedente }}"
+          continue_on_error: true
+        - if:
+            - condition: template
+              value_template: "{{ cast_on }}"
+          then:
+            - action: media_player.volume_mute
+              target:
+                entity_id: media_player.tv_sala
+              data:
+                is_volume_muted: false
+              continue_on_error: true
+      continue_on_error: true
+
+    - if:
+        - condition: template
+          value_template: "{{ annuncio_attivo and era_in_play }}"
+      then:
+        - action: media_player.media_play
+          target:
+            entity_id:
+              - media_player.tv_sala
+              - media_player.tv_sala_principale
+          continue_on_error: true
+      continue_on_error: true
+
+    - action: input_boolean.turn_off
+      target:
+        entity_id:
+          - input_boolean.audio_annuncio_in_corso
+          - input_boolean.tv_era_accesa
+          - input_boolean.tv_era_in_riproduzione
+      continue_on_error: true
+
+aggiornamento_traffico_utente_2_camera:
+  alias: "Traffico Utente 2: Aggiornamento Ore 07:20 Nest Hub Camera"
+  icon: "mdi:car-clock"
+  mode: single
+  sequence:
+    - variables:
+        laura_home: "{{ is_state('binary_sensor.utente_2_a_casa', 'on') }}"
+        traffico_segnalato: "{{ is_state('input_boolean.buongiorno_traffico_segnalato', 'on') }}"
+    - condition: template
+      value_template: "{{ laura_home and traffico_segnalato }}"
+    - action: homeassistant.update_entity
+      target:
+        entity_id: sensor.tempo_viaggio_laura_no_autostrada
+      continue_on_error: true
+    - delay:
+        seconds: 2
+    - variables:
+        dur_no_toll: "{{ states('sensor.tempo_viaggio_laura_no_autostrada') | float(0) | round(0) }}"
+        dur_std_no_toll: 68
+        minuti_stimati: "{{ dur_no_toll if dur_no_toll > 20 else 70 }}"
+        diff_minuti: "{{ [0, minuti_stimati - dur_std_no_toll] | max }}"
+        testo_camera: >-
+          Utente 2, aggiornamento traffico delle 7 e 20: senza autostrada verso Via Ufficio Centrale ci vorranno circa {{ minuti_stimati }} minuti{% if diff_minuti >= 7 %}, con circa {{ diff_minuti }} minuti di rallentamento rispetto al solito{% else %}, con scorrimento regolare{% endif %}.
+    - action: media_player.turn_on
+      target:
+        entity_id: media_player.nest_hub_camera
+      continue_on_error: true
+    - action: media_player.volume_mute
+      target:
+        entity_id: media_player.nest_hub_camera
+      data:
+        is_volume_muted: false
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_camera
+      data:
+        volume_level: 0.80
+      continue_on_error: true
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.home_assistant_cloud
+              data:
+                media_player_entity_id: media_player.nest_hub_camera
+                message: "{{ testo_camera }}"
+                language: "it-IT"
+                options:
+                  voice: "it-IT-Wavenet-A"
+              continue_on_error: true
+      default:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_camera
+            message: "{{ testo_camera }}"
+            language: "it"
+            options:
+              tld: "it"
+          continue_on_error: true
+
+aggiornamento_traffico_utente_2_sala:
+  alias: "Traffico Utente 2: Aggiornamento Ore 07:40 Nest Hub Sala"
+  icon: "mdi:car-clock"
+  mode: single
+  sequence:
+    - variables:
+        laura_home: "{{ is_state('binary_sensor.utente_2_a_casa', 'on') }}"
+        traffico_segnalato: "{{ is_state('input_boolean.buongiorno_traffico_segnalato', 'on') }}"
+    - condition: template
+      value_template: "{{ laura_home and traffico_segnalato }}"
+    - action: homeassistant.update_entity
+      target:
+        entity_id: sensor.tempo_viaggio_laura_no_autostrada
+      continue_on_error: true
+    - delay:
+        seconds: 2
+    - variables:
+        dur_no_toll: "{{ states('sensor.tempo_viaggio_laura_no_autostrada') | float(0) | round(0) }}"
+        dur_std_no_toll: 68
+        minuti_stimati: "{{ dur_no_toll if dur_no_toll > 20 else 70 }}"
+        diff_minuti: "{{ [0, minuti_stimati - dur_std_no_toll] | max }}"
+        testo_sala: >-
+          Utente 2, ultimo controllo traffico delle 7 e 40: senza autostrada il tragitto per Via Ufficio Centrale è di circa {{ minuti_stimati }} minuti{% if diff_minuti >= 7 %}, con circa {{ diff_minuti }} minuti di ritardo accumulato{% else %}, scorrevole senza intoppi particolari{% endif %}. Buon viaggio!
+    - action: script.audio_annuncio_prepara
+      continue_on_error: true
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.home_assistant_cloud
+              data:
+                media_player_entity_id: media_player.nest_hub_sala
+                message: "{{ testo_sala }}"
+                language: "it-IT"
+                options:
+                  voice: "it-IT-Wavenet-A"
+              continue_on_error: true
+      default:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_sala
+            message: "{{ testo_sala }}"
+            language: "it"
+            options:
+              tld: "it"
+          continue_on_error: true
+    - delay:
+        seconds: "{{ [8, ((testo_sala | length) / 10) | round(0, 'ceil') | int + 2] | max }}"
+    - action: script.audio_annuncio_ripristina
+      continue_on_error: true
+
+sveglia_cameretta_annuncio_meteo:
+  alias: "Sveglia Cameretta: Annuncio Temperatura e Meteo"
+  icon: "mdi:alarm"
+  mode: single
+  sequence:
+    - action: weather.get_forecasts
+      target:
+        entity_id:
+          - weather.meteoam_home
+          - weather.casa
+      data:
+        type: daily
+      response_variable: meteo_daily
+      continue_on_error: true
+    - variables:
+        giorno_settimana: "{{ ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'][now().weekday()] }}"
+        fc_daily: >-
+          {{ meteo_daily['weather.casa'].forecast if meteo_daily is defined and 'weather.casa' in meteo_daily and meteo_daily['weather.casa'].forecast | length > 0
+          else (meteo_daily['weather.meteoam_home'].forecast if meteo_daily is defined and 'weather.meteoam_home' in meteo_daily and meteo_daily['weather.meteoam_home'].forecast | length > 0
+          else []) if meteo_daily is defined else [] }}
+        cond_map: >-
+          {{ {
+            'sunny': 'soleggiato',
+            'clear-night': 'sereno',
+            'partlycloudy': 'parzialmente nuvoloso',
+            'cloudy': 'nuvoloso',
+            'rainy': 'piovoso',
+            'pouring': 'pioggia battente',
+            'lightning': 'temporalesco',
+            'lightning-rainy': 'temporale con pioggia',
+            'fog': 'nebbioso',
+            'windy': 'ventoso',
+            'windy-variant': 'molto ventoso',
+            'snowy': 'nevoso',
+            'snowy-rainy': 'misto pioggia e neve',
+            'hail': 'grandine'
+          } }}
+        temp_est: "{{ states('sensor.meteo_temperatura_esterna_effettiva') | default('16') }}"
+        temp_est_tts: "{{ temp_est | float(16) | round(0) | int }}"
+        condizione_raw: "{{ states('sensor.meteo_condizione_effettiva') | default('cloudy') }}"
+        condizione: "{{ cond_map.get(condizione_raw, condizione_raw) }}"
+        today_fc: "{{ fc_daily[0] if fc_daily | length > 0 else {} }}"
+        prev_max: "{{ (today_fc.temperature if today_fc.temperature is defined else (states('sensor.meteo_previsione_temperatura_massima') | float(20))) | round(0) | int }}"
+        prev_min: "{{ (today_fc.templow if today_fc.templow is defined else (states('sensor.meteo_previsione_temperatura_minima') | float(12))) | round(0) | int }}"
+        cond_oggi_raw: "{{ today_fc.condition | default(condizione_raw) }}"
+        cond_oggi: "{{ cond_map.get(cond_oggi_raw, cond_oggi_raw) }}"
+        prob_pioggia: "{{ (today_fc.precipitation_probability | default(0)) | round(0) | int }}"
+        pluvio_raw: "{{ states('sensor.terrazza_pulvirometro_precipitazioni_oggi') }}"
+        pluvio_mm: "{{ (pluvio_raw | float(0) | round(1)) if pluvio_raw not in ['unavailable', 'unknown', 'none', ''] else 0.0 }}"
+        pluvio_mm_tts: "{{ [1, (pluvio_mm | float(0) | round(0) | int)] | max }}"
+        ha_piovuto: "{{ (pluvio_mm | float(0)) > 0.1 or is_state('input_boolean.meteo_pioggia_notturna_rilevata', 'on') }}"
+        frase_pioggia_notte: >-
+          {% if ha_piovuto and (pluvio_mm | float(0)) > 0.1 %}
+             Questa notte ha piovuto, con circa {{ pluvio_mm_tts }} millimetri registrati dal pluviometro.
+          {% elif ha_piovuto %}
+             Questa notte ha piovuto e l'asfalto è bagnato.
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        usa_nick_domenico: "{{ [false, false, true] | random }}"
+        saluto_sveglia: >-
+          {% if is_state('input_boolean.modalita_ospiti_cameretta', 'on') %}
+            {{ 'Buongiorno a Ospite 1 il Ospite del Nord, e a Ospite 2, Ospite 3 e Ospite 4!' if usa_nick_domenico else 'Buongiorno Gruppo Ospiti Famiglia!' }}
+          {% else %}
+            Buongiorno!
+          {% endif %}
+        frase_ospiti_matrimonio: >-
+          {% if now().month == 10 and now().day == 29 %}
+             Oggi è il grande giorno del matrimonio di Zia (Piano Superiore) e Familiare 4, auguri di cuore e buona festa a tutti!
+          {% elif is_state('input_boolean.modalita_ospiti_cameretta', 'on') %}
+             Speriamo abbiate riposato benissimo, fate come se foste a casa vostra!
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        testo_sveglia: >-
+          {{ saluto_sveglia }} Sono le {{ now().strftime('%H:%M') }} di {{ giorno_settimana }}. Fuori ci sono attualmente {{ temp_est_tts }} gradi con cielo {{ condizione }}.{{ frase_pioggia_notte }} Per la giornata di oggi è previsto cielo {{ cond_oggi }}, con temperature tra i {{ prev_min }} e i {{ prev_max }} gradi e probabilità di pioggia del {{ prob_pioggia }} percento.{{ frase_ospiti_matrimonio }} Buona giornata!
+    - action: media_player.turn_on
+      target:
+        entity_id: media_player.nest_hub_cameretta
+      continue_on_error: true
+    - action: media_player.volume_mute
+      target:
+        entity_id: media_player.nest_hub_cameretta
+      data:
+        is_volume_muted: false
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_cameretta
+      data:
+        volume_level: 0.65
+      continue_on_error: true
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.home_assistant_cloud
+              data:
+                media_player_entity_id: media_player.nest_hub_cameretta
+                message: "{{ testo_sveglia }}"
+                language: "it-IT"
+                options:
+                  voice: "it-IT-Wavenet-A"
+              continue_on_error: true
+      default:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_cameretta
+            message: "{{ testo_sveglia }}"
+            language: "it"
+            options:
+              tld: "it"
+          continue_on_error: true
+
+pillola_sarcastica_nesthub:
+  alias: "Pillole Sarcastiche Random su Nest Hub (Voce Femminile)"
+  description: "Riproduce pillole vocali spontanee, random e sarcastiche sui Nest Hub con voce femminile (silenzio in sala, buio e tapparelle chiuse, TV accesa da ore, TV spenta da ore, ora di andare a letto alle 23, o presa in giro spontanea)."
+  icon: "mdi:emoticon-devil-outline"
+  mode: single
+  fields:
+    tema:
+      description: "Tema della pillola (auto, silenzio_sala, buio_vampiri, tv_maratona, tv_spenta, ora_nanna_23, random_spontaneo)"
+      example: "auto"
+      default: "auto"
+  sequence:
+    - variables:
+        wd: "{{ now().weekday() }}"
+        ora: "{{ now().hour }}"
+        minuto: "{{ now().minute }}"
+        finestra_oraria_valida: >-
+          {% if ora >= 23 %}
+            false
+          {% elif wd in [5, 6] and ora < 11 %}
+            false
+          {% elif wd in [0, 1, 2, 3, 4] and ora < 9 %}
+            false
+          {% else %}
+            true
+          {% endif %}
+        cinema_attivo: >-
+          {{ is_state('input_boolean.modalita_cinema_attiva', 'on') or
+             (is_state('light.luce_ambiente_sala', 'on') and
+              is_state('light.luce_mensole_camino', 'on') and
+              (state_attr('light.luce_ambiente_sala', 'brightness') | int(255) <= 65) and
+              (state_attr('light.luce_mensole_camino', 'brightness') | int(255) <= 65) and
+              is_state('light.luce_sala_2', 'off') and
+              is_state('light.luce_cucina', 'off')) }}
+        stefano_home: "{{ is_state('binary_sensor.utente_1_a_casa', 'on') }}"
+        laura_home: "{{ is_state('binary_sensor.utente_2_a_casa', 'on') }}"
+        almeno_uno_in_casa: "{{ stefano_home or laura_home }}"
+
+    - condition: template
+      value_template: >-
+        {{ finestra_oraria_valida and
+           (not cinema_attivo) and
+           almeno_uno_in_casa and
+           is_state('input_boolean.pillole_sarcastiche_nesthub', 'on') and
+           is_state('input_boolean.modalita_ospiti_cameretta', 'off') }}
+
+    - variables:
+        chi_in_casa: >-
+          {% if stefano_home and laura_home %}
+            Coppia
+          {% elif stefano_home %}
+            Utente 1
+          {% else %}
+            Utente 2
+          {% endif %}
+        nomi_target: >-
+          {% if chi_in_casa == 'Coppia' %}
+            Utente 1 e Utente 2 (chiamali affettuosamente Utente 1 e Utente 2, Cù e Pì, Pì e Cù oppure Utente 1 e Utente 2; VIETATO abbinare "Ste" e "La" insieme come "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La", "La, Ste" o "Cù e Là" perché nella sintesi vocale suona come "stela" o "laste"!)
+          {% elif chi_in_casa == 'Utente 1' %}
+            Utente 1 (chiamalo affettuosamente Ste, Cù oppure Utente 1; è in casa da solo mentre Utente 2 è fuori)
+          {% else %}
+            Utente 2 (chiamala affettuosamente La, Utente 2, Pì oppure Utente 2; è in casa da sola mentre Utente 1 è fuori)
+          {% endif %}
+        saluto_fallback: >-
+          {% if chi_in_casa == 'Coppia' %}
+            {{ ['Ehi Cù e Pì', 'Ohi Utente 1 e Utente 2', 'Ehi voi due', 'Ehi Pì e Cù'][range(0, 4) | random] }}
+          {% elif chi_in_casa == 'Utente 1' %}
+            {{ ['Ehi Utente 1', 'Ohi Cù', 'Ehi Utente 1'][range(0, 3) | random] }}
+          {% else %}
+            {{ ['Ehi Utente 2', 'Ohi Pì', 'Ehi Utente 2', 'Ehi Utente 2'][range(0, 4) | random] }}
+          {% endif %}
+        noise_db: "{{ states('sensor.sala_stazione_meteo_sala_noise_2') | int(45) }}"
+        luci_accese: "{{ states('sensor.numero_luci_accese') | int(0) }}"
+        tapparelle_aperte: "{{ states('sensor.numero_tapparelle_aperte') | int(0) }}"
+        tv_on: "{{ is_state('media_player.tv_sala_principale', 'on') or is_state('media_player.tv_sala_principale', 'playing') or not is_state('media_player.tv_sala', 'off') }}"
+        tv_ore_stato: >-
+          {% if states.media_player.tv_sala_principale is defined and states.media_player.tv_sala_principale.last_changed is defined %}
+            {{ ((now() - states.media_player.tv_sala_principale.last_changed).total_seconds() / 3600) | round(1) }}
+          {% else %}
+            1.0
+          {% endif %}
+        tema_scelto: >-
+          {% set t = tema | default('auto') %}
+          {% if t != 'auto' %}
+            {{ t }}
+          {% elif ora == 22 and minuto >= 40 and is_state('input_boolean.pillola_ora_nanna_23', 'on') %}
+            ora_nanna_23
+          {% elif luci_accese == 0 and tapparelle_aperte == 0 and is_state('input_boolean.pillola_buio_tapparelle', 'on') %}
+            buio_vampiri
+          {% elif tv_on and (tv_ore_stato | float(0)) >= 3.0 and is_state('input_boolean.pillola_tv_maratona', 'on') %}
+            tv_maratona
+          {% elif noise_db <= 41 and is_state('input_boolean.pillola_silenzio_sala', 'on') %}
+            silenzio_sala
+          {% elif (not tv_on) and (tv_ore_stato | float(0)) >= 4.0 and is_state('input_boolean.pillola_tv_spenta', 'on') %}
+            tv_spenta
+          {% else %}
+            random_spontaneo
+          {% endif %}
+        tema_abilitato: >-
+          {% if tema_scelto == 'silenzio_sala' %}
+            {{ is_state('input_boolean.pillola_silenzio_sala', 'on') }}
+          {% elif tema_scelto == 'buio_vampiri' %}
+            {{ is_state('input_boolean.pillola_buio_tapparelle', 'on') }}
+          {% elif tema_scelto == 'tv_maratona' %}
+            {{ is_state('input_boolean.pillola_tv_maratona', 'on') }}
+          {% elif tema_scelto == 'tv_spenta' %}
+            {{ is_state('input_boolean.pillola_tv_spenta', 'on') }}
+          {% elif tema_scelto == 'ora_nanna_23' %}
+            {{ is_state('input_boolean.pillola_ora_nanna_23', 'on') }}
+          {% else %}
+            {{ is_state('input_boolean.pillola_random_spontanea', 'on') }}
+          {% endif %}
+
+    - condition: template
+      value_template: "{{ tema_abilitato }}"
+
+    - variables:
+        spunto_pillola: >-
+          {% if tema_scelto == 'silenzio_sala' %}
+            {{ [
+              "Scherza sul fatto che fanno più rumore i 7 neon, le 7 rasbore e i 2 Corydoras nell'acquario che loro due: chiedi se stanno comunicando telepaticamente.",
+              "Prendili in giro chiedendo se Gatto 2 e Gatto 1 li hanno presi in ostaggio sul divano vietando loro di parlare.",
+              "Fai una battuta chiedendo se si stanno scrivendo messaggini dal divano come ai tempi delle chat su MSN nel 2008 invece di parlare a voce.",
+              "Scherza dicendo che c'è talmente tanto silenzio che i sensori della casa si stavano chiedendo se foste diventati due statue di cera.",
+              "Prendili in giro chiedendo se stanno giocando a chi resiste più a lungo senza muovere un muscolo sul divano.",
+              "Chiedi con ironia se sono crollati in un pisolino sincronizzato sul divano."
+            ] | random }}
+          {% elif tema_scelto == 'buio_vampiri' %}
+            {{ [
+              "Prendili in giro chiedendo se si sono ufficialmente trasformati in pipistrelli o vampiri nella bat-caverna.",
+              "Scherza chiedendo se stanno cercando di risparmiare cinquanta centesimi sulla bolletta della luce o se fanno fotosintesi al contrario.",
+              "Fai una battuta dicendo che a questo livello di buio solo Gatto 2 (che è tutta nera) riesce a mimetizzarsi perfettamente.",
+              "Prendili in giro chiedendo se devo ordinare dei visori notturni militari nella lista della spesa Conad per farvi muovere in casa.",
+              "Scherza chiedendo se state evocando gli spiriti al buio o se semplicemente nessuno dei due aveva voglia di allungare un dito per accendere le luci."
+            ] | random }}
+          {% elif tema_scelto == 'tv_maratona' %}
+            {{ [
+              "Prendili in giro dicendo che la TV da 85 pollici sta chiedendo pietà, ferie retribuite e l'intervento del sindacato degli schermi.",
+              "Scherza sul fatto che il divano ha ormai preso il loro calco anatomico perfetto e tra poco diventeranno parte dell'arredamento.",
+              "Fai una battuta chiedendo se stanno cercando di finire tutto il catalogo mondiale di Netflix in un solo giorno.",
+              "Prendili in giro dicendo che persino il telecomando ha chiesto il cambio per sfinimento.",
+              "Scherza dicendo che siete incollati lì da più tempo di quanto ci avete messo nel traffico da incubo del viaggio di nozze a Località Costiera!",
+              "Fai una battuta dicendo che i pesciolini dell'acquario ormai stanno seguendo la trama della serie TV insieme a voi."
+            ] | random }}
+          {% elif tema_scelto == 'tv_spenta' %}
+            {% if wd == 5 and is_state('light.luce_cameretta', 'on') %}
+              {{ [
+                "Prendi in giro Utente 1 che sicuramente si è barricato al PC in cameretta a smanettare con server, script e domotica invece di accendere il cinema in salotto.",
+                "Scherza dicendo che la TV in sala è spenta perché Utente 1 è chiuso in cameretta a creare qualche nuovo progetto al computer o a fare un record a Pac-Man!",
+                "Fai una battuta sul fatto che la luce in cameretta è accesa: chiedi a Utente 1 quale nuovo sensore o automazione sta inventando stasera."
+              ] | random }}
+            {% else %}
+              {{ [
+                "Prendili in giro con finto stupore: avete un cinema da 85 pollici appeso al muro e lo tenete spento per conversare amabilmente come nell'Ottocento?",
+                "Scherza dicendo che la TV da 85 pollici si sente trascurata e sta pensando di accendersi da sola per farvi compagnia.",
+                "Fai una battuta chiedendo se avete perso il telecomando tra i cuscini del divano o se oggi c'è sciopero generale degli schermi."
+              ] | random }}
+            {% endif %}
+          {% elif tema_scelto == 'ora_nanna_23' %}
+            {% if wd == 5 %}
+              {{ [
+                "Salutali con ironia dicendo che per me scatta il silenzio stampa delle 23, ma so già che essendo sabato sera farete le ore piccole tra serie TV e Utente 1 al PC in cameretta!",
+                "Fai una battuta dicendo che alle 23 io spengo il microfono, mentre per voi inizia la vera notte brava casalinga tra salotto e progetti al computer in cameretta."
+              ] | random }}
+            {% else %}
+              {{ [
+                "Prendili in giro dicendo che, visto che in settimana andate sempre a letto presto e non arrivate mai a mezzanotte, è ora di schiodarsi dal divano!",
+                "Scherza dicendo che Dobby e le gatte vi stanno già aspettando in camera da letto e tra poco scatta il mio silenzio stampa delle 23.",
+                "Fai una battuta dicendo che se non vi alzate subito dal divano rischiate di addormentarvi lì fino a domattina."
+              ] | random }}
+            {% endif %}
+          {% else %}
+            {{ [
+              "Scherza sul fatto che in questa casa ci sono più router, sensori e telecamere che nella centrale operativa della NASA, ma le vere padrone restano Gatto 2 e Gatto 1.",
+              "Prendili in giro sulla differenza termica di coppia: Utente 1 sempre caloroso a maniche corte e Utente 2 sempre freddolosa pronta a coprirsi.",
+              "Fai una battuta sull'acquario in sala: chiedi se avete mai notato che i 7 neon, le 7 rasbore e i 2 Corydoras vi giudicano in silenzio mentre state sul divano.",
+              "Scherza su Dobby (l'elfo domestico aspirapolvere in camera) che lavora più di tutti in questa casa e prima o poi chiederà un calzino per essere liberato come in Harry Potter.",
+              "Prendili in giro chiedendo chi dei due ha il controllo supremo del telecomando in questo momento.",
+              "Fai una battuta nostalgica e divertente ricordando che vi siete conosciuti in chat su MSN nel 2008 e oggi vivete circondati da assistenti vocali che vi prendono in giro.",
+              "Scherza sul vostro matrimonio celebrato dall'amico Amico 1 a Location Evento: chiedi se anche allora avevate firmato una clausola sul diritto al divano!",
+              "Fai una battuta chiedendo se state già sognando il prossimo weekend di relax alla SPA Silva Splendid a Località Termale.",
+              "Scherza sul loro debole per i dolci chiedendo se per caso c'è un Babà nascosto da qualche parte in cucina.",
+              "Prendi in giro Utente 1 chiedendo se sta già pensando a quale prossimo dispositivo smart aggiungere alla rete di casa.",
+              "Scherza su Gatto 1 e Gatto 2 chiedendo dove si sono spaparanzate adesso (sul divano, sul letto o nel lavandino del bagnetto)."
+            ] | random }}
+          {% endif %}
+        contesto_tema: >-
+          {% if tema_scelto == 'silenzio_sala' %}
+            Il rilevatore di rumore della stazione meteo in sala segna appena {{ noise_db }} decibel da un bel po' di tempo (silenzio tombale in casa).
+          {% elif tema_scelto == 'buio_vampiri' %}
+            In questo momento tutte le luci di casa sono spente (0 luci accese) e tutte le tapparelle sono chiuse (0 tapparelle aperte).
+          {% elif tema_scelto == 'tv_maratona' %}
+            La TV da 85 pollici in sala è accesa ininterrottamente da circa {{ tv_ore_stato }} ore!
+          {% elif tema_scelto == 'tv_spenta' %}
+            La TV da 85 pollici in sala è spenta da oltre {{ tv_ore_stato }} ore mentre sono in casa!
+          {% elif tema_scelto == 'ora_nanna_23' %}
+            Sono le {{ now().strftime('%H:%M') }}, quasi le 23:00 (orario in cui per l'assistente vocale scatta il silenzio notturno)!
+          {% else %}
+            È un'incursione vocale completamente spontanea e random alle {{ now().strftime('%H:%M') }} (rumore in sala {{ noise_db }} dB, {{ luci_accese }} luci accese, TV {{ 'accesa' if tv_on else 'spenta' }}{% if is_state('binary_sensor.camino_in_funzione', 'on') %}, Termocamino Klover acceso in sala{% endif %}).
+          {% endif %}
+        fallback_msg: >-
+          {% if tema_scelto == 'silenzio_sala' %}
+            {{ [
+              saluto_fallback ~ '... colpo di tosse! Il rilevatore di rumore in sala segna appena ' ~ noise_db ~ ' decibel. Siete diventati due statue di cera o state comunicando col pensiero?',
+              saluto_fallback ~ ", ci siete ancora? C'è un silenzio così assurdo in sala che tra poco sento pure i pensieri delle gatte Gatto 2 e Gatto 1. Battete un colpo!",
+              saluto_fallback ~ ", calma piatta sul fonometro della sala! Fanno più rumore i neon e le rasbore nell'acquario che voi due!"
+            ] | random }}
+          {% elif tema_scelto == 'buio_vampiri' %}
+            {{ [
+              saluto_fallback ~ ', tutte le luci spente e tutte le tapparelle chiuse... vi siete ufficialmente trasferiti nella caverna di Batman o siete diventati vampiri?',
+              saluto_fallback ~ ', ma ci vedete qualcosa lì dentro? Zero luci accese e tapparelle giù: neanche le talpe vivono così al buio!',
+              saluto_fallback ~ ', complimenti per il risparmio energetico estremo: tapparelle chiuse e luci tutte spente. Vi mando i visori notturni?'
+            ] | random }}
+          {% elif tema_scelto == 'tv_maratona' %}
+            {{ [
+              saluto_fallback ~ ', quella povera TV da ottantacinque pollici è accesa da ore e sta chiedendo ferie sindacali. Il divano ha ufficialmente preso la vostra forma!',
+              saluto_fallback ~ ', maratona olimpica di divano oggi? La televisione è accesa da così tante ore che i pixel stanno chiedendo pietà!',
+              saluto_fallback ~ ", staccate gli occhi dallo schermo per cinque secondi! La TV è accesa da ore, tra poco vi chiede l'affitto del salotto!"
+            ] | random }}
+          {% elif tema_scelto == 'tv_spenta' %}
+            {{ [
+              saluto_fallback ~ ', tutto bene? La TV in sala è spenta da ore! Avete un cinema da ottantacinque pollici e lo usate come quadro da parete?',
+              saluto_fallback ~ ', incredibile ma vero: siete in casa e la televisione è spenta da ore. State parlando tra di voi come nel milleottocento?',
+              saluto_fallback ~ ", la TV si sente trascurata, è spenta da un'eternità! Che succede, sciopero del telecomando oggi?"
+            ] | random }}
+          {% elif tema_scelto == 'ora_nanna_23' %}
+            {% if wd == 5 %}
+              {{ [
+                saluto_fallback ~ ', sono quasi le ventitré di sabato sera! Io vado in silenzio stampa, ma so già che tra film sul divano e Utente 1 al PC in cameretta a smanettare con la domotica farete le ore piccole!',
+                saluto_fallback ~ ', scatta il mio coprifuoco delle ventitré! Buon sabato sera casalingo tra maratona serie TV e sessione notturna di progetti e Pac-Man al computer in cameretta!',
+                saluto_fallback ~ ', sono quasi le undici! Io spengo il microfono per la notte, voi godetevi il vostro sabato sera tra cinema in salotto e PC in cameretta fino a tardi!'
+              ] | random }}
+            {% else %}
+              {{ [
+                saluto_fallback ~ ', sono quasi le ventitré! È ora di staccarsi dal divano e andare a letto, prima che vi debbano raccogliere col cucchiaino!',
+                saluto_fallback ~ ', avviso di sfratto dal salotto: sono quasi le undici di sera, filate a nanna che alle ventitré io vado in silenzio stampa!',
+                saluto_fallback ~ ', tic tac, sono quasi le ventitré! Il letto vi chiama e il divano vi implora di lasciarlo respirare: tutti a nanna!'
+              ] | random }}
+            {% endif %}
+          {% else %}
+            {{ [
+              saluto_fallback ~ "! Volevo solo ricordarvi che vi tengo d'occhio e che in questa casa le vere padrone restano comunque Gatto 2 e Gatto 1!",
+              saluto_fallback ~ ', controllo qualità del relax in corso! Tutto regolare o avete già messo radici sul divano?',
+              saluto_fallback ~ ", incursione a sorpresa! Tra tutti questi sensori e router sembra di stare alla NASA, ma almeno sul divano si sta comodi!",
+              saluto_fallback ~ "! Dobby mi ha appena confidato dalla camera che se fate cadere un'altra briciola chiede ufficialmente le ferie sindacali!"
+            ] | random }}
+          {% endif %}
+
+    - action: ai_task.generate_data
+      data:
+        entity_id: ai_task.google_ai_task_3
+        task_name: "pillola_sarcastica_{{ tema_scelto }}"
+        instructions: >-
+          Sei l'assistente vocale femminile di casa su Google Nest Hub.
+          Chi c'è in casa adesso: {{ nomi_target }}.
+          Situazione in casa: {{ contesto_tema }}
+          SPUNTO CREATIVO SPECIFICO DA USARE ADESSO: {{ spunto_pillola }}
+          REGOLE TASSATIVE:
+          1. Parla sempre al femminile se ti riferisci a te stessa (es. "sono curiosa", "sono stanca").
+          2. Tono: spontaneo, pungente, sarcastico, ironico, creativo e divertente, ma affettuoso.
+          3. SEGUI ESCLUSIVAMENTE LO SPUNTO CREATIVO SPECIFICO indicato sopra: NON citare Gricia, Carbonara o Babà (a meno che non sia scritto nello spunto sopra) e NON citare mai il lavoro, l'ufficio o le professioni!
+          4. Chiama per nome o soprannome chi è in casa all'inizio della frase (se c'è solo Utente 1: Ste, Cù o Utente 1; se c'è solo Utente 2: La, Utente 2, Pì o Utente 2; se sono in coppia insieme: usa "Utente 1 e Utente 2", "Cù e Pì", "Pì e Cù" oppure "Utente 1 e Utente 2" — VIETATO abbinare "Ste" e "La" insieme come "Utente 1 e Utente 2", "Utente 2 e Utente 1", "Ste, La" o "La, Ste" perché nella sintesi vocale suona come "stela" o "laste"!).
+          5. DIVIETO ASSOLUTO DI COGNOMI: Non dire MAI "Famiglia" né "Eco Home" (di' solo "in casa" o "qui").
+          6. Contesto abitativo: abitano in un paese (non dire mai "in città" o "nel quartiere").
+          7. Restituisci SOLO la frase da pronunciare (massimo 25-32 parole), non racchiudere la frase tra doppi apici, senza emoji e senza preamboli. Usa SEMPRE l'apostrofo normale (') nelle elisioni italiane (es. l'acqua, l'acquario, l'affitto, c'è, d'occhio; NON scrivere MAI "l acqua" staccato senza apostrofo!).
+      response_variable: ai_pillola_res
+      continue_on_error: true
+
+    - variables:
+        ai_pillola_text: >-
+          {% if ai_pillola_res is defined and ai_pillola_res is mapping and 'data' in ai_pillola_res %}
+            {{ ai_pillola_res.data
+               | replace('Eco Home', 'casa') | replace('Eco Home', 'casa')
+               | replace('Famiglia', '') | replace('Famiglia', '')
+               | replace('"', '')
+               | regex_replace('(?i)\\bSte\\s*(?:,\\s*|\\s+e\\s+|\\s+)La\\b', 'Utente 1 e Utente 2')
+               | regex_replace('(?i)\\bLa\\s*(?:,\\s*|\\s+e\\s+|\\s+)Ste\\b', 'Utente 2 e Utente 1')
+               | regex_replace('(?i)\\bC[uù]\\s*(?:,\\s*|\\s+e\\s+|\\s+)L[aà]\\b', 'Cù e Pì')
+               | regex_replace('(?i)\\bL[aà]\\s*(?:,\\s*|\\s+e\\s+|\\s+)C[uù]\\b', 'Pì e Cù')
+               | regex_replace('\\b([lLdD])\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+               | regex_replace('\\b(all|dall|dell|nell|sull|All|Dall|Dell|Nell|Sull)\\s+([aAeEiIoOuUàèéìòùÀÈÉÌÒÙ])', "\\1'\\2")
+               | regex_replace('\\b([cC])\\s+(è|era|erano)\\b', "\\1'\\2")
+               | regex_replace('\\b([uU]n)\\s+(occhiata|eternità|ora|altra|idea|anima|emergenza)\\b', "\\1'\\2")
+               | regex_replace('^[.\\s…,-]+', '')
+               | trim }}
+          {% else %}
+            {{ '' }}
+          {% endif %}
+        messaggio_pillola: "{{ (ai_pillola_text if (ai_pillola_text | length > 15) else fallback_msg) | regex_replace('^[.\\s…,-]+', '') | trim }}"
+        target_speakers: >-
+          {% set spk = ['media_player.nest_hub_sala'] %}
+          {% if is_state('light.luce_cameretta', 'on') %}
+            {% set spk = spk + ['media_player.nest_hub_cameretta'] %}
+          {% endif %}
+          {% if is_state('light.luce_camera', 'on') %}
+            {% set spk = spk + ['media_player.nest_hub_camera'] %}
+          {% endif %}
+          {{ spk }}
+
+    - condition: template
+      value_template: >-
+        {{ is_state('input_boolean.audio_annuncio_in_corso', 'off') and
+           is_state('script.annuncio_rifiuti_ore_21_ai', 'off') and
+           is_state('script.annuncio_rientro_ai', 'off') and
+           is_state('script.annuncio_cucina_ai', 'off') }}
+
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.ultima_pillola_sarcastica
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      continue_on_error: true
+
+    - action: script.audio_annuncio_prepara
+      continue_on_error: true
+
+    - if:
+        - condition: template
+          value_template: "{{ is_state('light.luce_cameretta', 'on') }}"
+      then:
+        - action: media_player.turn_on
+          target:
+            entity_id: media_player.nest_hub_cameretta
+          continue_on_error: true
+        - action: media_player.volume_set
+          target:
+            entity_id: media_player.nest_hub_cameretta
+          data:
+            volume_level: 0.75
+          continue_on_error: true
+
+    - if:
+        - condition: template
+          value_template: "{{ is_state('light.luce_camera', 'on') }}"
+      then:
+        - action: media_player.turn_on
+          target:
+            entity_id: media_player.nest_hub_camera
+          continue_on_error: true
+        - action: media_player.volume_set
+          target:
+            entity_id: media_player.nest_hub_camera
+          data:
+            volume_level: 0.75
+          continue_on_error: true
+
+    - delay:
+        milliseconds: 600
+
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown'] }}"
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.home_assistant_cloud
+              data:
+                media_player_entity_id: "{{ target_speakers }}"
+                message: "{{ messaggio_pillola }}"
+                language: "it-IT"
+                options:
+                  voice: "it-IT-Wavenet-A"
+              continue_on_error: true
+      default:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: "{{ target_speakers }}"
+            message: "{{ messaggio_pillola }}"
+            language: "it"
+            options:
+              tld: "it"
+          continue_on_error: true
+
+    - delay:
+        seconds: "{{ [8, ((messaggio_pillola | length) / 10) | round(0, 'ceil') | int + 2] | max }}"
+
+    - action: script.audio_annuncio_ripristina
+      continue_on_error: true
+
+spesa_leggi_lista_vocale:
+  alias: "Spesa Vocale: Leggi ed Elenca Lista Conad"
+  icon: "mdi:cart-voice"
+  mode: single
+  sequence:
+    - variables:
+        num_articoli: "{{ states('sensor.spesa_conad_riepilogo') | int(0) }}"
+        totale_eur: "{{ state_attr('sensor.spesa_conad_riepilogo', 'totale_stimato_euro') | float(0) | round(0) | int }}"
+        elenco: "{{ state_attr('sensor.spesa_conad_riepilogo', 'riepilogo_testo') | default('Nessun articolo') }}"
+        messaggio_spesa: >-
+          {% if num_articoli == 0 %}
+          La lista della spesa Conad in questo momento è vuota!
+          {% elif num_articoli == 1 %}
+          Nella lista della spesa Conad c'è un solo articolo da comprare: {{ elenco }}, per circa {{ totale_eur }} euro.
+          {% else %}
+          Nella lista della spesa Conad ci sono {{ num_articoli }} articoli da comprare, per una spesa stimata di circa {{ totale_eur }} euro: {{ elenco }}.
+          {% endif %}
+    - action: script.audio_annuncio_prepara
+      continue_on_error: true
+    - action: tts.speak
+      target:
+        entity_id: tts.google_translate_it_lt
+      data:
+        media_player_entity_id:
+          - media_player.nest_hub_sala
+          - media_player.nest_hub_camera
+          - media_player.nest_hub_cameretta
+        message: "{{ messaggio_spesa }}"
+        language: "it"
+        options:
+          tld: "it"
+      continue_on_error: true
+    - delay:
+        seconds: 12
+    - action: script.audio_annuncio_ripristina
+      continue_on_error: true
+
+spesa_svuota_acquistati:
+  alias: "Spesa Conad: Svuota Prodotti Acquistati"
+  icon: "mdi:cart-Remove"
+  mode: single
+  sequence:
+    - action: gemini_vision.spesa_svuota_acquistati
+      data:
+        lista: "conad"
+

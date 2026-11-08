@@ -48,8 +48,8 @@ Inserisci le opzioni nello stesso ordine:
 
 ```text
 Percorso audio
-Rientro Stefano
-Rientro Laura
+Rientro Utente 1
+Rientro Utente 2
 Rientro di coppia
 Modalità notte
 Promemoria asciugatrice

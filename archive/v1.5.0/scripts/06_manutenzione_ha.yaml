@@ -1,0 +1,791 @@
+# ==============================================================================
+# 06 — SICUREZZA, GESTIONE CONTAINER DOCKER, AGGIORNAMENTI HACS & GPS
+# ==============================================================================
+
+aggiorna_posizioni_gps:
+  alias: "Aggiorna Posizioni GPS"
+  icon: "mdi:crosshairs-gps"
+  mode: restart
+  sequence:
+    - action: notify.mobile_app_smartphone_utente_1
+      data:
+        message: "request_location_update"
+      continue_on_error: true
+    - action: notify.mobile_app_smartphone_utente_2
+      data:
+        message: "request_location_update"
+      continue_on_error: true
+    - action: homeassistant.update_entity
+      target:
+        entity_id:
+          - device_tracker.smartphone_utente_1_2
+          - device_tracker.smartphone_utente_2_2
+          - sensor.smartphone_utente_1_geocoded_location
+          - sensor.smartphone_utente_2_geocoded_location
+          - sensor.utente_1_luogo_smart
+          - sensor.utente_2_luogo_smart
+      continue_on_error: true
+
+sicurezza_attiva_casa_vuota:
+  alias: "Sicurezza: Attiva Modalità Casa Vuota"
+  icon: "mdi:shield-lock"
+  mode: restart
+  sequence:
+    - action: alarm_control_panel.alarm_arm_away
+      target:
+        entity_id: alarm_control_panel.sicurezza_eco_home
+    - action: input_text.set_value
+      target:
+        entity_id: input_text.sicurezza_snapshot_infissi
+      data:
+        value: >-
+          {% set aperti = state_attr('binary_sensor.sicurezza_infissi_aperti', 'elenco_aperti') %}
+          {{ (aperti | join(', ')) if aperti and aperti | length > 0 else 'Tutti Chiusi' }}
+      continue_on_error: true
+
+sicurezza_disattiva:
+  alias: "Sicurezza: Disattiva Modalità Allarme"
+  icon: "mdi:shield-off"
+  mode: restart
+  sequence:
+    - action: alarm_control_panel.alarm_disarm
+      target:
+        entity_id: alarm_control_panel.sicurezza_eco_home
+
+sicurezza_attiva_notte:
+  alias: "Sicurezza: Attiva Modalità Notte"
+  icon: "mdi:shield-moon"
+  mode: restart
+  fields:
+    forza:
+      description: "Forza l'attivazione anche fuori dalla fascia notturna"
+      example: true
+      default: false
+  sequence:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: >-
+                {{ forza | default(false) or (now().hour >= 21 or now().hour < 7) }}
+          sequence:
+            - action: alarm_control_panel.alarm_arm_night
+              target:
+                entity_id: alarm_control_panel.sicurezza_eco_home
+      default:
+        - action: script.notifica_smart
+          data:
+            titolo: "🛡️ Attivazione Allarme Notturno Rifiutata"
+            messaggio: "Tentativo di inserire l'allarme notturno alle ore {{ now().strftime('%H:%M') }} bloccato. La modalità notte è consentita solo tra le 21:00 e le 07:00."
+            categoria: "sicurezza"
+            priorita: "bassa"
+            tag: "sicurezza_blocco_diurno"
+
+sicurezza_allarme_notte_annuncio_vocale:
+  alias: "Sicurezza: Allarme Notturno Annuncio Vocale Nest Hub"
+  icon: "mdi:bullhorn"
+  mode: restart
+  fields:
+    zona:
+      description: "Zona esterna in cui è stato rilevato il movimento"
+      example: "Terrazza"
+      default: "Area Esterna"
+    telecamera:
+      description: "Entità telecamera da mostrare in live stream sul Nest Hub Camera"
+      example: "camera.scale"
+      default: ""
+    immagine:
+      description: "Percorso snapshot telecamera associata"
+      default: ""
+    telecamere_associate:
+      description: "Descrizione telecamere esterna e interna associate al varco/zona"
+      default: ""
+  sequence:
+    - variables:
+        zona_raw: "{{ zona | default('Area Esterna', true) | string }}"
+        zona_pulita: >-
+          {% set z = zona_raw
+             | regex_replace('(?i)\\b(sensore\\s+movimento|person\\s+occupancy|person_occupancy|occupazione|occupancy|motion|movimento|contact|contatto)\\b', '')
+             | replace('_', ' ')
+             | regex_replace('\\s+', ' ')
+             | trim %}
+          {% set z_low = z | lower %}
+          {% if z_low in ['terrazza 2', 'terrazza', 'luce terrazzo', 'luce porta terrazzo', 'terrazzo 3', 'terrazzo'] %}
+            Terrazza
+          {% elif 'locale tecnico' in z_low %}
+            Locale Tecnico
+          {% elif z | length > 0 %}
+            {{ z }}
+          {% else %}
+            Area Esterna
+          {% endif %}
+        zona_target: "{{ zona_pulita | trim }}"
+        cam_target: >-
+          {% set c = telecamera | default('', true) | string | trim %}
+          {% set z_low = zona_target | lower %}
+          {% if c.startswith('camera.') %}
+            {{ c }}
+          {% elif 'scale' in z_low or 'locale tecnico' in z_low or 'porta ingresso' in z_low %}
+            camera.scale
+          {% elif 'porta terrazzo' in z_low %}
+            camera.terrazza_2
+          {% elif 'balcone sala' in z_low or 'finestra sala' in z_low or 'finestra cucina' in z_low %}
+            camera.balcone_sala
+          {% elif 'balcone camera' in z_low or 'finestra camera' in z_low or 'finestra cameretta' in z_low or 'finestra bagno' in z_low or 'finestra bagnetto' in z_low %}
+            camera.balcone_camera
+          {% else %}
+            camera.terrazza
+          {% endif %}
+        messaggio_vocale: >-
+          {% set z_low = zona_target | lower %}
+          {% if z_low.startswith('movimento ') %}
+            {{ zona_target }}.
+          {% elif z_low in ['terrazza', 'terrazzo'] %}
+            Movimento in Terrazza.
+          {% elif z_low == 'scale' %}
+            Movimento sulle Scale.
+          {% elif z_low.startswith('balcone') %}
+            Movimento sul {{ zona_target }}.
+          {% elif 'locale tecnico' in z_low %}
+            Movimento nel Locale Tecnico.
+          {% elif z_low.startswith('porta ') or z_low.startswith('finestra ') %}
+            Movimento sulla {{ zona_target }}.
+          {% else %}
+            Movimento in {{ zona_target }}.
+          {% endif %}
+        cams_info: "{{ telecamere_associate | default('') }}"
+        img_target: "{{ immagine | default('') }}"
+    # 1. NOTIFICA SMARTPUSH CRITICA IMMEDIATA SU TELEFONI
+    - action: script.notifica_smart
+      data:
+        titolo: "🚨 Allarme Notturno: Movimento Esterno"
+        messaggio: >-
+          Rilevato movimento su {{ zona_target }} durante la modalità Notte!{% if cams_info | length > 0 %} ({{ cams_info }}){% endif %} Verificare subito la visuale telecamere.
+        categoria: sicurezza
+        priorita: critica
+        canale: tutti_telefoni
+        immagine: "{{ img_target }}"
+        tag: allarme_intrusione_notte
+        azioni:
+          - action: URI
+            title: "📹 Guarda Telecamere Live"
+            uri: /eco-home/sicurezza
+            url: /eco-home/sicurezza
+      continue_on_error: true
+    # 2. IMPOSTA VOLUME 50% E SMUTA SU NEST HUB CAMERA
+    - action: media_player.turn_on
+      target:
+        entity_id: media_player.nest_hub_camera
+      continue_on_error: true
+    - action: media_player.volume_mute
+      target:
+        entity_id: media_player.nest_hub_camera
+      data:
+        is_volume_muted: false
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.nest_hub_camera
+      data:
+        volume_level: 0.50
+      continue_on_error: true
+    # 3. ANNUNCIO VOCALE TTS COMPATTO
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('tts.home_assistant_cloud') not in ['unavailable', 'unknown', 'none'] }}"
+          sequence:
+            - action: tts.speak
+              target:
+                entity_id: tts.home_assistant_cloud
+              data:
+                media_player_entity_id: media_player.nest_hub_camera
+                message: "{{ messaggio_vocale }}"
+                language: "it-IT"
+                options:
+                  voice: "it-IT-Wavenet-A"
+              continue_on_error: true
+      default:
+        - action: tts.speak
+          target:
+            entity_id: tts.google_translate_it_lt
+          data:
+            media_player_entity_id: media_player.nest_hub_camera
+            message: "{{ messaggio_vocale }}"
+            language: "it"
+            options:
+              tld: "it"
+          continue_on_error: true
+    # 4. ATTENDI FINE ANNUNCIO VOCALE E AVVIA STREAMING LIVE TELECAMERA SU NEST HUB CAMERA
+    - wait_template: "{{ states('media_player.nest_hub_camera') == 'playing' }}"
+      timeout: "00:00:05"
+      continue_on_timeout: true
+    - wait_template: "{{ states('media_player.nest_hub_camera') in ['idle', 'paused', 'off', 'standby'] }}"
+      timeout: "00:00:08"
+      continue_on_timeout: true
+    - delay:
+        milliseconds: 400
+    - action: camera.play_stream
+      target:
+        entity_id: "{{ cam_target }}"
+      data:
+        media_player: media_player.nest_hub_camera
+        format: hls
+      continue_on_error: true
+    # 5. MANTIENI IL FLUSSO VIDEO PER 90 SECONDI E POI SPEGNI LO SCHERMO
+    - delay: "00:01:30"
+    - action: media_player.turn_off
+      target:
+        entity_id: media_player.nest_hub_camera
+      continue_on_error: true
+
+sicurezza_sospendi_temporizzata:
+  alias: "Sicurezza: Sospendi Allarme Temporaneamente"
+  icon: "mdi:timer-sand"
+  mode: restart
+  fields:
+    minuti:
+      description: "Durata della sospensione in minuti"
+      example: 60
+      default: 60
+  sequence:
+    - variables:
+        durata_min: "{{ minuti | default(60) | int(60) }}"
+        durata_sec: "{{ (minuti | default(60) | int(60)) * 60 }}"
+        target_time: "{{ (now() + timedelta(minutes=(minuti | default(60) | int(60)))).strftime('%Y-%m-%d %H:%M:%S') }}"
+        target_label: "{{ (now() + timedelta(minutes=(minuti | default(60) | int(60)))).strftime('%H:%M') }}"
+    - action: alarm_control_panel.alarm_disarm
+      target:
+        entity_id: alarm_control_panel.sicurezza_eco_home
+      continue_on_error: true
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.sicurezza_sospensione_manuale
+      continue_on_error: true
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.sicurezza_sospensione_fino_a
+      data:
+        datetime: "{{ target_time }}"
+      continue_on_error: true
+    - action: timer.start
+      target:
+        entity_id: timer.sicurezza_sospensione
+      data:
+        duration: "{{ durata_sec }}"
+      continue_on_error: true
+    - action: script.notifica_smart
+      data:
+        titolo: "⏱️ Allarme Sospeso per {{ durata_min }} Minuti"
+        messaggio: "Il sistema di allarme è sospeso fino alle {{ target_label }}. Ideale per arrivo di ospiti (mamma, cugino). Al termine, se la casa sarà ancora vuota, l'allarme si riarmerà automaticamente."
+        categoria: sicurezza
+        priorita: normale
+        canale: tutti_telefoni
+        tag: sicurezza_stato
+        azioni:
+          - action: RIARMA_SICUREZZA
+            title: "🛡️ Riarma Subito"
+          - action: URI
+            title: "📹 Guarda Live"
+            uri: /eco-home/sicurezza
+            url: /eco-home/sicurezza
+      continue_on_error: true
+
+sicurezza_sospendi_permanente:
+  alias: "Sicurezza: Disattiva Proprio Allarme (Ospiti a Casa)"
+  icon: "mdi:shield-off"
+  mode: restart
+  sequence:
+    - action: alarm_control_panel.alarm_disarm
+      target:
+        entity_id: alarm_control_panel.sicurezza_eco_home
+      continue_on_error: true
+    - action: timer.cancel
+      target:
+        entity_id: timer.sicurezza_sospensione
+      continue_on_error: true
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.sicurezza_sospensione_manuale
+      continue_on_error: true
+    - action: script.notifica_smart
+      data:
+        titolo: "🛑 Allarme Disattivato Proprio (Ospiti a Casa)"
+        messaggio: "La protezione automatica a casa vuota è disattivata a tempo indeterminato. Il sistema rimarrà disarmato per la presenza di ospiti (mamma, cugino) finché non verrà riattivato manualmente."
+        categoria: sicurezza
+        priorita: normale
+        canale: tutti_telefoni
+        tag: sicurezza_stato
+        azioni:
+          - action: RIARMA_SICUREZZA
+            title: "🛡️ Riattiva Allarme"
+          - action: URI
+            title: "📹 Guarda Live"
+            uri: /eco-home/sicurezza
+            url: /eco-home/sicurezza
+      continue_on_error: true
+
+sicurezza_ripristina_protezione:
+  alias: "Sicurezza: Ripristina Protezione Automatica"
+  icon: "mdi:shield-check"
+  mode: restart
+  sequence:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.sicurezza_sospensione_manuale
+      continue_on_error: true
+    - action: timer.cancel
+      target:
+        entity_id: timer.sicurezza_sospensione
+      continue_on_error: true
+    - if:
+        - condition: state
+          entity_id: binary_sensor.casa_occupata
+          state: 'off'
+      then:
+        - action: script.sicurezza_attiva_casa_vuota
+      else:
+        - action: alarm_control_panel.alarm_disarm
+          target:
+            entity_id: alarm_control_panel.sicurezza_eco_home
+        - action: script.notifica_smart
+          data:
+            titolo: "🛡️ Protezione Allarme Ripristinata"
+            messaggio: "La sospensione è terminata. Il sistema riprenderà ad armarsi automaticamente a casa vuota o di notte."
+            categoria: sicurezza
+            priorita: normale
+            canale: tutti_telefoni
+            tag: sicurezza_stato
+          continue_on_error: true
+
+sicurezza_dissuasione_notturna_allarme:
+  alias: "Sicurezza: Dissuasione Visiva Notturna Allarme"
+  icon: "mdi:lightbulb-alert"
+  mode: restart
+  sequence:
+    # 1. SALVA SNAPSHOT COMPLETO DELLO STATO PRE-ALLARME (Luci e Tapparelle)
+    - action: scene.create
+      data:
+        scene_id: stato_pre_allarme_dissuasione
+        snapshot_entities:
+          - light.luce_sala_2
+          - light.luce_ambiente_sala
+          - light.luce_mensole_camino
+          - light.luce_cucina
+          - light.luce_applique
+          - light.faretti_cucina
+          - light.luce_camera
+          - light.luce_comodino_1_camera
+          - light.luce_comodino_2_camera
+          - light.luce_cameretta
+          - light.luce_bagno
+          - light.luce_bagnetto
+          - light.luce_corridoio
+          - light.luce_terrazzo
+          - light.luce_porta_terrazzo
+          - cover.tapparella_sala
+          - cover.tapparella_cucina
+          - cover.tapparella_camera
+          - cover.tapparella_cameretta
+          - cover.tapparella_bagno
+          - cover.tapparella_bagnetto
+      continue_on_error: true
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.sicurezza_dissuasione_in_corso
+      continue_on_error: true
+
+    # 2. ACCENDI A RANDOM LE LUCI IN CASA (Simulazione Presenza Immediata)
+    - action: light.turn_on
+      target:
+        entity_id: >-
+          {% set all_lights = [
+            'light.luce_sala_2',
+            'light.luce_ambiente_sala',
+            'light.luce_mensole_camino',
+            'light.luce_cucina',
+            'light.faretti_cucina',
+            'light.luce_camera',
+            'light.luce_comodino_1_camera',
+            'light.luce_comodino_2_camera',
+            'light.luce_cameretta',
+            'light.luce_bagno',
+            'light.luce_corridoio',
+            'light.luce_terrazzo'
+          ] %}
+          {{ (all_lights | shuffle)[:6] }}
+      data:
+        brightness_pct: 100
+      continue_on_error: true
+
+    # 3. SE E SOLO SE IL PLUVIOMETRO NON RILEVA PIOGGIA, ALZA A RANDOM LE TAPPARELLE
+    - if:
+        - condition: template
+          value_template: >-
+            {% set p_att = states('sensor.meteo_pioggia_attuale_effettiva') | float(0) %}
+            {% set p_raw = states('sensor.terrazza_pulvirometro_precipitazione') | float(0) %}
+            {{ p_att <= 0.0 and p_raw <= 0.0 and not is_state('input_boolean.meteo_pioggia_notturna_rilevata', 'on') }}
+      then:
+        - action: cover.set_cover_position
+          target:
+            entity_id: >-
+              {% set covers = ['cover.tapparella_sala', 'cover.tapparella_cucina', 'cover.tapparella_camera', 'cover.tapparella_cameretta'] %}
+              {{ (covers | shuffle)[:2] }}
+          data:
+            position: >-
+              {{ [70, 85, 100] | random }}
+          continue_on_error: true
+
+    # 4. ATTENDI 5 MINUTI
+    - delay:
+        minutes: 5
+
+    # 5. DOPO 5 MINUTI TORNA ALLO STATO PRECEDENTE
+    - action: script.sicurezza_ripristina_stato_pre_dissuasione
+      continue_on_error: true
+
+sicurezza_ripristina_stato_pre_dissuasione:
+  alias: "Sicurezza: Ripristina Stato Pre-Dissuasione Allarme"
+  icon: "mdi:restore"
+  mode: restart
+  sequence:
+    - action: script.turn_off
+      target:
+        entity_id: script.sicurezza_dissuasione_notturna_allarme
+      continue_on_error: true
+    - action: scene.turn_on
+      target:
+        entity_id: scene.stato_pre_allarme_dissuasione
+      continue_on_error: true
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.sicurezza_dissuasione_in_corso
+      continue_on_error: true
+
+docker_restart_homeassistant:
+  alias: "🔄 Riavvia Home Assistant Core"
+  icon: "mdi:home-assistant"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: 🔄 Home Assistant
+        messaggio: Riavvio del Core di Home Assistant avviato...
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: homeassistant.restart
+
+docker_restart_zigbee2mqtt:
+  alias: "🔄 Riavvia Container Zigbee2MQTT"
+  icon: "mdi:zigbee"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: 🔄 Zigbee2MQTT
+        messaggio: Riavvio del container Zigbee2MQTT inviato...
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "restart zigbee2mqtt"
+      continue_on_error: true
+
+docker_stop_zigbee2mqtt:
+  alias: "⏹️ Ferma Container Zigbee2MQTT"
+  icon: "mdi:stop-circle"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: ⏹️ Zigbee2MQTT
+        messaggio: Comando di arresto container Zigbee2MQTT inviato.
+        canale: utente_1
+        priorita: alta
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "stop zigbee2mqtt"
+      continue_on_error: true
+
+docker_start_zigbee2mqtt:
+  alias: "▶️ Avvia Container Zigbee2MQTT"
+  icon: "mdi:play-circle"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: ▶️ Zigbee2MQTT
+        messaggio: Avvio container Zigbee2MQTT in corso...
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "start zigbee2mqtt"
+      continue_on_error: true
+
+docker_restart_mosquitto:
+  alias: "🔄 Riavvia Container Mosquitto MQTT"
+  icon: "mdi:message-processing"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: 🔄 Mosquitto MQTT
+        messaggio: Riavvio broker Mosquitto MQTT in corso...
+        canale: utente_1
+        priorita: alta
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "restart mosquitto"
+      continue_on_error: true
+
+docker_stop_mosquitto:
+  alias: "⏹️ Ferma Container Mosquitto MQTT"
+  icon: "mdi:stop-circle"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: ⚠️ Mosquitto MQTT
+        messaggio: Arresto broker Mosquitto inviato. Attenzione, i dispositivi MQTT e Zigbee2MQTT si disconnetteranno!
+        canale: utente_1
+        priorita: alta
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "stop mosquitto"
+      continue_on_error: true
+
+docker_start_mosquitto:
+  alias: "▶️ Avvia Container Mosquitto MQTT"
+  icon: "mdi:play-circle"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: ▶️ Mosquitto MQTT
+        messaggio: Avvio broker Mosquitto MQTT in corso...
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "start mosquitto"
+      continue_on_error: true
+
+docker_restart_frigate:
+  alias: "🔄 Riavvia Container Frigate NVR"
+  icon: "mdi:cctv"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: 🔄 Frigate NVR
+        messaggio: Riavvio container Frigate NVR in corso...
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "restart frigate"
+      continue_on_error: true
+
+docker_stop_frigate:
+  alias: "⏹️ Ferma Container Frigate NVR"
+  icon: "mdi:stop-circle"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: ⚠️ Frigate NVR
+        messaggio: Arresto container Frigate NVR inviato. Il rilevamento video sarà temporaneamente sospeso!
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "stop frigate"
+      continue_on_error: true
+
+docker_start_frigate:
+  alias: "▶️ Avvia Container Frigate NVR"
+  icon: "mdi:play-circle"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: ▶️ Frigate NVR
+        messaggio: Avvio container Frigate NVR in corso...
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "start frigate"
+      continue_on_error: true
+
+docker_restart_jellyfin:
+  alias: "🔄 Riavvia Container Jellyfin Media Server"
+  icon: "mdi:play-box-multiple"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: 🔄 Jellyfin Server
+        messaggio: Riavvio media server Jellyfin in corso...
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "restart jellyfin"
+      continue_on_error: true
+
+docker_stop_jellyfin:
+  alias: "⏹️ Ferma Container Jellyfin Media Server"
+  icon: "mdi:stop-circle"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: ⚠️ Jellyfin Server
+        messaggio: Arresto container Jellyfin inviato.
+        canale: utente_1
+        priorita: bassa
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "stop jellyfin"
+      continue_on_error: true
+
+docker_start_jellyfin:
+  alias: "▶️ Avvia Container Jellyfin Media Server"
+  icon: "mdi:play-circle"
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: ▶️ Jellyfin Server
+        messaggio: Avvio container Jellyfin in corso...
+        canale: utente_1
+        priorita: media
+        categoria: generale
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "start jellyfin"
+      continue_on_error: true
+
+docker_aggiorna_tutti_container:
+  alias: "🐳 Aggiorna Tutti i Container Docker"
+  icon: "mdi:cloud-download-outline"
+  description: "Controlla le ultime immagini (:latest / :stable) su Docker Hub e GHCR per tutti i container sul NAS Synology, aggiorna e ricrea solo quelli con una nuova versione disponibile ed elimina le vecchie immagini."
+  mode: single
+  sequence:
+    - action: script.notifica_smart
+      data:
+        titolo: "🐳 Aggiornamento Docker"
+        messaggio: "Controllo e download nuove versioni di tutti i container Docker avviato in background..."
+        canale: utente_1
+        priorita: bassa
+        categoria: generale
+        tag: docker_auto_update
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__docker__"
+        question: "update all"
+      continue_on_error: true
+
+aggiorna_integrazioni_home_assistant:
+  alias: "🧩 Aggiorna Integrazioni e Componenti Home Assistant (HACS)"
+  icon: "mdi:puzzle-edit-outline"
+  description: "Controlla e installa automaticamente tutti gli aggiornamenti disponibili per le integrazioni custom, card Lovelace e temi gestiti da HACS, riavviando Home Assistant se necessario."
+  mode: single
+  fields:
+    silenzioso_se_aggiornato:
+      description: "Se true, non invia notifiche quando tutte le integrazioni sono già aggiornate (utile per le automazioni notturne)"
+      default: false
+      selector:
+        boolean:
+    riavvia_se_necessario:
+      description: "Se true, riavvia automaticamente Home Assistant dopo aver installato gli aggiornamenti delle integrazioni"
+      default: true
+      selector:
+        boolean:
+  sequence:
+    - variables:
+        entita_hacs: "{{ integration_entities('hacs') | select('match', '^update\\.') | list }}"
+    - if:
+        - condition: template
+          value_template: "{{ entita_hacs | count > 0 }}"
+      then:
+        - action: homeassistant.update_entity
+          target:
+            entity_id: "{{ entita_hacs }}"
+          continue_on_error: true
+        - delay:
+            seconds: 5
+    - variables:
+        totale_hacs: "{{ integration_entities('hacs') | select('match', '^update\\.') | list | count }}"
+        da_aggiornare: "{{ integration_entities('hacs') | select('match', '^update\\.') | select('is_state', 'on') | list }}"
+        conteggio: "{{ da_aggiornare | count }}"
+        elenco_aggiornati: >-
+          {% set ns = namespace(items=[]) %}
+          {% for eid in da_aggiornare %}
+            {% set nome = (state_attr(eid, 'friendly_name') | default(eid, true)) | replace(' Update', '') %}
+            {% set old_v = state_attr(eid, 'installed_version') | default('?', true) %}
+            {% set new_v = state_attr(eid, 'latest_version') | default('?', true) %}
+            {% set ns.items = ns.items + [nome ~ ' (' ~ old_v ~ ' ➔ ' ~ new_v ~ ')'] %}
+          {% endfor %}
+          {{ ns.items | join(', ') }}
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ conteggio | int(0) > 0 }}"
+          sequence:
+            - repeat:
+                for_each: "{{ da_aggiornare }}"
+                sequence:
+                  - action: update.install
+                    target:
+                      entity_id: "{{ repeat.item }}"
+                    continue_on_error: true
+                  - delay:
+                      seconds: 3
+            - delay:
+                seconds: 3
+            - action: script.notifica_smart
+              data:
+                titolo: "🧩 Integrazioni Home Assistant Aggiornate"
+                messaggio: >-
+                  Aggiornati {{ conteggio }} componenti HACS: {{ elenco_aggiornati }}.{{ ' Riavvio automatico di Home Assistant in corso per applicare le modifiche...' if (riavvia_se_necessario | default(true)) else '' }}
+                canale: utente_1
+                priorita: bassa
+                categoria: generale
+                tag: hacs_auto_update
+              continue_on_error: true
+            - if:
+                - condition: template
+                  value_template: "{{ riavvia_se_necessario | default(true) }}"
+              then:
+                - delay:
+                    seconds: 5
+                - action: homeassistant.restart
+                  continue_on_error: true
+      default:
+        - if:
+            - condition: template
+              value_template: "{{ not (silenzioso_se_aggiornato | default(false)) }}"
+          then:
+            - action: script.notifica_smart
+              data:
+                titolo: "🧩 Integrazioni Home Assistant"
+                messaggio: "Tutte le {{ totale_hacs }} integrazioni e card HACS sono già aggiornate all'ultima versione disponibile."
+                canale: utente_1
+                priorita: bassa
+                categoria: generale
+                tag: hacs_auto_update
+              continue_on_error: true
+
