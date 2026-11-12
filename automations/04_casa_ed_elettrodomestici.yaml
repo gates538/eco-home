@@ -1,0 +1,795 @@
+# ==============================================================================
+# 04 — CUCINA, ELETTRODOMESTICI SMART, ROBOT ASPIRAPOLVERE & ENERGIA 6kW
+# ==============================================================================
+
+- id: 'dobby_pulizia_mattina_clean_genius'
+  alias: 'Dobby: Pulizia Mattina (Clean Genius) Fuori Casa'
+  description: 'Quando la mattina nessuno è in casa da 10 minuti, attiva la modalità Clean Genius per tutta la casa e avvia Dobby (massimo una volta al mattino).'
+  mode: single
+  trigger:
+    - trigger: numeric_state
+      entity_id: zone.home
+      below: 1
+      for: '00:10:00'
+      id: casa_vuota_10m
+    - trigger: time
+      at: '08:30:00'
+      id: check_orario_mattina
+  condition:
+    - condition: time
+      after: '07:30:00'
+      before: '13:00:00'
+    - condition: numeric_state
+      entity_id: zone.home
+      below: 1
+    - condition: template
+      value_template: >-
+        {{ not is_state('person.utente_1', 'home') and not is_state('person.utente_2', 'home') and
+           is_state('input_boolean.modalita_ospiti_cameretta', 'off') and
+           is_state('binary_sensor.sicurezza_sospensione_attiva', 'off') }}
+    - condition: state
+      entity_id: vacuum.dobby
+      state: 'docked'
+    - condition: template
+      value_template: >-
+        {{ (state_attr('vacuum.dobby', 'battery') | default(100) | int) >= 30 }}
+    - condition: template
+      value_template: >-
+        {{ trigger.id == 'casa_vuota_10m' or (states('zone.home') | int(0) == 0 and (now() - states.zone.home.last_changed).total_seconds() >= 590) }}
+    - condition: template
+      value_template: >-
+        {{ this.attributes.last_triggered is none or (this.attributes.last_triggered.date() != now().date()) }}
+  action:
+    - action: select.select_option
+      target:
+        entity_id: select.dobby_cleangenius
+      data:
+        option: routine_cleaning
+    - delay: '00:00:02'
+    - action: vacuum.start
+      target:
+        entity_id: vacuum.dobby
+    - action: script.notifica_dobby
+      data:
+        titolo: "🧹 Dobby: Pulizia Mattina Avviata (Clean Genius)"
+        messaggio: "Nessuno in casa da 10 minuti. Dobby ha avviato la pulizia intelligente Clean Genius per tutta la casa."
+        priorita: normale
+        tag: dobby_pulizia_mattina
+
+- id: 'dobby_pulizia_pomeriggio_aspira'
+  alias: 'Dobby: Pulizia Pomeriggio (Aspira) Fuori Casa'
+  description: 'Quando il pomeriggio nessuno è in casa da 10 minuti, disattiva Clean Genius, imposta la modalità Aspira (Sweeping) per tutta la casa e avvia Dobby (massimo una volta nel pomeriggio).'
+  mode: single
+  trigger:
+    - trigger: numeric_state
+      entity_id: zone.home
+      below: 1
+      for: '00:10:00'
+      id: casa_vuota_10m
+  condition:
+    - condition: time
+      after: '13:00:00'
+      before: '20:00:00'
+    - condition: numeric_state
+      entity_id: zone.home
+      below: 1
+    - condition: template
+      value_template: >-
+        {{ not is_state('person.utente_1', 'home') and not is_state('person.utente_2', 'home') and
+           is_state('input_boolean.modalita_ospiti_cameretta', 'off') and
+           is_state('binary_sensor.sicurezza_sospensione_attiva', 'off') }}
+    - condition: state
+      entity_id: vacuum.dobby
+      state: 'docked'
+    - condition: template
+      value_template: >-
+        {{ (state_attr('vacuum.dobby', 'battery') | default(100) | int) >= 30 }}
+    - condition: template
+      value_template: >-
+        {{ trigger.id == 'casa_vuota_10m' or (states('zone.home') | int(0) == 0 and (now() - states.zone.home.last_changed).total_seconds() >= 590) }}
+    - condition: template
+      value_template: >-
+        {{ this.attributes.last_triggered is none or (this.attributes.last_triggered.date() != now().date()) }}
+  action:
+    - action: select.select_option
+      target:
+        entity_id: select.dobby_cleangenius
+      data:
+        option: 'off'
+      continue_on_error: true
+    - delay: '00:00:02'
+    - action: select.select_option
+      target:
+        entity_id: select.dobby_cleaning_mode
+      data:
+        option: sweeping
+      continue_on_error: true
+    - action: vacuum.set_fan_speed
+      target:
+        entity_id: vacuum.dobby
+      data:
+        fan_speed: strong
+      continue_on_error: true
+    - delay: '00:00:02'
+    - action: vacuum.start
+      target:
+        entity_id: vacuum.dobby
+      continue_on_error: true
+    - action: script.notifica_dobby
+      data:
+        titolo: "🌪️ Dobby: Aspirazione Pomeridiana Avviata (Aspira)"
+        messaggio: "Nessuno in casa da 10 minuti. Dobby ha avviato la sola aspirazione (Aspira) per tutta la casa."
+        priorita: normale
+        tag: dobby_pulizia_pomeriggio
+
+- id: 'dobby_stop_e_rientro_su_presenza'
+  alias: 'Dobby: Stop e Rientro alla Base su Rientro a Casa'
+  description: 'Se qualcuno rientra a casa mentre Dobby è in azione, interrompe immediatamente la pulizia e lo fa tornare alla stazione di ricarica.'
+  mode: restart
+  trigger:
+    - trigger: numeric_state
+      entity_id: zone.home
+      above: 0
+      id: zona_home_presenza
+    - trigger: state
+      entity_id:
+        - person.utente_1
+        - person.utente_2
+      to: 'home'
+      id: persona_rientrata
+    - trigger: state
+      entity_id: binary_sensor.porta_ingresso_contact
+      to: 'on'
+      id: porta_ingresso_aperta
+  condition:
+    - condition: template
+      value_template: >-
+        {{ states('vacuum.dobby') in ['cleaning', 'paused'] or (is_state_attr('vacuum.dobby', 'started', true) and not is_state('vacuum.dobby', 'docked') and not is_state('vacuum.dobby', 'returning')) }}
+  action:
+    - action: vacuum.return_to_base
+      target:
+        entity_id: vacuum.dobby
+    - action: script.notifica_dobby
+      data:
+        titolo: "🏠 Dobby: Ritorno alla Base (Rilevata Presenza)"
+        messaggio: "Rilevata presenza in casa. Dobby ha interrotto la pulizia ed è stato rimandato alla stazione di ricarica."
+        priorita: normale
+        tag: dobby_rientro_presenza
+
+- id: 'dobby_notifiche_fine_pulizia_e_anomalie'
+  alias: 'Dobby: Notifiche Fine Pulizia e Anomalie'
+  description: 'Invia notifiche su smartphone e plancia per il completamento con successo della pulizia (con riepilogo m² e durata) e per qualsiasi anomalia o errore di Dobby (blocco robot, guasto o serbatoi acqua da riempire/svuotare).'
+  mode: queued
+  max: 10
+  trigger:
+    - trigger: state
+      entity_id: sensor.dobby_task_status
+      to: 'completed'
+      id: pulizia_completata
+    - trigger: state
+      entity_id: vacuum.dobby
+      to: 'error'
+      id: errore_robot
+    - trigger: template
+      value_template: >-
+        {{ states('sensor.dobby_error') not in ['no_error', 'none', 'unknown', 'unavailable', ''] }}
+      id: errore_dobby
+    - trigger: template
+      value_template: >-
+        {{ states('sensor.dobby_low_water_warning') not in ['no_warning', 'none', 'unknown', 'unavailable', ''] }}
+      id: anomalia_acqua
+    - trigger: state
+      entity_id: sensor.dobby_self_wash_base_status
+      from: washing
+      to:
+        - drying
+        - idle
+      id: mocio_pulito
+  action:
+    - choose:
+        # 1. ERRORE ROBOT O BLOCCO
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.id in ['errore_robot', 'errore_dobby'] }}"
+          sequence:
+            - action: script.notifica_dobby
+              data:
+                titolo: "🚨 Dobby: Errore o Blocco Robot!"
+                messaggio: >-
+                  Dobby segnala un blocco o errore operativo: {{ states('sensor.dobby_error') }}. Verificare che non sia incastrato o che spazzole e rulli non siano ostruiti.
+                priorita: alta
+                tag: dobby_errore
+
+        # 2. AVVISO SERBATOI ACQUA (PULITA SCARSA / SPORCA PIENA)
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.id == 'anomalia_acqua' }}"
+          sequence:
+            - action: script.notifica_dobby
+              data:
+                titolo: "💧 Dobby: Avviso Serbatoi Stazione"
+                messaggio: >-
+                  Segnalazione stazione Dobby: {{ states('sensor.dobby_low_water_warning') }}. Ricaricare il serbatoio di acqua pulita o svuotare l'acqua sporca.
+                priorita: alta
+                tag: dobby_acqua
+
+        # 3. FINE PULIZIA COMPLETATA CON SUCCESSO
+        - conditions:
+            - condition: template
+              value_template: >-
+                {{ trigger.id == 'pulizia_completata' and (trigger.from_state.state in ['cleaning', 'auto_cleaning', 'zone_cleaning', 'segment_cleaning', 'spot_cleaning'] or trigger.from_state.state not in ['completed', 'idle', 'unknown', 'unavailable']) }}
+          sequence:
+            - action: script.notifica_dobby
+              data:
+                titolo: "✅ Dobby: Pulizia Completata"
+                messaggio: >-
+                  Dobby ha terminato la pulizia ed è tornato alla base. Area coperta: {{ states('sensor.dobby_cleaned_area') }} m² in {{ states('sensor.dobby_cleaning_time') }} min.
+                priorita: normale
+                tag: dobby_fine_pulizia
+
+        # 4. LAVAGGIO MOCI COMPLETATO (PROMEMORIA ACQUA SPORCA)
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.id == 'mocio_pulito' }}"
+          sequence:
+            - action: script.notifica_dobby
+              data:
+                titolo: "✨ Dobby: Mocio Pulito"
+                messaggio: >-
+                  Il lavaggio dei moci è terminato alla stazione. Versare l'acqua di scarico in tempo utile per evitare cattivi odori.
+                priorita: normale
+                tag: dobby_mocio_lavato
+
+- id: 'annuncio_cucina_avvio_cottura'
+  alias: 'Cucina: Annunci Vocali AI Sarcastici Avvio Cottura'
+  description: >-
+    Riproduce annunci sarcastici, scherzosi e non ripetitivi su Nest Hub Sala
+    quando viene acceso il piano cottura a induzione o il forno, personalizzati in base
+    alla presenza di Utente 1, Utente 2 o entrambi.
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: sensor.cucina_piano_cottura_stato_di_funzionamento
+      to:
+        - run
+        - running
+        - 'on'
+      not_from:
+        - run
+        - running
+        - 'on'
+        - unknown
+        - unavailable
+      id: induzione
+    - trigger: state
+      entity_id: binary_sensor.cucina_piano_cottura_potenza
+      to: 'on'
+      not_from:
+        - 'on'
+        - unknown
+        - unavailable
+      id: induzione
+    - trigger: state
+      entity_id:
+        - sensor.cucina_forno_machine_state
+        - sensor.cucina_forno_second_cavity_machine_state
+      to:
+        - running
+        - run
+        - preheating
+      not_from:
+        - running
+        - run
+        - preheating
+        - unknown
+        - unavailable
+      id: forno
+    - trigger: state
+      entity_id: sensor.cucina_forno_job_state
+      to:
+        - cooking
+        - preheat
+        - fast_preheat
+        - searing
+      not_from:
+        - cooking
+        - preheat
+        - fast_preheat
+        - searing
+        - ready
+        - cleaning
+        - cooling
+        - finished
+        - unknown
+        - unavailable
+      id: forno
+  condition:
+    # Cooldown di 20 minuti per evitare doppi annunci se si accendono sia forno che piano cottura
+    - condition: template
+      value_template: >-
+        {{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 1200 }}
+    # Helper abilitato da interfaccia utente
+    - condition: state
+      entity_id: input_boolean.annunci_vocali_cucina
+      state: 'on'
+  action:
+    - action: script.annuncio_cucina_ai
+      data:
+        dispositivo: "{{ 'piano_cottura' if trigger.id == 'induzione' else 'forno' }}"
+
+- id: 'cucina_avviso_porta_frigo_o_freezer_aperta_60s'
+  alias: 'Cucina: Avviso Porta Frigo o Freezer Aperta > 60s'
+  description: >-
+    Avvisa con annunci vocali sarcastici AI su Nest Hub Sala e notifiche push su smartphone
+    quando la porta del frigorifero o del congelatore rimane aperta per oltre 60 secondi.
+  mode: single
+  trigger:
+    - trigger: state
+      entity_id: binary_sensor.cucina_frigorifero_fridge_door
+      to: 'on'
+      for: '00:01:00'
+      id: frigo
+    - trigger: state
+      entity_id: binary_sensor.cucina_frigorifero_freezer_door
+      to: 'on'
+      for: '00:01:00'
+      id: freezer
+  condition:
+    - condition: template
+      value_template: >-
+        {{ is_state('binary_sensor.cucina_frigorifero_fridge_door', 'on') or is_state('binary_sensor.cucina_frigorifero_freezer_door', 'on') }}
+  action:
+    - action: shell_command.analizza_telecamera_gemini
+      data:
+        camera: "__refresh_fridge__"
+        question: "refresh"
+      continue_on_error: true
+    - repeat:
+        while:
+          - condition: template
+            value_template: >-
+              {{ is_state('binary_sensor.cucina_frigorifero_fridge_door', 'on') or is_state('binary_sensor.cucina_frigorifero_freezer_door', 'on') }}
+        sequence:
+          - variables:
+              porta_corrente: >-
+                {% if is_state('binary_sensor.cucina_frigorifero_fridge_door', 'on') and is_state('binary_sensor.cucina_frigorifero_freezer_door', 'on') %}
+                  entrambi
+                {% elif is_state('binary_sensor.cucina_frigorifero_freezer_door', 'on') %}
+                  freezer
+                {% else %}
+                  frigo
+                {% endif %}
+          - action: script.annuncio_frigo_ai
+            data:
+              porta: "{{ porta_corrente }}"
+              ripetizione: "{{ repeat.index }}"
+          - wait_template: >-
+              {{ is_state('binary_sensor.cucina_frigorifero_fridge_door', 'off') and is_state('binary_sensor.cucina_frigorifero_freezer_door', 'off') }}
+            timeout: "00:01:30"
+            continue_on_timeout: true
+          - action: shell_command.analizza_telecamera_gemini
+            data:
+              camera: "__refresh_fridge__"
+              question: "refresh"
+            continue_on_error: true
+          - if:
+              - condition: template
+                value_template: "{{ repeat.index >= 5 }}"
+            then:
+              - stop: "Raggiunto limite massimo di 5 avvisi ripetuti"
+
+- id: 'elettrodomestici_notifica_frigo_freezer_anomalie'
+  alias: "Elettrodomestici: Notifica Frigorifero & Freezer (Temp e Offline)"
+  description: "Notifica temperature critiche o offline del frigorifero/freezer Samsung (le porte aperte >60s sono già gestite da cucina_avviso_porta_frigo_o_freezer_aperta_60s)."
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.cucina_frigorifero_fridge_temperature
+      above: 9
+      for:
+        minutes: 15
+      id: temp_frigo_alta
+    - trigger: numeric_state
+      entity_id: sensor.cucina_frigorifero_freezer_temperature
+      above: -10
+      for:
+        minutes: 15
+      id: temp_freezer_alta
+    - trigger: state
+      entity_id: sensor.cucina_frigorifero_potenza
+      to: 'unavailable'
+      for:
+        minutes: 15
+      id: frigo_offline
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_elettrodomestici
+      state: 'on'
+  actions:
+    - variables:
+        dettagli_frigo: >-
+          {% if trigger.id == 'temp_frigo_alta' %}
+            ⚠️ Temperatura anomala nel frigorifero: rilevati {{ states('sensor.cucina_frigorifero_fridge_temperature') }}°C (soglia max 9°C da 15 min).
+          {% elif trigger.id == 'temp_freezer_alta' %}
+            ⚠️ Temperatura anomala nel freezer: rilevati {{ states('sensor.cucina_frigorifero_freezer_temperature') }}°C (soglia max -10°C da 15 min).
+          {% else %}
+            ⚠️ Il frigorifero Smart risulta disconnesso/irraggiungibile da 15 minuti. Verificare presa di corrente o Wi-Fi.
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "❄️ Allerta Frigorifero & Freezer"
+        messaggio: "{{ dettagli_frigo }}"
+        priorita: "alta"
+        categoria: "elettrodomestici"
+        tag: "frigo_anomalia_{{ trigger.id }}"
+        azioni:
+          - action: "URI"
+            title: "🧊 Apri Elettrodomestici"
+            uri: "/eco-home/elettrodomestici"
+
+- id: 'elettrodomestici_notifica_forno_sicurezza_ed_errori'
+  alias: "Elettrodomestici: Notifica Forno Smart (Sicurezza ed Errori)"
+  description: "Invia notifica di emergenza se il forno è acceso a casa vuota o se si verificano errori operativi."
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      to: 'armed_away'
+      id: casa_vuota_forno
+    - trigger: state
+      entity_id: binary_sensor.casa_occupata
+      to: 'off'
+      id: casa_vuota_forno
+    - trigger: state
+      entity_id:
+        - sensor.cucina_forno_machine_state
+        - sensor.cucina_forno_job_state
+      to:
+        - 'error'
+        - 'fault'
+      id: errore_forno
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_elettrodomestici
+      state: 'on'
+    - condition: template
+      value_template: >-
+        {% if trigger.id == 'casa_vuota_forno' %}
+          {{ states('sensor.cucina_forno_machine_state') not in ['stop', 'off', 'ready', 'unavailable', 'unknown', 'standby']
+             or states('sensor.cucina_forno_job_state') in ['cooking', 'preheating', 'baking', 'roasting'] }}
+        {% else %}
+          true
+        {% endif %}
+  actions:
+    - variables:
+        titolo_forno: >-
+          {% if trigger.id == 'casa_vuota_forno' %}
+            🚨 PERICOLO: Forno Acceso a Casa Vuota!
+          {% else %}
+            ⚠️ Errore o Anomalia Forno Smart
+          {% endif %}
+        msg_forno: >-
+          {% if trigger.id == 'casa_vuota_forno' %}
+            Tutti sono usciti ma il forno risulta in funzione a {{ states('sensor.cucina_forno_temperatura') | default('?', true) }}°C (Setpoint: {{ states('sensor.cucina_forno_setpoint') | default('?', true) }}°C)! Spegnilo immediatamente tramite il pulsante rapido sottostante.
+          {% else %}
+            Il forno Smart segnala uno stato di errore ({{ trigger.to_state.state }}). Verificare il display o l'interno della cavità.
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "{{ titolo_forno }}"
+        messaggio: "{{ msg_forno }}"
+        priorita: "alta"
+        categoria: "elettrodomestici"
+        tag: "forno_avviso_sicurezza"
+        azioni:
+          - action: "ARRESTA_FORNO"
+            title: "🛑 Spegni Forno"
+          - action: "URI"
+            title: "📱 Apri Forno"
+            uri: "/eco-home/elettrodomestici"
+
+- id: 'elettrodomestici_notifica_forno_avanzamento'
+  alias: "Elettrodomestici: Notifica Preriscaldamento e Fine Cottura Forno"
+  description: "Invia una notifica quando il forno termina il preriscaldamento o completa la cottura."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: sensor.cucina_forno_job_state
+      from: preheat
+      to: cooking
+      id: preriscaldamento_completato
+    - trigger: state
+      entity_id: sensor.cucina_forno_job_state
+      to: finished
+      id: cottura_terminata
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_elettrodomestici
+      state: 'on'
+  actions:
+    - variables:
+        titolo_cottura: >-
+          {% if trigger.id == 'preriscaldamento_completato' %}
+            ♨️ Forno: Preriscaldamento Completato
+          {% else %}
+            🍽️ Forno: Cottura Terminata
+          {% endif %}
+        msg_cottura: >-
+          {% if trigger.id == 'preriscaldamento_completato' %}
+            Il forno ha raggiunto la temperatura impostata ({{ states('sensor.cucina_forno_setpoint') | default(states('sensor.cucina_forno_temperatura'), true) }}°C). Puoi infornare!
+          {% else %}
+            Il ciclo di cottura del forno è terminato. Ricordati di estrarre la teglia.
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "{{ titolo_cottura }}"
+        messaggio: "{{ msg_cottura }}"
+        priorita: "normale"
+        categoria: "elettrodomestici"
+        tag: "forno_avanzamento"
+        azioni:
+          - action: "URI"
+            title: "📱 Dettagli Forno"
+            uri: "/eco-home/elettrodomestici"
+
+- id: 'elettrodomestici_notifica_piano_induzione_sicurezza'
+  alias: "Elettrodomestici: Notifica Piano Cottura Induzione (Sicurezza)"
+  description: "Notifica se il piano a induzione viene dimenticato acceso a casa vuota o per oltre 2.5 ore continuative."
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: state
+      entity_id: alarm_control_panel.sicurezza_eco_home
+      to: 'armed_away'
+      id: induzione_casa_vuota
+    - trigger: state
+      entity_id: binary_sensor.casa_occupata
+      to: 'off'
+      id: induzione_casa_vuota
+    - trigger: state
+      entity_id: binary_sensor.cucina_piano_cottura_potenza
+      to: 'on'
+      for:
+        minutes: 150
+      id: induzione_tempo_prolungato
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_elettrodomestici
+      state: 'on'
+    - condition: template
+      value_template: >-
+        {% if trigger.id == 'induzione_casa_vuota' %}
+          {{ is_state('binary_sensor.cucina_piano_cottura_potenza', 'on') }}
+        {% else %}
+          true
+        {% endif %}
+  actions:
+    - variables:
+        msg_induzione: >-
+          {% if trigger.id == 'induzione_casa_vuota' %}
+            🚨 PERICOLO: Tutti sono usciti di casa ma il piano cottura a induzione risulta ACCESO! Verificare con urgenza.
+          {% else %}
+            ⚠️ Il piano cottura a induzione è attivo ininterrottamente da oltre 2 ore e mezza. Verificare che non sia rimasto incustodito.
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "🍳 Allerta Piano Cottura Induzione"
+        messaggio: "{{ msg_induzione }}"
+        priorita: "alta"
+        categoria: "elettrodomestici"
+        tag: "induzione_sicurezza"
+        azioni:
+          - action: "URI"
+            title: "🍳 Controlla Cucina"
+            uri: "/eco-home/elettrodomestici"
+
+- id: 'elettrodomestici_notifica_asciugatrice_errori'
+  alias: "Elettrodomestici: Notifica Errori e Blocchi Asciugatrice"
+  description: "Invia una notifica se l'asciugatrice va in errore o si disconnette durante il funzionamento."
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: state
+      entity_id:
+        - sensor.esterno_asciugatrice_machine_state
+        - sensor.esterno_asciugatrice_job_state
+      to:
+        - 'error'
+        - 'fault'
+      id: errore_asciugatrice
+    - trigger: state
+      entity_id: sensor.esterno_asciugatrice_machine_state
+      to: 'unavailable'
+      for:
+        minutes: 10
+      id: disconnessa_asciugatrice
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_elettrodomestici
+      state: 'on'
+  actions:
+    - variables:
+        msg_dryer: >-
+          {% if trigger.id == 'errore_asciugatrice' %}
+            L'asciugatrice esterna segnala un errore o blocco ciclo ({{ trigger.to_state.state }}). Verificare il filtro lanugine.
+          {% else %}
+            L'asciugatrice esterna risulta disconnessa da oltre 10 minuti. Verificare la connessione.
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "⚠️ Avviso Asciugatrice Esterna"
+        messaggio: "{{ msg_dryer }}"
+        priorita: "alta"
+        categoria: "elettrodomestici"
+        tag: "asciugatrice_errore"
+        azioni:
+          - action: "URI"
+            title: "🧺 Apri Asciugatrice"
+            uri: "/eco-home/elettrodomestici"
+
+- id: 'elettrodomestici_notifica_asciugatrice_fine_ciclo'
+  alias: "Elettrodomestici: Notifica Fine Ciclo Asciugatrice"
+  description: "Invia una notifica quando l'asciugatrice completa il ciclo di asciugatura (con promemoria pulizia filtro lanugine)."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: sensor.esterno_asciugatrice_job_state
+      from:
+        - drying
+        - cooling
+        - wrinkle_prevent
+      to: finished
+    - trigger: state
+      entity_id: binary_sensor.asciugatrice_in_funzione
+      from: 'on'
+      to: 'off'
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_elettrodomestici
+      state: 'on'
+    - condition: template
+      value_template: >-
+        {{ this.attributes.last_triggered is none or (now() - this.attributes.last_triggered).total_seconds() > 300 }}
+  actions:
+    - action: script.notifica_smart
+      data:
+        titolo: "🧺 Asciugatrice: Ciclo Terminato"
+        messaggio: "Il ciclo di asciugatura è terminato. I capi sono pronti! Ricordati di pulire il filtro lanugine."
+        priorita: "normale"
+        categoria: "elettrodomestici"
+        tag: "asciugatrice_fine_ciclo"
+        azioni:
+          - action: "URI"
+            title: "🧺 Dettagli Asciugatrice"
+            uri: "/eco-home/elettrodomestici"
+
+- id: 'elettrodomestici_notifica_shelfy_e_dobby_manutenzione'
+  alias: "Elettrodomestici: Notifiche Manutenzione Shelfy & Dobby"
+  description: "Invia avvisi quando il filtro di Shelfy è da lavare o la batteria è scarica, o quando i componenti di Dobby sono usurati/pieni."
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.cucina_vitesyshelfy_giorni_alla_pulizia_filtro
+      below: 1
+      id: shelfy_filtro
+    - trigger: numeric_state
+      entity_id: sensor.cucina_shelfy_frigo_batteria
+      below: 15
+      id: shelfy_batteria
+    - trigger: numeric_state
+      entity_id:
+        - sensor.dobby_filter_left
+        - sensor.dobby_main_brush_left
+        - sensor.dobby_side_brush_left
+        - sensor.dobby_sensor_dirty_left
+      below: 10
+      id: dobby_ricambio
+    - trigger: state
+      entity_id: sensor.dobby_dirty_water_tank_status
+      to:
+        - 'full'
+        - 'error'
+        - 'not_installed_or_full'
+      id: dobby_acqua_sporca
+    - trigger: state
+      entity_id: sensor.dobby_dust_bag_status
+      to:
+        - 'full'
+        - 'error'
+        - 'not_installed'
+      id: dobby_sacchetto
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_elettrodomestici
+      state: 'on'
+  actions:
+    - variables:
+        titolo_man: >-
+          {% if 'shelfy' in trigger.id %}🧼 Shelfy Frigo: Manutenzione{% else %}🧹 Dobby: Manutenzione Accessori{% endif %}
+        msg_man: >-
+          {% if trigger.id == 'shelfy_batteria' %}
+            La batteria del purificatore Shelfy nel frigo è quasi scarica ({{ states('sensor.cucina_shelfy_frigo_batteria') }}%). Ricaricare il dispositivo.
+          {% elif trigger.id == 'shelfy_filtro' %}
+            Il filtro fotocatalitico di Shelfy nel frigorifero richiede il lavaggio periodico consigliato.
+          {% elif trigger.id == 'dobby_acqua_sporca' %}
+            Il serbatoio delle acque sporche nella stazione base di Dobby è pieno o non inserito. Svuotarlo per consentire il lavaggio dei moci.
+          {% elif trigger.id == 'dobby_sacchetto' %}
+            Il sacchetto della polvere nella stazione base di Dobby è pieno o assente. Verificare il sacchetto raccoglipolvere.
+          {% else %}
+            Uno degli accessori di Dobby ({{ trigger.to_state.name | default('Filtro o Spazzole') }}) ha raggiunto un livello di usura inferiore al 10% (residuo: {{ trigger.to_state.state }}%). Verificare o sostituire l'accessorio.
+          {% endif %}
+    - action: script.notifica_smart
+      data:
+        titolo: "{{ titolo_man }}"
+        messaggio: "{{ msg_man }}"
+        priorita: "normale"
+        categoria: "elettrodomestici"
+        tag: "manutenzione_{{ trigger.id }}"
+        azioni:
+          - action: "URI"
+            title: "📱 Apri Dettagli"
+            uri: "/eco-home/elettrodomestici"
+
+- id: 'elettrodomestici_azioni_notifiche_smartphone'
+  alias: "Elettrodomestici: Azioni da Notifiche Smartphone (Arresta Forno)"
+  description: "Intercetta i tocchi sui pulsanti di notifica interattiva per arrestare il forno Smart."
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: ARRESTA_FORNO
+  actions:
+    - action: button.press
+      target:
+        entity_id: button.cucina_forno_ferma
+
+- id: 'energia_preallarme_sovraccarico_6kw'
+  alias: "Energia: Preallarme Sovraccarico Contatore 6 kW"
+  description: "Avvisa vocalmente e su smartphone se l'assorbimento supera i 5.8 kW per 40 secondi, prevenendo lo scatto del contatore."
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.potenza_totale_istantanea_casa
+      above: 5800
+      for:
+        seconds: 40
+  conditions:
+    - condition: state
+      entity_id: input_boolean.notifiche_energia_contatore
+      state: 'on'
+  actions:
+    - variables:
+        p_val: "{{ states('sensor.potenza_totale_istantanea_casa') }}"
+        kw_val: "{{ (states('sensor.potenza_totale_istantanea_casa') | float(0) / 1000) | round(1) }}"
+    - parallel:
+        - action: script.notifica_smart
+          data:
+            titolo: "⚡ ALLERTA POTENZA: Rischio Distacco 6 kW!"
+            messaggio: "Assorbimento totale a {{ p_val }} W ({{ kw_val }} kW su 6 kW max)! Ridurre i carichi (forno, induzione, clima o asciugatrice) per evitare lo scatto del contatore."
+            priorita: "alta"
+            categoria: "energia"
+            tag: "allarme_sovraccarico_6kw"
+            azioni:
+              - action: "URI"
+                title: "📊 Dettagli Consumi"
+                uri: "/eco-home/elettrodomestici"
+        - sequence:
+            - condition: state
+              entity_id: input_boolean.annunci_vocali_cucina
+              state: 'on'
+            - condition: time
+              after: '08:00:00'
+              before: '22:30:00'
+            - action: tts.google_translate_say
+              target:
+                entity_id:
+                  - media_player.nest_hub_sala
+                  - media_player.nest_hub_camera
+              data:
+                message: "Attenzione Utente 1 e Utente 2! Assorbimento elettrico a {{ kw_val }} kilowatt. Rischio di scatto imminente del contatore da 6 kilowatt. Spegnere o ridurre gli apparati ad alto consumo."
+
